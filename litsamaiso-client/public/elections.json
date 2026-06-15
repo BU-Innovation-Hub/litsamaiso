@@ -1,0 +1,71 @@
+[
+  {
+    "title": "2025 Student Council Elections",
+    "description": "Vote for your student council representatives",
+    "startDate": "2025-11-12T00:00:00Z",
+    "endDate": "2025-11-14T23:59:59Z",
+    "isActive": true,
+    "positions": [
+      {
+        "name": "President",
+        "description": "Lead the student council",
+        "candidates": [
+          {
+            "name": "Thabo",
+            "description": "Committed to student welfare and academic excellence"
+          },
+          {
+            "name": "Thabiso",
+            "description": "Focused on campus development and community engagement"
+          }
+        ]
+      },
+      {
+        "name": "Vice President",
+        "description": "Support the president and lead special initiatives",
+        "candidates": [
+          {
+            "name": "Joel",
+            "description": "Passionate about student events and activities"
+          },
+          {
+            "name": "Bokang",
+            "description": "Dedicated to sports and wellness programs"
+          },
+          {
+            "name": "Katleho",
+            "description": "Advocate for student rights and representation"
+          }
+        ]
+      },
+      {
+        "name": "Academics Representative",
+        "description": "Represent students in academic matters",
+        "candidates": [
+          {
+            "name": "Lerato",
+            "description": "Focus on improving academic support services"
+          },
+          {
+            "name": "Puleng",
+            "description": "Committed to course curriculum improvement"
+          }
+        ]
+      },
+      {
+        "name": "Finance Officer",
+        "description": "Manage student council finances and budget",
+        "candidates": [
+          {
+            "name": "Poloko",
+            "description": "Experienced in financial management and transparency"
+          },
+          {
+            "name": "Mantina",
+            "description": "Expert in budgeting and resource allocation"
+          }
+        ]
+      }
+    ]
+  }
+]

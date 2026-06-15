@@ -1,0 +1,51 @@
+{
+    "name": "litsamaiso-api",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "index.js",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node ./dist/index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "@google/generative-ai": "^0.24.1",
+        "@react-email/components": "^1.0.12",
+        "@react-email/render": "^2.0.8",
+        "agenda": "^5.0.0",
+        "bcryptjs": "^3.0.3",
+        "cloudinary": "^2.6.1",
+        "cors": "^2.8.6",
+        "dotenv": "^17.4.2",
+        "express": "^5.2.1",
+        "jsonwebtoken": "^9.0.3",
+        "mongoose": "^9.6.2",
+        "multer": "^1.4.5-lts.1",
+        "nodemailer": "^8.0.9",
+        "react": "^19.2.7",
+        "react-dom": "^19.2.7",
+        "tesseract.js": "^2.1.5",
+        "xlsx": "^0.18.5"
+    },
+    "devDependencies": {
+        "@types/agenda": "^4.0.9",
+        "@types/bcryptjs": "^2.4.6",
+        "@types/cors": "^2.8.19",
+        "@types/express": "^5.0.6",
+        "@types/jsonwebtoken": "^9.0.10",
+        "@types/mongoose": "^5.11.96",
+        "@types/multer": "^2.1.0",
+        "@types/node": "^25.9.0",
+        "@types/nodemailer": "^8.0.0",
+        "@types/react": "^19.2.17",
+        "@types/react-dom": "^19.2.3",
+        "ts-node-dev": "^2.0.0",
+        "tsx": "^4.22.3",
+        "typescript": "^6.0.3"
+    }
+}
