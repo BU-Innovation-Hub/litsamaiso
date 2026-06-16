@@ -234,7 +234,7 @@ const UsersPage: React.FC = () => {
                           <div className="flex items-center gap-3">
                             {isAppAdmin && (
                               <button
-                                className="text-blue-600 hover:text-blue-900"
+                                className="text-primary-clr hover:text-active"
                                 title="Reset password"
                                 type="button"
                                 onClick={() => {
@@ -294,7 +294,7 @@ const UsersPage: React.FC = () => {
       )}
 
       {passwordTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">Reset password</h2>
             <p className="mt-2 text-sm text-gray-600">
@@ -338,7 +338,7 @@ const UsersPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handlePasswordReset}
-                className="rounded-md bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+                className="rounded-md bg-primary-clr px-4 py-2 font-semibold text-white hover:bg-active transition-colors"
               >
                 Update password
               </button>

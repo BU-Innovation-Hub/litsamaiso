@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
+import bcrypt from "bcryptjs";
 
 // Helper: get id string from ObjectId, populated doc, or string
 const idOf = (v: any): string | null => {
@@ -135,13 +136,25 @@ export const updateUser = async (
     return;
   }
 
-  const { email, role, studentId, faceDescriptor, faceImageUrl } =
+  const { email, role, studentId, faceDescriptor, faceImageUrl, password } =
     req.body as any;
 
   if (email) user.email = email;
   if (studentId) user.studentId = studentId;
   if (faceDescriptor) user.faceDescriptor = faceDescriptor;
   if (faceImageUrl) user.faceImageUrl = faceImageUrl;
+
+  // Password change: only allow when provided (admins perform resets)
+  if (password) {
+    const pw = String(password || "").trim();
+    if (pw.length < 6) {
+      res.status(400).json({ message: "Password must be at least 6 characters long" });
+      return;
+    }
+    const hashed = await bcrypt.hash(pw, 10);
+    // assign hashed password directly (password field is select:false)
+    (user as any).password = hashed;
+  }
 
   // Only AppAdmin can change role or institution
   const currentRole =
