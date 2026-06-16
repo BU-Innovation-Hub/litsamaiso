@@ -2,6 +2,7 @@ import { normalizeToRows, defaultFilename } from './utils';
 
 // Fallback PDF exporter using jsPDF + autotable to avoid @react-pdf/renderer peer issues.
 export const exportPdf = async ({ data, meta, filename, logoSrc }: { data: unknown; meta?: any; filename?: string; logoSrc?: string }) => {
+  void logoSrc;
   const name = filename || defaultFilename(meta?.title || meta?.reportKey || 'report', 'pdf');
   try {
     const { columns, rows } = normalizeToRows(data);
@@ -10,7 +11,7 @@ export const exportPdf = async ({ data, meta, filename, logoSrc }: { data: unkno
 
     // dynamic import to keep bundle small and avoid build-time peer issues
     const jsPDFModule = await import('jspdf');
-    const autoTableModule = await import('jspdf-autotable');
+    await import('jspdf-autotable');
     // jsPDF default export may be under default
     // @ts-ignore
     const jsPDF = (jsPDFModule && (jsPDFModule.jsPDF || jsPDFModule.default)) as any;
