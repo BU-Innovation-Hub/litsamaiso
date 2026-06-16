@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle, Clock, CreditCard, Filter, Receipt, Search, ShieldCheck, Upload, XCircle, Download, Edit } from 'lucide-react';
+import exportData from '../exporters';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { accountService, type AccountReports } from '../services/accountService';
@@ -38,6 +39,7 @@ const AccountsPage: React.FC = () => {
   const paidFileRef = useRef<HTMLInputElement | null>(null);
   const studentsFileRef = useRef<HTMLInputElement | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [issueList, setIssueList] = useState<any[] | null>(null);
   const [issuesLoading, setIssuesLoading] = useState(false);
 
@@ -601,11 +603,26 @@ const AccountsPage: React.FC = () => {
                         <Download className="w-4 h-4" /> Export
                       </button>
                       {showExportMenu && (
-                        <div className="absolute right-0 mt-2 w-56 rounded-md border bg-white shadow z-20">
-                          <button onClick={async () => { setShowExportMenu(false); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `reports_bundle_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(a); a.click(); a.remove(); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export reports')); } }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Full reports (JSON)</button>
-                          <div className="border-t" />
+                        <div className="absolute right-0 mt-2 w-72 rounded-md border bg-white shadow z-20 p-2">
+                          <div className="p-2">
+                            <div className="flex gap-2">
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export reports')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full JSON</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'csv', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full CSV</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'xlsx', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full XLSX</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'pdf', data, meta: { title: 'All Reports' }, logoSrc: '/logo-1.png' }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export PDF')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full PDF</button>
+                            </div>
+                          </div>
+                          <div className="border-t my-2" />
                           {reports?.catalog?.map((c) => (
-                            <button key={(c as any).key} onClick={async () => { setShowExportMenu(false); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); const blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `report_${(c as any).key}_${new Date().toISOString().split('T')[0]}.json`; document.body.appendChild(a); a.click(); a.remove(); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export report')); } }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50">{(c as any).title}</button>
+                            <div key={(c as any).key} className="px-3 py-2">
+                              <div className="text-sm font-medium">{(c as any).title}</div>
+                              <div className="mt-1 flex gap-2">
+                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export report')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">JSON</button>
+                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'csv', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">CSV</button>
+                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'xlsx', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">XLSX</button>
+                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'pdf', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope }, logoSrc: '/logo-1.png' }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export PDF')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">PDF</button>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       )}
