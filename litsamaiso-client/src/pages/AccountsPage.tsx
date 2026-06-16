@@ -1,11 +1,14 @@
-import React, { useCallback, useEffect, useState } from 'react';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle, Clock, CreditCard, FileUp, Filter, Receipt, Search, ShieldCheck, Upload, XCircle } from 'lucide-react';
+import { CheckCircle, Clock, CreditCard, Filter, Receipt, Search, ShieldCheck, Upload, XCircle, Download, Edit } from 'lucide-react';
+import exportData from '../exporters';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { accountService, type AccountReports } from '../services/accountService';
 import { institutionService } from '../services/institutionService';
 import { studentService } from '../services/studentService';
+import { issueService } from '../services/issueService';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getRoleName } from '../utils/userDisplay';
 import type { Account, Institution } from '../types';
@@ -29,6 +32,33 @@ const AccountsPage: React.FC = () => {
     correctedBankName: '',
     correctedAccountNumber: '',
     document: null as File | null,
+  });
+
+  const [activeTab, setActiveTab] = useState<'records' | 'issues'>('records');
+  const accountsFileRef = useRef<HTMLInputElement | null>(null);
+  const paidFileRef = useRef<HTMLInputElement | null>(null);
+  const studentsFileRef = useRef<HTMLInputElement | null>(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [issueList, setIssueList] = useState<any[] | null>(null);
+  const [issuesLoading, setIssuesLoading] = useState(false);
+
+  // issue service (student-scoped)
+  // lazy import to avoid circular deps - using local service
+  // we'll import at top of file
+
+  // UI state for selection, bulk actions and editing
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [isSelectAll, setIsSelectAll] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [editForm, setEditForm] = useState<Partial<Account>>({
+    fullnames: '',
+    contractNumber: '',
+    courseOfStudy: '',
+    bankName: '',
+    accountNumber: '',
+    status: 'pending',
   });
 
   const canViewReports = ['AppAdmin', 'InstitutionAdmin', 'Finance'].includes(role);
@@ -94,6 +124,25 @@ const AccountsPage: React.FC = () => {
 
     void loadInstitutions();
   }, [isAppAdmin]);
+
+  useEffect(() => {
+    const loadIssues = async () => {
+      if (activeTab !== 'issues') return;
+      if (role !== 'Student') return;
+      setIssuesLoading(true);
+      try {
+        const list = await issueService.listIssues();
+        setIssueList(list || []);
+      } catch (err: unknown) {
+        toast.error(getApiErrorMessage(err, 'Failed to load issues'));
+        setIssueList([]);
+      } finally {
+        setIssuesLoading(false);
+      }
+    };
+
+    void loadIssues();
+  }, [activeTab, role]);
 
   const handleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -179,8 +228,91 @@ const AccountsPage: React.FC = () => {
     }
   };
 
+  const handleSelectAll = () => {
+    if (isSelectAll) {
+      setSelectedAccountIds([]);
+      setIsSelectAll(false);
+    } else {
+      const ids = accounts.map((a) => a._id);
+      setSelectedAccountIds(ids);
+      setIsSelectAll(true);
+    }
+  };
+
+  const handleSelectAccount = (accountId: string) => {
+    setSelectedAccountIds((prev) => {
+      if (prev.includes(accountId)) return prev.filter((id) => id !== accountId);
+      return [...prev, accountId];
+    });
+  };
+
+  const handleBulkMarkAsPaid = async () => {
+    if (selectedAccountIds.length === 0) return;
+    try {
+      await Promise.all(selectedAccountIds.map((id) => accountService.updateAccount(id, { status: 'paid' } as any)));
+      toast.success(`Marked ${selectedAccountIds.length} accounts as paid`);
+      setSelectedAccountIds([]);
+      setIsSelectAll(false);
+      await Promise.all([loadAccountRows(), accountService.getReports({ institutionId: selectedInstitutionId || undefined }).then(setReports)]);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to mark selected accounts as paid'));
+    }
+  };
+
+  const openEditModal = (account: Account) => {
+    setEditingAccount(account);
+    setEditForm({
+      fullnames: account.fullnames,
+      contractNumber: account.contractNumber,
+      courseOfStudy: account.courseOfStudy,
+      bankName: account.bankName,
+      accountNumber: account.accountNumber,
+      status: account.status,
+    });
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingAccount(null);
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAccount) return;
+    try {
+      await accountService.updateAccount(editingAccount._id, editForm as any);
+      toast.success('Account updated');
+      closeEditModal();
+      await Promise.all([loadAccountRows(), accountService.getReports({ institutionId: selectedInstitutionId || undefined }).then(setReports)]);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to update account'));
+    }
+  };
+
+  const exportSelectedAsJson = () => {
+    const selected = accounts.filter((a) => selectedAccountIds.includes(a._id));
+    const blob = new Blob([JSON.stringify(selected, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `accounts_selected_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   const summary = reports?.reports.summary;
   const confirmedNotPaid = reports?.reports.confirmedNotPaid;
+
+  const percentages = useMemo(() => {
+    const total = summary?.total || 0;
+    if (total === 0) return { confirmed: 0, paid: 0, unconfirmed: 0 };
+    return {
+      confirmed: Math.round(((summary?.confirmed || 0) / total) * 1000) / 10,
+      paid: Math.round(((summary?.paid || 0) / total) * 1000) / 10,
+      unconfirmed: Math.round(((summary?.unconfirmed || 0) / total) * 1000) / 10,
+    };
+  }, [summary]);
 
   const getStatusLabel = (status?: string) => {
     const normalized = (status || 'pending').toLowerCase();
@@ -223,6 +355,13 @@ const AccountsPage: React.FC = () => {
           </p>
         </div>
 
+        <div className="bg-white rounded-md shadow-sm">
+          <nav className="flex items-center gap-6 px-4 py-3">
+            <button onClick={() => setActiveTab('records')} className={`text-sm font-medium ${activeTab === 'records' ? 'text-blue-600 border-b-2 border-blue-600 pb-2' : 'text-gray-600'}`}>Account Records</button>
+            <button onClick={() => setActiveTab('issues')} className={`text-sm font-medium ${activeTab === 'issues' ? 'text-blue-600 border-b-2 border-blue-600 pb-2' : 'text-gray-600'}`}>Issues Review</button>
+          </nav>
+        </div>
+
         {isAppAdmin && (
           <div className="rounded-lg bg-white p-6 shadow">
             <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -248,12 +387,115 @@ const AccountsPage: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'issues' && (
+          <div className="rounded-lg bg-white p-6 shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold text-gray-900">Issues</h2>
+                <p className="text-sm text-muted-foreground">Student-submitted issues and finance resolutions.</p>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              {role === 'Student' && (
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <button onClick={async () => { setIssuesLoading(true); try { const list = await issueService.listIssues(); setIssueList(list || []); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to refresh issues')); } finally { setIssuesLoading(false); } }} className="rounded-md bg-button px-3 py-2 text-white">Refresh</button>
+                    <button onClick={async () => { try { const res = await issueService.deleteIssuesForStudent(); toast.success(res.message || 'Deleted issues'); setIssueList([]); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to delete issues')); } }} className="rounded-md border border-gray-300 px-3 py-2">Delete all</button>
+                  </div>
+                  {issuesLoading ? (
+                    <p className="text-gray-500">Loading issues...</p>
+                  ) : !issueList || issueList.length === 0 ? (
+                    <p className="text-gray-500">No issues found</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Contract</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Bank</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Account</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Submitted</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {issueList.map((it) => (
+                            <tr key={(it as any)._id}>
+                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{(it as any).contractNumber}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{(it as any).bankName}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{(it as any).accountNumber}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{(it as any).status}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{new Date((it as any).createdAt).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {role === 'Finance' && (
+                <form className="max-w-md space-y-3" onSubmit={handleFinanceResolve}>
+                  <label className="text-sm font-medium">Resolve student issue</label>
+                  <input value={financeStudentId} onChange={(e) => setFinanceStudentId(e.target.value)} placeholder="Student ID" className="w-full rounded-md border border-gray-300 px-3 py-2" />
+                  <div className="flex gap-2">
+                    <button type="submit" className="rounded-md bg-button px-4 py-2 text-white">Resolve</button>
+                    <button type="button" onClick={() => setFinanceStudentId('')} className="rounded-md border px-4 py-2">Clear</button>
+                  </div>
+                </form>
+              )}
+
+              {role !== 'Student' && role !== 'Finance' && (
+                <p className="text-gray-600">Listing all student issues is not available on this API. Finance users can resolve issues by Student ID.</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showEditModal && editingAccount && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black opacity-40" onClick={closeEditModal} />
+            <div className="relative z-10 w-full max-w-2xl rounded-lg bg-white p-6 shadow-lg">
+              <h3 className="text-lg font-semibold">Edit account</h3>
+              <form onSubmit={handleEditSubmit} className="mt-4 space-y-4">
+                <div>
+                  <label className="text-sm text-gray-600">Fullnames</label>
+                  <input value={String(editForm.fullnames || '')} onChange={(e) => setEditForm((p) => ({ ...p, fullnames: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <input value={String(editForm.contractNumber || '')} onChange={(e) => setEditForm((p) => ({ ...p, contractNumber: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
+                  <input value={String(editForm.courseOfStudy || '')} onChange={(e) => setEditForm((p) => ({ ...p, courseOfStudy: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <input value={String(editForm.bankName || '')} onChange={(e) => setEditForm((p) => ({ ...p, bankName: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
+                  <input value={String(editForm.accountNumber || '')} onChange={(e) => setEditForm((p) => ({ ...p, accountNumber: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600">Status</label>
+                  <select value={String(editForm.status || 'pending')} onChange={(e) => setEditForm((p) => ({ ...p, status: e.target.value as any }))} className="w-full rounded-md border border-gray-300 px-3 py-2">
+                    <option value="pending">Pending</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="paid">Paid</option>
+                    <option value="erroneous">Erroneous</option>
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={closeEditModal} className="rounded-md border border-gray-300 px-4 py-2">Cancel</button>
+                  <button type="submit" className="rounded-md bg-active px-4 py-2 text-white">Save</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         {summary && (
           <div className="grid gap-4 md:grid-cols-4">
             <ReportCard label="Total Accounts" value={summary.total} />
-            <ReportCard label="Confirmed" value={summary.confirmed} />
-            <ReportCard label="Paid" value={summary.paid} />
-            <ReportCard label="Unconfirmed" value={summary.unconfirmed} />
+            <ReportCard label="Confirmed" value={summary.confirmed} percent={percentages.confirmed} />
+            <ReportCard label="Paid" value={summary.paid} percent={percentages.paid} />
+            <ReportCard label="Unconfirmed" value={summary.unconfirmed} percent={percentages.unconfirmed} />
           </div>
         )}
 
@@ -341,54 +583,67 @@ const AccountsPage: React.FC = () => {
           </div>
         )}
 
-        {role === 'Finance' && (
-          <div className="grid gap-4 lg:grid-cols-3">
-            <UploadPanel
-              title="Upload accounts"
-              description="Import the institution account spreadsheet used for student confirmations."
-              onChange={(event) => handleUpload(event, 'accounts')}
-            />
-            <UploadPanel
-              title="Upload paid students"
-              description="Load students whose payments have been processed."
-              onChange={(event) => handleUpload(event, 'paid')}
-            />
-            <form className="bg-white rounded-lg border border-border p-6 shadow-sm space-y-4" onSubmit={handleFinanceResolve}>
-              <CheckCircle className="text-active mb-2" size={32} />
-              <div>
-                <h2 className="text-xl font-semibold text-primary-clr mb-2">Resolve student issue</h2>
-                <p className="text-muted-foreground">
-                  Apply the pending correction submitted by a student.
-                </p>
-              </div>
-              <input
-                value={financeStudentId}
-                onChange={(event) => setFinanceStudentId(event.target.value)}
-                placeholder="Student ID"
-                required
-                className="w-full rounded-md border border-gray-300 px-3 py-2"
-              />
-              <button className="w-full rounded-md bg-button py-2 font-semibold text-white" type="submit">
-                Resolve issue
-              </button>
-            </form>
-          </div>
-        )}
+        {/* Finance upload panels and resolve controls are integrated into the table toolbar below */}
 
-        {canViewReports && (
+        {activeTab === 'records' && canViewReports && (
           <div className="rounded-lg bg-white shadow overflow-hidden">
             <div className="border-b px-6 py-4">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="font-semibold text-gray-900">Account Records</h2>
-                  <p className="text-sm text-muted-foreground">
-                    View uploaded accounts and track confirmation/payment status.
-                  </p>
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Account Records</h2>
+                    <p className="text-sm text-muted-foreground">
+                      View uploaded accounts and track confirmation/payment status.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="rounded bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">{accounts.length} loaded</span>
+                    <div className="relative">
+                      <button onClick={() => setShowExportMenu((s) => !s)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold">
+                        <Download className="w-4 h-4" /> Export
+                      </button>
+                      {showExportMenu && (
+                        <div className="absolute right-0 mt-2 w-72 rounded-md border bg-white shadow z-20 p-2">
+                          <div className="p-2">
+                            <div className="flex gap-2">
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export reports')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full JSON</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'csv', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full CSV</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'xlsx', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full XLSX</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'pdf', data, meta: { title: 'All Reports' }, logoSrc: '/logo-1.png' }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export PDF')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full PDF</button>
+                            </div>
+                          </div>
+                          <div className="border-t my-2" />
+                          {reports?.catalog?.map((c) => (
+                            <div key={(c as any).key} className="px-3 py-2">
+                              <div className="text-sm font-medium">{(c as any).title}</div>
+                              <div className="mt-1 flex gap-2">
+                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export report')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">JSON</button>
+                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'csv', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">CSV</button>
+                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'xlsx', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">XLSX</button>
+                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'pdf', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope }, logoSrc: '/logo-1.png' }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export PDF')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">PDF</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <button onClick={() => accountsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white">Import Accounts</button>
+                      <input ref={accountsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'accounts')} className="hidden" />
+                    </div>
+                    <div>
+                      <button onClick={() => paidFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Paid</button>
+                      <input ref={paidFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'paid')} className="hidden" />
+                    </div>
+                    {isAppAdmin || role === 'InstitutionAdmin' ? (
+                      <div>
+                        <button onClick={() => studentsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Students</button>
+                        <input ref={studentsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'students')} className="hidden" />
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-                <span className="rounded bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-                  {accounts.length} loaded
-                </span>
-              </div>
             </div>
 
             <div className="space-y-4 border-b p-6">
@@ -467,30 +722,50 @@ const AccountsPage: React.FC = () => {
               </div>
             </div>
 
+            {selectedAccountIds.length > 0 && (
+              <div className="flex items-center justify-between px-6 py-3 border-b bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">{selectedAccountIds.length} selected</span>
+                  <button onClick={handleBulkMarkAsPaid} className="inline-flex items-center gap-2 rounded-md bg-active px-3 py-1 text-white text-sm font-semibold">Mark as paid</button>
+                  <button onClick={exportSelectedAsJson} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm font-semibold">Export JSON</button>
+                </div>
+                <div>
+                  <button onClick={() => { setSelectedAccountIds([]); setIsSelectAll(false); }} className="text-sm text-gray-600">Clear selection</button>
+                </div>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                      <input type="checkbox" checked={isSelectAll} onChange={handleSelectAll} />
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Student</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Contract</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Bank Details</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Batch</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Dates</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {accountsLoading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">Loading accounts...</td>
+                      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">Loading accounts...</td>
                     </tr>
                   ) : accounts.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">No accounts found</td>
+                      <td colSpan={8} className="px-6 py-8 text-center text-gray-500">No accounts found</td>
                     </tr>
                   ) : (
                     accounts.map((account) => (
                       <tr key={account._id}>
+                        <td className="px-4 py-4">
+                          <input type="checkbox" checked={selectedAccountIds.includes(account._id)} onChange={() => handleSelectAccount(account._id)} />
+                        </td>
                         <td className="whitespace-nowrap px-6 py-4">
                           <p className="text-sm font-medium text-gray-900">{account.fullnames}</p>
                           <p className="text-sm text-gray-500">{account.courseOfStudy}</p>
@@ -533,6 +808,16 @@ const AccountsPage: React.FC = () => {
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                           <p>Confirmed: {account.confirmationDate ? new Date(account.confirmationDate).toLocaleDateString() : '-'}</p>
                           <p>Paid: {account.paidAt || account.paidDate ? new Date(account.paidAt || account.paidDate || '').toLocaleDateString() : '-'}</p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            <button onClick={() => openEditModal(account)} className="rounded-md p-2 hover:bg-gray-100">
+                              <Edit className="h-4 w-4 text-gray-700" />
+                            </button>
+                            <button onClick={() => { const b = new Blob([JSON.stringify(account, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `account_${account.contractNumber || account._id}.json`; document.body.appendChild(a); a.click(); a.remove(); }} className="rounded-md p-2 hover:bg-gray-100">
+                              <Download className="h-4 w-4 text-gray-700" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -577,33 +862,43 @@ const AccountsPage: React.FC = () => {
   );
 };
 
-const ReportCard = ({ label, value }: { label: string; value: number }) => (
+const ReportCard = ({ label, value, percent }: { label: string; value: number; percent?: number }) => (
   <div className="rounded-lg bg-white p-6 shadow">
     <p className="text-sm font-medium text-gray-600">{label}</p>
-    <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
+    <div className="flex items-baseline justify-between">
+      <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
+      {typeof percent === 'number' && (
+        <p className="text-sm text-gray-500">{percent}%</p>
+      )}
+    </div>
+    {typeof percent === 'number' && (
+      <div className="mt-3 h-2 w-full rounded-full bg-gray-100">
+        <div className="h-2 rounded-full bg-active" style={{ width: `${Math.max(0, Math.min(100, percent))}%` }} />
+      </div>
+    )}
   </div>
 );
 
-const UploadPanel = ({
-  title,
-  description,
-  onChange,
-}: {
-  title: string;
-  description: string;
-  onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-}) => (
-  <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
-    <FileUp className="text-active mb-4" size={32} />
-    <h2 className="text-xl font-semibold text-primary-clr mb-2">{title}</h2>
-    <p className="text-muted-foreground mb-5">{description}</p>
-    <input
-      type="file"
-      accept=".xlsx,.xls,.csv"
-      onChange={onChange}
-      className="block w-full text-sm"
-    />
-  </div>
-);
+// const UploadPanel = ({
+//   title,
+//   description,
+//   onChange,
+// }: {
+//   title: string;
+//   description: string;
+//   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+// }) => (
+//   <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
+//     <FileUp className="text-active mb-4" size={32} />
+//     <h2 className="text-xl font-semibold text-primary-clr mb-2">{title}</h2>
+//     <p className="text-muted-foreground mb-5">{description}</p>
+//     <input
+//       type="file"
+//       accept=".xlsx,.xls,.csv"
+//       onChange={onChange}
+//       className="block w-full text-sm"
+//     />
+//   </div>
+// );
 
 export default AccountsPage;

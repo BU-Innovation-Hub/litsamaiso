@@ -114,6 +114,11 @@ export const accountService = {
     return response.data;
   },
 
+  getReport: async (reportKey: string, params?: { institutionId?: string; stuckDays?: number; recentDays?: number }) => {
+    const response = await apiClient.get(`/reports/accounts/${encodeURIComponent(reportKey)}`, { params });
+    return response.data;
+  },
+
   submitCorrection: async (data: {
     correctedBankName: string;
     correctedAccountNumber: string;
