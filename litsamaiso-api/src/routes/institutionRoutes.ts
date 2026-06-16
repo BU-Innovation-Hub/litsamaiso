@@ -16,6 +16,9 @@ router.post("/", requireRole("AppAdmin"), institutionController.createInstitutio
 // PUT /institutions/:id - update an institution (AppAdmin)
 router.put("/:id", requireRole("AppAdmin"), institutionController.updateInstitution);
 
+// DELETE /institutions/:id - delete an institution and related data (AppAdmin)
+router.delete("/:id", requireRole("AppAdmin"), institutionController.deleteInstitution);
+
 // POST /institutions/:id/lock - lock an institution (AppAdmin)
 router.post("/:id/lock", requireRole("AppAdmin"), institutionController.lockInstitution);
 

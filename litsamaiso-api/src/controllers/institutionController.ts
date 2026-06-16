@@ -2,6 +2,13 @@ import type { Request, Response } from "express";
 import { Institution } from "../models/Institution.js";
 import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
+import { Student } from "../models/Student.js";
+import { Account } from "../models/Account.js";
+import { Election } from "../models/Election.js";
+import { Candidate } from "../models/Candidate.js";
+import { Position } from "../models/Position.js";
+import { Ballot } from "../models/Ballot.js";
+import { ResultSnapshot } from "../models/ResultSnapshot.js";
 import bcrypt from "bcryptjs";
 
 // List institutions (AppAdmin)
@@ -315,4 +322,66 @@ export const unlockInstitution = async (req: Request, res: Response): Promise<vo
   }
 };
 
-export default { listInstitutions, updateInstitution, getInstitutionUsers, createInstitutionRoleUser, lockInstitution, unlockInstitution };
+export const deleteInstitution = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const institution = await Institution.findById(id);
+    if (!institution) {
+      res.status(404).json({ message: 'Institution not found' });
+      return;
+    }
+
+    const currentUser = (req as any).user;
+    const currentRole = (currentUser?.role && (currentUser.role as any).name) || (currentUser?.role as string);
+    if (String(currentRole) !== 'AppAdmin') {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    // Delete users, students, accounts belonging to institution
+    const usersRes = await User.deleteMany({ institution: id });
+    const studentsRes = await Student.deleteMany({ institution: id });
+    const accountsRes = await Account.deleteMany({ institution: id });
+
+    // Find elections for this institution and delete related election data
+    const elections = await Election.find({ institution: id }).select('_id').lean();
+    const electionIds = elections.map((e: any) => e._id).filter(Boolean);
+
+    let positionsRes: any = { deletedCount: 0 };
+    let candidatesRes: any = { deletedCount: 0 };
+    let ballotsRes: any = { deletedCount: 0 };
+    let snapshotsRes: any = { deletedCount: 0 };
+    let electionsRes: any = { deletedCount: 0 };
+
+    if (electionIds.length > 0) {
+      positionsRes = await Position.deleteMany({ electionId: { $in: electionIds } });
+      candidatesRes = await Candidate.deleteMany({ electionId: { $in: electionIds } });
+      ballotsRes = await Ballot.deleteMany({ electionId: { $in: electionIds } });
+      snapshotsRes = await ResultSnapshot.deleteMany({ electionId: { $in: electionIds } });
+      electionsRes = await Election.deleteMany({ _id: { $in: electionIds } });
+    }
+
+    // Finally delete the institution
+    await institution.deleteOne();
+
+    res.json({
+      message: 'Institution deleted',
+      deleted: {
+        institutions: 1,
+        users: usersRes.deletedCount || 0,
+        students: studentsRes.deletedCount || 0,
+        accounts: accountsRes.deletedCount || 0,
+        elections: electionsRes.deletedCount || 0,
+        positions: positionsRes.deletedCount || 0,
+        candidates: candidatesRes.deletedCount || 0,
+        ballots: ballotsRes.deletedCount || 0,
+        resultSnapshots: snapshotsRes.deletedCount || 0,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || 'Failed to delete institution' });
+  }
+};
+
+export default { listInstitutions, createInstitution, updateInstitution, getInstitutionUsers, createInstitutionRoleUser, lockInstitution, unlockInstitution, deleteInstitution };
