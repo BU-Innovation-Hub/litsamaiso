@@ -430,20 +430,25 @@ const AccountsPage: React.FC = () => {
                     </option>
                   ))}
                 </select>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="date"
-                    value={accountStartDate}
-                    onChange={(event) => setAccountStartDate(event.target.value)}
-                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-                  />
-                  <span className="text-gray-500">to</span>
-                  <input
-                    type="date"
-                    value={accountEndDate}
-                    onChange={(event) => setAccountEndDate(event.target.value)}
-                    className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-                  />
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-2">
+                    <label className="text-xs text-gray-500 lg:mr-2">From</label>
+                    <input
+                      type="date"
+                      value={accountStartDate}
+                      onChange={(event) => setAccountStartDate(event.target.value)}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-2">
+                    <label className="text-xs text-gray-500 lg:mr-2">To</label>
+                    <input
+                      type="date"
+                      value={accountEndDate}
+                      onChange={(event) => setAccountEndDate(event.target.value)}
+                      className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
                 {(accountStatus || accountBatch || accountStartDate || accountEndDate) && (
                   <button

@@ -86,7 +86,14 @@ export const listAccounts = async (req: Request, res: Response) => {
     }
 
     if (params.status) {
-      q.status = String(params.status).trim();
+      const s = String(params.status).trim();
+      // frontend uses 'pending' to mean the default 'undefined' status
+      if (s.toLowerCase() === 'pending') {
+        q.status = 'undefined';
+      } else {
+        // allow case-insensitive match for other statuses
+        q.status = new RegExp(`^${s}$`, 'i');
+      }
     }
 
     if (params.batchNumber) {
