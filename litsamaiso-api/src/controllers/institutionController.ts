@@ -311,7 +311,7 @@ export const unlockInstitution = async (req: Request, res: Response): Promise<vo
     }
 
     institution.locked = false;
-    institution.lockedReason = undefined;
+    (institution as any).lockedReason = undefined;
     institution.lockedAt = undefined as any;
 
     await institution.save();
@@ -339,13 +339,16 @@ export const deleteInstitution = async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    // Use the institution's ObjectId for queries
+    const instId = (institution as any)._id;
+
     // Delete users, students, accounts belonging to institution
-    const usersRes = await User.deleteMany({ institution: id });
-    const studentsRes = await Student.deleteMany({ institution: id });
-    const accountsRes = await Account.deleteMany({ institution: id });
+    const usersRes = await User.deleteMany({ institution: instId } as any);
+    const studentsRes = await Student.deleteMany({ institution: instId } as any);
+    const accountsRes = await Account.deleteMany({ institution: instId } as any);
 
     // Find elections for this institution and delete related election data
-    const elections = await Election.find({ institution: id }).select('_id').lean();
+    const elections = await Election.find({ institution: instId } as any).select('_id').lean();
     const electionIds = elections.map((e: any) => e._id).filter(Boolean);
 
     let positionsRes: any = { deletedCount: 0 };

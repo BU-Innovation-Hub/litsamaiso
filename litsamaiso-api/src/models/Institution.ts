@@ -4,8 +4,8 @@ export interface InstitutionDocument {
   name: string;
   email: string;
   locked?: boolean;
-  lockedReason?: string;
-  lockedAt?: Date;
+  lockedReason?: string | undefined;
+  lockedAt?: Date | undefined;
 }
 
 const institutionSchema = new Schema<InstitutionDocument>(

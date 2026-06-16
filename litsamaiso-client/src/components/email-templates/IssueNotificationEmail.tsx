@@ -1,4 +1,3 @@
-import React from "react";
 import BaseEmail from "./BaseEmail";
 import { Text, Link, Row, Column } from "@react-email/components";
 
