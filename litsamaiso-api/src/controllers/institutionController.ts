@@ -196,7 +196,7 @@ export const getInstitutionUsers = async (req: Request, res: Response): Promise<
 export const createInstitutionRoleUser = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { name, email, password, role } = req.body as any;
+    const { name, email, password, role, studentId } = req.body as any;
 
     if (!email || !password || !role) {
       res.status(400).json({ message: "name, email, password and role are required" });
@@ -235,6 +235,14 @@ export const createInstitutionRoleUser = async (req: Request, res: Response): Pr
       return;
     }
 
+    if (studentId && typeof studentId === 'string' && String(studentId).trim()) {
+      const existingSid = await User.findOne({ studentId: String(studentId).trim() });
+      if (existingSid) {
+        res.status(409).json({ message: 'Student ID already exists' });
+        return;
+      }
+    }
+
     const roleDoc = await Role.findOne({ name: new RegExp(`^${String(role)}$`, "i") });
     if (!roleDoc) {
       const available = await Role.find().select("name -_id").lean();
@@ -254,6 +262,7 @@ export const createInstitutionRoleUser = async (req: Request, res: Response): Pr
     (newUser as any).role = roleId;
     (newUser as any).institution = instId;
     if (name) (newUser as any).name = name;
+    if (studentId) (newUser as any).studentId = String(studentId).trim();
     await newUser.save();
 
     res.status(201).json({ message: "Role user created", user: { id: newUser._id, email: newUser.email, role: roleDoc.name } });

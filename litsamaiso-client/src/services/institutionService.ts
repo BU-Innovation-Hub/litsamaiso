@@ -85,7 +85,8 @@ export const institutionService = {
       name?: string;
       email: string;
       password: string;
-      role: 'InstitutionAdmin' | 'Finance' | 'SAAD';
+      role: string;
+      studentId?: string;
     },
   ) => {
     const response = await apiClient.post<{ message: string; user: User }>(

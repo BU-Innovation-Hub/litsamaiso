@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { KeyRound, Search, Trash2, UserCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { userService } from '../services/userService';
-import type { Role, User } from '../types';
+import { institutionService } from '../services/institutionService';
+import type { Role, User, Institution } from '../types';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getInstitutionName, getRoleName } from '../utils/userDisplay';
 import { useAuth } from '../hooks/useAuth';
@@ -23,6 +24,16 @@ const UsersPage: React.FC = () => {
   const [passwordForm, setPasswordForm] = useState({
     password: '',
     confirmPassword: '',
+  });
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [institutions, setInstitutions] = useState<Institution[]>([]);
+  const [newUserForm, setNewUserForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: '',
+    institutionId: '',
+    studentId: '',
   });
 
   const loadUsers = useCallback(async () => {
@@ -63,6 +74,44 @@ const UsersPage: React.FC = () => {
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [loadUsers]);
+
+  const openCreateModal = async () => {
+    // prepare form defaults
+    const defaultRole = roles.find((r) => r.name !== 'AppAdmin' && r.name !== 'Student')?.name || roles[0]?.name || '';
+    if (isAppAdmin) {
+      try {
+        const insts = await institutionService.getInstitutions();
+        setInstitutions(insts || []);
+        setNewUserForm((prev) => ({ ...prev, role: defaultRole, institutionId: insts?.[0]?._id || '' }));
+      } catch (err: unknown) {
+        toast.error(getApiErrorMessage(err, 'Failed to load institutions'));
+        setNewUserForm((prev) => ({ ...prev, role: defaultRole }));
+      }
+    } else {
+      // InstitutionAdmin: set institution to current user's institution
+      const inst = currentUser?.institution as Institution | string | undefined;
+      const instId = typeof inst === 'string' ? inst : inst?._id || '';
+      setNewUserForm((prev) => ({ ...prev, role: defaultRole, institutionId: instId }));
+    }
+    setShowCreateModal(true);
+  };
+
+  const handleCreateUser = async () => {
+    const { name, email, password, role, institutionId, studentId } = newUserForm;
+    if (!email || !password || !role || !institutionId) {
+      toast.error('Email, password, role and institution are required');
+      return;
+    }
+    try {
+      await institutionService.createInstitutionRoleUser(institutionId, { name: name || undefined, email, password, role: role as string, studentId: studentId || undefined });
+      toast.success('User created');
+      setShowCreateModal(false);
+      setNewUserForm({ name: '', email: '', password: '', role: '', institutionId: '', studentId: '' });
+      await loadUsers();
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Failed to create user'));
+    }
+  };
 
   const roleCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -172,18 +221,29 @@ const UsersPage: React.FC = () => {
               />
             </div>
 
-            <select
-              value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
-              className="rounded-md border border-gray-300 px-3 py-2"
-            >
-              <option value="">All roles</option>
-              {roles.map((role) => (
-                <option key={role._id} value={role.name}>
-                  {role.name}
-                </option>
-              ))}
-            </select>
+            <div>
+              <select
+                value={roleFilter}
+                onChange={(event) => setRoleFilter(event.target.value)}
+                className="rounded-md border border-gray-300 px-3 py-2"
+              >
+                <option value="">All roles</option>
+                {roles.map((role) => (
+                  <option key={role._id} value={role.name}>
+                    {role.name}
+                  </option>
+                ))}
+              </select>
+              {(isAppAdmin || currentRole === 'InstitutionAdmin') && (
+                <button
+                  type="button"
+                  onClick={openCreateModal}
+                  className="ml-3 rounded-md bg-primary-clr px-3 py-2 font-semibold text-white hover:bg-active transition-colors"
+                >
+                  Create user
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -266,7 +326,7 @@ const UsersPage: React.FC = () => {
       </div>
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">Delete user</h2>
             <p className="mt-2 text-sm text-gray-600">
@@ -287,6 +347,104 @@ const UsersPage: React.FC = () => {
                 className="rounded-md bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700"
               >
                 Delete user
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Create user</h2>
+            <p className="mt-2 text-sm text-gray-600">Create a new user for the selected institution.</p>
+            <div className="mt-5 space-y-4">
+              {isAppAdmin && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Institution</label>
+                  <select
+                    value={newUserForm.institutionId}
+                    onChange={(e) => setNewUserForm((prev) => ({ ...prev, institutionId: e.target.value }))}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2"
+                  >
+                    <option value="">Select institution</option>
+                    {institutions.map((inst) => (
+                      <option key={inst._id} value={inst._id}>{inst.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Full name (optional)</label>
+                <input
+                  value={newUserForm.name}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+                <input
+                  value={newUserForm.email}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, email: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+                <input
+                  type="password"
+                  value={newUserForm.password}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, password: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Student ID (optional)</label>
+                <input
+                  value={newUserForm.studentId}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, studentId: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+                <select
+                  value={newUserForm.role}
+                  onChange={(e) => setNewUserForm((prev) => ({ ...prev, role: e.target.value }))}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2"
+                >
+                  <option value="">Select role</option>
+                  {roles
+                    .filter((r) => r.name !== 'AppAdmin')
+                    .map((role) => (
+                      <option key={role._id} value={role.name}>{role.name}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                  onClick={() => {
+                  setShowCreateModal(false);
+                  setNewUserForm({ name: '', email: '', password: '', role: '', institutionId: '', studentId: '' });
+                }}
+                className="rounded-md border px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateUser}
+                className="rounded-md bg-primary-clr px-4 py-2 font-semibold text-white hover:bg-active"
+              >
+                Create user
               </button>
             </div>
           </div>
