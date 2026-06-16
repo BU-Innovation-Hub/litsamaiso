@@ -3,6 +3,7 @@ import { model, Schema, type Types } from "mongoose";
 export interface UserDocument {
   email: string;
   password: string;
+  name?: string;
   role: Types.ObjectId;
   institution: Types.ObjectId;
   studentId?: string;
@@ -14,6 +15,7 @@ export interface UserDocument {
 
 const userSchema = new Schema<UserDocument>(
   {
+    name: { type: String, trim: true },
     email: { type: String, required: true, trim: true, unique: true },
     password: { type: String, required: true, select: false },
     role: { type: Schema.Types.ObjectId, ref: "Role", required: true },

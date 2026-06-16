@@ -61,10 +61,15 @@ export const listAccounts = async (req: Request, res: Response) => {
     // pagination / limit
     const limit = Math.min(parseInt(String(params.limit || "200"), 10) || 200, 2000);
 
-    // determine institution scope: AppAdmin may request any institution via institutionId
+    // determine institution scope:
+    // - AppAdmin: if `institutionId` query provided, scope to that; otherwise no institution filter (see all)
+    // - Others: scope to the user's institution
     let institutionFilter: any = {};
-    if (params.institutionId && (user.role && (user.role as any).name) === "AppAdmin") {
-      institutionFilter.institution = params.institutionId;
+    const userRoleName = (user.role && (user.role as any).name) || (user.role as string) || "";
+    if (String(userRoleName).toLowerCase() === "appadmin") {
+      if (params.institutionId) {
+        institutionFilter.institution = params.institutionId;
+      }
     } else {
       institutionFilter.institution = user.institution;
     }
@@ -81,7 +86,14 @@ export const listAccounts = async (req: Request, res: Response) => {
     }
 
     if (params.status) {
-      q.status = String(params.status).trim();
+      const s = String(params.status).trim();
+      // frontend uses 'pending' to mean the default 'undefined' status
+      if (s.toLowerCase() === 'pending') {
+        q.status = 'undefined';
+      } else {
+        // allow case-insensitive match for other statuses
+        q.status = new RegExp(`^${s}$`, 'i');
+      }
     }
 
     if (params.batchNumber) {

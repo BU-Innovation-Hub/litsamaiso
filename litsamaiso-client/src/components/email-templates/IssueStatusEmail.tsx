@@ -1,6 +1,5 @@
-import React from "react";
 import BaseEmail from "./BaseEmail";
-import { Text, Link } from "@react-email/components";
+import { Text } from "@react-email/components";
 
 type Issue = {
   _id?: string;

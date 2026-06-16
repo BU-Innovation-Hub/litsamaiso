@@ -14,6 +14,13 @@ router.get(
   userController.listUsers,
 );
 
+// GET /users/roles - list available roles
+router.get(
+  "/roles",
+  requireRole(["AppAdmin", "InstitutionAdmin"]),
+  userController.getRoles,
+);
+
 // GET /users/:id - get a single user
 router.get(
   "/:id",

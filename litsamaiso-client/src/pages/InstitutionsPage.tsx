@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, ChevronUp, KeyRound, Lock, Pencil, Plus, Search, Trash2, Unlock, Users } from 'lucide-react';
+import { Building2, ChevronUp, KeyRound, Lock, Pencil, LayersPlus, Search, Trash2, Unlock, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Institution, User } from '../types';
 import { institutionService, type InstitutionUsersResponse } from '../services/institutionService';
@@ -296,7 +296,7 @@ const InstitutionsPage: React.FC = () => {
         <div className="mb-8 grid gap-6 lg:grid-cols-[380px_1fr]">
           <form className="rounded-lg bg-white p-6 shadow space-y-4" onSubmit={handleSubmit}>
             <div className="flex items-center gap-3">
-              {editingId ? <Pencil className="h-6 w-6 text-blue-600" /> : <Plus className="h-6 w-6 text-purple-600" />}
+              {editingId ? <Pencil className="h-6 w-6 text-blue-600" /> : <LayersPlus className="h-6 w-6 text-primary-clr" />}
               <h2 className="text-lg font-semibold text-gray-900">
                 {editingId ? 'Edit Institution' : 'Create Institution'}
               </h2>
@@ -391,7 +391,7 @@ const InstitutionsPage: React.FC = () => {
                 institutions.map((institution) => (
                   <div key={institution._id} className="relative flex flex-wrap items-center justify-between gap-4 p-6">
                     <div className="flex items-center gap-3">
-                      <Building2 className="h-8 w-8 text-purple-600" />
+                      <Building2 className="h-8 w-8 text-primary-clr" />
                       <div>
                         <p className="font-semibold text-gray-900">{institution.name}</p>
                         <div className="flex flex-wrap items-center gap-2">
@@ -500,7 +500,7 @@ const InstitutionsPage: React.FC = () => {
       </div>
 
       {lockTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">
               {lockTarget.locked ? 'Unlock institution' : 'Lock institution'}
@@ -549,7 +549,7 @@ const InstitutionsPage: React.FC = () => {
       )}
 
       {usersTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
           <div className="flex max-h-[85vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl">
             <div className="border-b px-6 py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -791,7 +791,7 @@ const InstitutionsPage: React.FC = () => {
       )}
 
       {editUserTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/50 px-4">
           <form onSubmit={handleUpdateUser} className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">Edit user</h2>
             <p className="mt-1 text-sm text-gray-500">{editUserTarget.email}</p>
@@ -846,7 +846,7 @@ const InstitutionsPage: React.FC = () => {
       )}
 
       {passwordUserTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">Reset password</h2>
             <p className="mt-1 text-sm text-gray-500">{passwordUserTarget.email}</p>
@@ -890,7 +890,7 @@ const InstitutionsPage: React.FC = () => {
       )}
 
       {deleteUserTarget && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">Delete user</h2>
             <p className="mt-2 text-sm text-gray-600">
@@ -917,7 +917,7 @@ const InstitutionsPage: React.FC = () => {
       )}
 
       {deleteTarget && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 px-4">
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
             <h2 className="text-lg font-semibold text-gray-900">Delete institution</h2>
             <p className="mt-2 text-sm text-gray-600">
