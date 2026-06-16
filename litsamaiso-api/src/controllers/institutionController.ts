@@ -17,6 +17,76 @@ export const listInstitutions = async (
   }
 };
 
+export const createInstitution = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name, email, adminName, adminEmail, adminPassword } = req.body as any;
+
+    if (!name || !email) {
+      res.status(400).json({ message: 'name and email are required' });
+      return;
+    }
+
+    if (!adminEmail || !adminPassword) {
+      res.status(400).json({ message: 'adminEmail and adminPassword are required' });
+      return;
+    }
+
+    // Ensure unique institution email
+    const exists = await Institution.findOne({ email: String(email).trim() });
+    if (exists) {
+      res.status(409).json({ message: 'Institution email already exists' });
+      return;
+    }
+
+    // Ensure admin email not in use
+    const existingUser = await User.findOne({ email: String(adminEmail).trim() });
+    if (existingUser) {
+      res.status(409).json({ message: 'Admin user email already exists' });
+      return;
+    }
+
+    // Find InstitutionAdmin role
+    const roleDoc = await Role.findOne({ name: new RegExp('^InstitutionAdmin$', 'i') });
+    if (!roleDoc) {
+      const available = await Role.find().select('name -_id').lean();
+      const names = available.map((r: any) => r.name).join(', ');
+      res.status(500).json({ message: `Missing required role. Available roles: ${names}` });
+      return;
+    }
+
+    // Create institution
+    const institution = new Institution({ name: String(name).trim(), email: String(email).trim() });
+    await institution.save();
+
+    // Create admin user
+    const hashed = await bcrypt.hash(String(adminPassword), 10);
+    const adminUser = new User();
+    (adminUser as any).email = String(adminEmail).trim();
+    (adminUser as any).password = hashed;
+    (adminUser as any).role = (roleDoc as any)._id;
+    (adminUser as any).institution = (institution as any)._id;
+    if (adminName) (adminUser as any).name = adminName;
+    await adminUser.save();
+
+    res.status(201).json({
+      institution,
+      admin: { id: adminUser._id, email: adminUser.email, name: adminUser.name, role: (roleDoc as any).name, institution: institution._id },
+    });
+  } catch (err: any) {
+    // Attempt to cleanup institution if it was created
+    try {
+      const maybeEmail = (req.body as any)?.email;
+      if (maybeEmail) {
+        const inst = await Institution.findOne({ email: String(maybeEmail).trim() });
+        if (inst) await inst.deleteOne();
+      }
+    } catch (e) {
+      // ignore cleanup errors
+    }
+    res.status(500).json({ message: err.message || 'Failed to create institution' });
+  }
+};
+
 export const updateInstitution = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;

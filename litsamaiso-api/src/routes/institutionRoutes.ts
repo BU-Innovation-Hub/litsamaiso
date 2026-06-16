@@ -10,6 +10,9 @@ router.use(requireAuth);
 // GET /institutions - list institutions (AppAdmin only)
 router.get("/", requireRole("AppAdmin"), institutionController.listInstitutions);
 
+// POST /institutions - create an institution with first admin (AppAdmin)
+router.post("/", requireRole("AppAdmin"), institutionController.createInstitution);
+
 // PUT /institutions/:id - update an institution (AppAdmin)
 router.put("/:id", requireRole("AppAdmin"), institutionController.updateInstitution);
 
