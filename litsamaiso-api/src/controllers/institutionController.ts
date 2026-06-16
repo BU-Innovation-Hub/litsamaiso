@@ -83,7 +83,8 @@ export const getInstitutionUsers = async (req: Request, res: Response): Promise<
 
     const q: any = { institution: id };
     if (role && typeof role === "string" && role.trim()) {
-      const roleDoc = await Role.findOne({ name: role });
+      const r = role.trim();
+      const roleDoc = await Role.findOne({ name: new RegExp(`^${r}$`, "i") });
       if (roleDoc) q.role = roleDoc._id;
       else {
         res.json({ institution, users: [], roleCounts: [], total: 0 });

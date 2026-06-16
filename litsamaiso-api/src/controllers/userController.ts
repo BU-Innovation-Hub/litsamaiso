@@ -103,9 +103,36 @@ export const updateUser = async (
     (currentUser.role && (currentUser.role as any).name) ||
     (currentUser.role as string);
   if (currentRole === "AppAdmin") {
-    if (role) user.role = role;
-    if ((req.body as any).institution)
-      user.institution = (req.body as any).institution;
+    if (role) {
+      // role may be provided as an ObjectId string, an ObjectId, or a role name
+      if (typeof role === "string") {
+        const r = role.trim();
+        let roleDoc = null as any;
+        // try by id first (24 hex)
+        if (/^[0-9a-fA-F]{24}$/.test(r)) {
+          roleDoc = await Role.findById(r);
+        }
+        // fallback to case-insensitive name lookup
+        if (!roleDoc) {
+          roleDoc = await Role.findOne({ name: new RegExp(`^${r}$`, "i") });
+        }
+        if (!roleDoc) {
+          res.status(400).json({ message: "Role not found" });
+          return;
+        }
+        user.role = roleDoc._id;
+      } else if (typeof role === "object" && (role as any)._id) {
+        user.role = (role as any)._id;
+      } else {
+        user.role = role;
+      }
+    }
+
+    if ((req.body as any).institution) {
+      const inst = (req.body as any).institution;
+      // accept either id or populated object
+      user.institution = (inst && (inst._id || inst)) || inst;
+    }
   }
 
   await user.save();
