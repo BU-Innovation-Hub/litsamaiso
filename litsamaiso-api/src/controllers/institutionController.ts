@@ -168,18 +168,81 @@ export const createInstitutionRoleUser = async (req: Request, res: Response): Pr
 
     const hashed = await bcrypt.hash(password, 10);
 
-    const user = await User.create({
-      email,
-      password: hashed,
-      role: roleDoc._id,
-      institution: institution._id,
-      name: name || undefined,
-    });
+    const roleId = (roleDoc as any)._id;
+    const instId = (institution as any)._id;
 
-    res.status(201).json({ message: "Role user created", user: { id: user._id, email: user.email, role: roleDoc.name } });
+    const newUser = new User();
+    (newUser as any).email = email;
+    (newUser as any).password = hashed;
+    (newUser as any).role = roleId;
+    (newUser as any).institution = instId;
+    if (name) (newUser as any).name = name;
+    await newUser.save();
+
+    res.status(201).json({ message: "Role user created", user: { id: newUser._id, email: newUser.email, role: roleDoc.name } });
   } catch (err: any) {
     res.status(500).json({ message: err.message || "Failed to create role user" });
   }
 };
 
-export default { listInstitutions, updateInstitution, getInstitutionUsers, createInstitutionRoleUser };
+export const lockInstitution = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body as any;
+
+    const institution = await Institution.findById(id);
+    if (!institution) {
+      res.status(404).json({ message: 'Institution not found' });
+      return;
+    }
+
+    // Only AppAdmin may lock/unlock institutions
+    const currentUser = (req as any).user;
+    const currentRole = (currentUser?.role && (currentUser.role as any).name) || (currentUser?.role as string);
+    if (String(currentRole) !== 'AppAdmin') {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    institution.locked = true;
+    institution.lockedReason = reason || undefined;
+    institution.lockedAt = new Date();
+
+    await institution.save();
+
+    res.json({ institution });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || 'Failed to lock institution' });
+  }
+};
+
+export const unlockInstitution = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const institution = await Institution.findById(id);
+    if (!institution) {
+      res.status(404).json({ message: 'Institution not found' });
+      return;
+    }
+
+    const currentUser = (req as any).user;
+    const currentRole = (currentUser?.role && (currentUser.role as any).name) || (currentUser?.role as string);
+    if (String(currentRole) !== 'AppAdmin') {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    institution.locked = false;
+    institution.lockedReason = undefined;
+    institution.lockedAt = undefined as any;
+
+    await institution.save();
+
+    res.json({ institution });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || 'Failed to unlock institution' });
+  }
+};
+
+export default { listInstitutions, updateInstitution, getInstitutionUsers, createInstitutionRoleUser, lockInstitution, unlockInstitution };
