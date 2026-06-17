@@ -7,6 +7,7 @@ import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 import { requireDate, requireString, optionalString } from "../utils/validation.js";
 import { scheduleElectionJobs, scheduleCountJob } from "./electionScheduler.js";
+import { ensureDefaultSrcPositions } from "./positionService.js";
 
 const ensureEditable = (election: ElectionDocument): void => {
   if (["OPEN", "CLOSED", "COUNTING", "RESULTS_PUBLISHED", "ARCHIVED"].includes(election.status)) {
@@ -50,6 +51,10 @@ export const createElection = async (params: {
   };
 
   const election = await Election.create(payload);
+  await ensureDefaultSrcPositions({
+    user: params.user,
+    electionId: election._id.toString(),
+  });
 
   await recordAudit({
     action: "election.create",

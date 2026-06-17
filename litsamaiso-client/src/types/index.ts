@@ -84,6 +84,29 @@ export interface Position {
   displayOrder?: number;
 }
 
+export interface CandidateImportWarning {
+  rowNumber?: number;
+  column?: string;
+  message: string;
+}
+
+export interface CandidateImportSummary {
+  rowsRead: number;
+  parsedCandidates: number;
+  importedCandidates: number;
+  skippedCandidates: number;
+  warnings: CandidateImportWarning[];
+  mappedColumns: Array<{
+    position: string;
+    columns: Partial<Record<'candidate' | 'studentId' | 'party' | 'manifesto' | 'imageUrl' | 'approved', string>>;
+  }>;
+}
+
+export interface CandidateImportResult {
+  summary: CandidateImportSummary;
+  candidates: Candidate[];
+}
+
 export interface Election {
   _id: string;
   title: string;

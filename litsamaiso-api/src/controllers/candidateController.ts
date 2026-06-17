@@ -9,6 +9,7 @@ import {
   approveCandidate,
   disqualifyCandidate,
 } from "../services/candidateService.js";
+import { importCandidatesFromSpreadsheet } from "../services/candidateImportService.js";
 
 const handleError = (res: Response, err: any): void => {
   if (err instanceof AppError) {
@@ -117,6 +118,35 @@ export const disqualifyCandidateHandler = async (req: Request, res: Response) =>
     });
 
     res.json({ message: "Candidate disqualified", candidate });
+  } catch (err: any) {
+    handleError(res, err);
+  }
+};
+
+export const importCandidatesHandler = async (req: Request, res: Response) => {
+  try {
+    const file = (req as any).file as { buffer: Buffer; originalname?: string } | undefined;
+    if (!file || !file.buffer) {
+      res.status(400).json({ message: "Spreadsheet file is required" });
+      return;
+    }
+
+    const approveImported = ["true", "1", "yes"].includes(
+      String((req.body || {}).approveImported || "").toLowerCase(),
+    );
+
+    const result = await importCandidatesFromSpreadsheet({
+      user: (req as any).user,
+      electionId: req.params.electionId as string,
+      fileBuffer: file.buffer,
+      ...(file.originalname !== undefined && { fileName: file.originalname }),
+      approveImported,
+    });
+
+    res.status(201).json({
+      message: "Candidate import completed",
+      ...result,
+    });
   } catch (err: any) {
     handleError(res, err);
   }

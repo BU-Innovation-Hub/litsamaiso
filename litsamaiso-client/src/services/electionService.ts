@@ -1,5 +1,5 @@
 import apiClient from './authService';
-import type { Election, Position, Candidate, ResultPositionDetail, ResultSnapshot, Vote } from '../types';
+import type { Election, Position, Candidate, CandidateImportResult, ResultPositionDetail, ResultSnapshot, Vote } from '../types';
 
 export const electionService = {
   // Get all active elections for the current institution
@@ -129,6 +129,25 @@ export const electionService = {
       `/elections/positions/${positionId}/candidates`
     );
     return response.data.candidates;
+  },
+
+  importCandidates: async (
+    electionId: string,
+    file: File,
+    options?: { approveImported?: boolean }
+  ) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (options?.approveImported) {
+      formData.append('approveImported', 'true');
+    }
+
+    const response = await apiClient.post<CandidateImportResult>(
+      `/elections/${electionId}/candidates/import`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
   },
 
   // Cast a vote

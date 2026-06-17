@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Election } from "../models/Election.js";
 import { Position, type PositionDocument } from "../models/Position.js";
+import { SRC_POSITION_TEMPLATES, normalizePositionLabel } from "../constants/srcPositions.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 import { optionalString, requireNumber, requireString } from "../utils/validation.js";
@@ -68,6 +69,68 @@ export const createPosition = async (params: {
   });
 
   return position;
+};
+
+export const ensureDefaultSrcPositions = async (params: {
+  user?: any;
+  electionId: string;
+}): Promise<PositionDocument[]> => {
+  const election = await Election.findOne({
+    _id: params.electionId,
+    deletedAt: null,
+    ...(params.user?.institution && { institution: params.user.institution }),
+  });
+  if (!election) throw new AppError("Election not found", 404);
+
+  ensureEditable(election.status);
+
+  const existing = await Position.find({
+    electionId: election._id,
+    deletedAt: null,
+  }).sort({ displayOrder: 1 });
+
+  const existingTitleKeys = new Set(
+    existing.map((position) => normalizePositionLabel(position.title)),
+  );
+  const usedOrders = new Set(existing.map((position) => position.displayOrder));
+  const created: PositionDocument[] = [];
+
+  const nextAvailableOrder = (preferred: number): number => {
+    let order = preferred;
+    while (usedOrders.has(order)) order += 1;
+    usedOrders.add(order);
+    return order;
+  };
+
+  for (const template of SRC_POSITION_TEMPLATES) {
+    const titleKey = normalizePositionLabel(template.title);
+    if (existingTitleKeys.has(titleKey)) continue;
+
+    const position = await Position.create({
+      electionId: election._id,
+      title: template.title,
+      description: template.description,
+      maxVotesAllowed: 1,
+      displayOrder: nextAvailableOrder(template.displayOrder),
+      isActive: true,
+    });
+    created.push(position);
+    existingTitleKeys.add(titleKey);
+  }
+
+  if (created.length > 0) {
+    await recordAudit({
+      action: "position.seed-src-defaults",
+      actorId: params.user?._id?.toString(),
+      actorEmail: params.user?.email,
+      actorRole: (params.user?.role && (params.user.role as any).name) || params.user?.role,
+      targetCollection: "Election",
+      targetId: election._id?.toString(),
+      details: { count: created.length },
+    });
+  }
+
+  return created;
 };
 // Service function to update a position's details, with checks for election status and audit logging of the update action
 export const updatePosition = async (params: {

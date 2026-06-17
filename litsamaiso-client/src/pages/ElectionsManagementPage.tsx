@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CalendarDays, CheckCircle, Clock, Download, Edit, Loader2, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { electionService } from '../services/electionService';
-import type { Candidate, Election, Position, ResultSnapshot } from '../types';
+import type { Candidate, CandidateImportSummary, Election, Position, ResultSnapshot } from '../types';
 import { getApiErrorMessage } from '../utils/apiError';
 
 const toDateTimeLocalValue = (value?: string) => {
@@ -205,10 +205,12 @@ const ElectionsManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isAddingCandidate, setIsAddingCandidate] = useState(false);
+  const [isImportingCandidates, setIsImportingCandidates] = useState(false);
   const [isUpdatingElection, setIsUpdatingElection] = useState(false);
   const [isUpdatingCandidate, setIsUpdatingCandidate] = useState(false);
   const candidateImageInputRef = useRef<HTMLInputElement | null>(null);
   const editCandidateImageInputRef = useRef<HTMLInputElement | null>(null);
+  const candidateImportInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedElectionId, setSelectedElectionId] = useState('');
   const [selectedPositionId, setSelectedPositionId] = useState('');
   const [positions, setPositions] = useState<Array<Position & { candidates?: Candidate[] }>>([]);
@@ -242,6 +244,7 @@ const ElectionsManagementPage: React.FC = () => {
     studentId: '',
     image: null as File | null,
   });
+  const [candidateImportSummary, setCandidateImportSummary] = useState<CandidateImportSummary | null>(null);
   const [editElectionForm, setEditElectionForm] = useState({
     title: '',
     description: '',
@@ -401,6 +404,32 @@ const ElectionsManagementPage: React.FC = () => {
       toast.error(getApiErrorMessage(error, 'Failed to create candidate'));
     } finally {
       setIsAddingCandidate(false);
+    }
+  };
+
+  const handleImportCandidates = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!selectedElectionId) {
+      toast.error('Select an election before importing candidates');
+      event.target.value = '';
+      return;
+    }
+
+    setIsImportingCandidates(true);
+    setCandidateImportSummary(null);
+    try {
+      const result = await electionService.importCandidates(selectedElectionId, file);
+      setCandidateImportSummary(result.summary);
+      toast.success(`Imported ${result.summary.importedCandidates} candidate${result.summary.importedCandidates === 1 ? '' : 's'}`);
+      await loadPositions(selectedElectionId);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to import candidates'));
+    } finally {
+      setIsImportingCandidates(false);
+      if (candidateImportInputRef.current) {
+        candidateImportInputRef.current.value = '';
+      }
     }
   };
 
@@ -818,6 +847,102 @@ const ElectionsManagementPage: React.FC = () => {
               {isAddingCandidate ? 'Adding candidate...' : 'Add Candidate'}
             </button>
           </form>
+        </div>
+
+        <div className="mb-8 rounded-lg bg-white p-6 shadow">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Bulk Import Candidates</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                Upload CSV or Excel files. Use Position/Candidate columns, or columns named after seeded SRC positions such as President or Minister of Finance.
+              </p>
+            </div>
+            <label className={`inline-flex items-center gap-2 rounded-md px-4 py-2 font-semibold text-white ${
+              isImportingCandidates || !selectedElectionId
+                ? 'cursor-not-allowed bg-gray-400'
+                : 'cursor-pointer bg-button hover:opacity-90'
+            }`}>
+              {isImportingCandidates ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              {isImportingCandidates ? 'Importing...' : 'Upload Spreadsheet'}
+              <input
+                ref={candidateImportInputRef}
+                type="file"
+                accept=".csv,.xls,.xlsx"
+                disabled={isImportingCandidates || !selectedElectionId}
+                onChange={handleImportCandidates}
+                className="sr-only"
+              />
+            </label>
+          </div>
+
+          <div className="mt-4 grid gap-3 text-sm text-gray-600 md:grid-cols-2">
+            <div className="rounded-md bg-gray-50 p-3">
+              <p className="font-semibold text-gray-800">Long format</p>
+              <p>Columns like Position, Candidate, Student ID, Party, Manifesto.</p>
+            </div>
+            <div className="rounded-md bg-gray-50 p-3">
+              <p className="font-semibold text-gray-800">SRC position columns</p>
+              <p>Columns like President, Vice President, Finance Student ID, Academics Party.</p>
+            </div>
+          </div>
+
+          {candidateImportSummary && (
+            <div className="mt-5 rounded-md border border-gray-200 p-4">
+              <div className="grid gap-3 text-sm sm:grid-cols-4">
+                <div>
+                  <p className="text-gray-500">Rows read</p>
+                  <p className="text-lg font-bold text-gray-900">{candidateImportSummary.rowsRead}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Parsed</p>
+                  <p className="text-lg font-bold text-gray-900">{candidateImportSummary.parsedCandidates}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Imported</p>
+                  <p className="text-lg font-bold text-green-700">{candidateImportSummary.importedCandidates}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Skipped</p>
+                  <p className="text-lg font-bold text-yellow-700">{candidateImportSummary.skippedCandidates}</p>
+                </div>
+              </div>
+
+              {candidateImportSummary.mappedColumns.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2 text-sm font-semibold text-gray-800">Mapped columns</p>
+                  <div className="flex flex-wrap gap-2">
+                    {candidateImportSummary.mappedColumns.map((mapping) => (
+                      <span
+                        key={`${mapping.position}-${Object.values(mapping.columns).join('-')}`}
+                        className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-800"
+                      >
+                        {mapping.position}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {candidateImportSummary.warnings.length > 0 && (
+                <div className="mt-4 rounded-md bg-yellow-50 p-3">
+                  <p className="mb-2 text-sm font-semibold text-yellow-900">Import warnings</p>
+                  <ul className="max-h-40 space-y-1 overflow-y-auto text-sm text-yellow-900">
+                    {candidateImportSummary.warnings.slice(0, 12).map((warning, index) => (
+                      <li key={`${warning.rowNumber || 'general'}-${index}`}>
+                        {warning.rowNumber ? `Row ${warning.rowNumber}: ` : ''}
+                        {warning.message}
+                      </li>
+                    ))}
+                  </ul>
+                  {candidateImportSummary.warnings.length > 12 && (
+                    <p className="mt-2 text-xs text-yellow-800">
+                      Showing 12 of {candidateImportSummary.warnings.length} warnings.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {positions.length > 0 && (
