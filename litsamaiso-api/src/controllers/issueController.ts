@@ -10,7 +10,10 @@ export const listIssuesForStudent = async (req: Request, res: Response) => {
       res.status(400).json({ error: "Student ID is required" });
       return;
     }
-    const issues = await Issue.find({ studentId: user.studentId, status: { $ne: "approved" } }).sort({ createdAt: -1 });
+    const issues = await Issue.find({
+      studentId: user.studentId,
+      status: { $nin: ["approved", "resolved"] },
+    }).sort({ createdAt: -1 });
     res.json({ issues });
   } catch (err: any) {
     console.error("Error fetching issues:", err);

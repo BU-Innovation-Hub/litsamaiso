@@ -167,6 +167,11 @@ const REPORT_KEYS = new Set(REPORT_CATALOG.map((item) => item.key));
 const safeString = (value: unknown): string =>
   String(value ?? "").trim();
 
+const normalizeStatus = (value: unknown): string => {
+  const status = safeString(value).toLowerCase();
+  return status === "" || status === "undefined" ? "pending" : status;
+};
+
 const normalizeKey = (value: string): string =>
   value
     .trim()
@@ -281,8 +286,8 @@ const loadScopedAccounts = async (filter: Record<string, unknown>): Promise<Scop
 
 const buildSummary = (rows: ScopedAccountRow[]) => {
   const total = rows.length;
-  const confirmed = rows.filter((row) => safeString(row.status).toLowerCase() === "confirmed").length;
-  const paid = rows.filter((row) => safeString(row.status).toLowerCase() === "paid").length;
+  const confirmed = rows.filter((row) => normalizeStatus(row.status) === "confirmed").length;
+  const paid = rows.filter((row) => normalizeStatus(row.status) === "paid").length;
   const unconfirmed = total - confirmed - paid;
 
   return {
@@ -297,7 +302,7 @@ const buildSummary = (rows: ScopedAccountRow[]) => {
 
 const buildConfirmedNotPaid = (rows: ScopedAccountRow[]) => {
   const accounts = rows
-    .filter((row) => safeString(row.status).toLowerCase() === "confirmed")
+    .filter((row) => normalizeStatus(row.status) === "confirmed")
     .map((row) => ({
       contractNumber: row.contractNumber,
       accountNumber: row.accountNumber,
@@ -314,7 +319,7 @@ const buildConfirmedNotPaid = (rows: ScopedAccountRow[]) => {
 
 const buildSnapshot = (rows: ScopedAccountRow[], targetStatus: string) => {
   const lowerTarget = targetStatus.toLowerCase();
-  const matching = rows.filter((row) => safeString(row.status).toLowerCase() === lowerTarget);
+  const matching = rows.filter((row) => normalizeStatus(row.status) === lowerTarget);
   const others = rows.length - matching.length;
 
   return {
@@ -352,7 +357,7 @@ const buildAverageDays = (
 const buildStuckConfirmed = (rows: ScopedAccountRow[], days: number) => {
   const threshold = new Date(Date.now() - days * MS_PER_DAY);
   const accounts = rows.filter((row) => {
-    const status = safeString(row.status).toLowerCase();
+    const status = normalizeStatus(row.status);
     return (
       status === "confirmed" &&
       !row.paidAt &&
@@ -380,7 +385,7 @@ const buildStuckConfirmed = (rows: ScopedAccountRow[], days: number) => {
 const buildRecentPayments = (rows: ScopedAccountRow[], days: number) => {
   const threshold = new Date(Date.now() - days * MS_PER_DAY);
   const paidRows = rows
-    .filter((row) => safeString(row.status).toLowerCase() === "paid")
+    .filter((row) => normalizeStatus(row.status) === "paid")
     .filter((row) => row.paidAt && row.paidAt >= threshold)
     .sort((left, right) => (right.paidAt?.getTime() || 0) - (left.paidAt?.getTime() || 0));
 
@@ -402,10 +407,10 @@ const buildRecentPayments = (rows: ScopedAccountRow[], days: number) => {
 };
 
 const buildAnomalies = (rows: ScopedAccountRow[]) => {
-  const allowedStatuses = new Set(["undefined", "confirmed", "paid"]);
+  const allowedStatuses = new Set(["pending", "confirmed", "erroneous", "paid"]);
   const anomalies = rows.flatMap((row) => {
     const issues: string[] = [];
-    const status = safeString(row.status).toLowerCase();
+    const status = normalizeStatus(row.status);
 
     if (!allowedStatuses.has(status)) {
       issues.push(`unexpected status: ${row.status}`);
@@ -482,14 +487,14 @@ const buildReportBundle = async (
   rows: ScopedAccountRow[],
   options: { stuckDays: number; recentDays: number },
 ) => {
-  const confirmedRows = rows.filter((row) => safeString(row.status).toLowerCase() === "confirmed");
-  const paidRows = rows.filter((row) => safeString(row.status).toLowerCase() === "paid");
+  const confirmedRows = rows.filter((row) => normalizeStatus(row.status) === "confirmed");
+  const paidRows = rows.filter((row) => normalizeStatus(row.status) === "paid");
 
   const byInstitution = await buildInstitutionBreakdown(rows);
 
   return {
     summary: buildSummary(rows),
-    statusBreakdown: groupCount(rows, (row) => row.status || "undefined"),
+    statusBreakdown: groupCount(rows, (row) => normalizeStatus(row.status)),
     confirmationOverview: buildSnapshot(rows, "confirmed"),
     paymentOverview: buildSnapshot(rows, "paid"),
     confirmedNotPaid: buildConfirmedNotPaid(rows),

@@ -3,7 +3,11 @@ import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute, PublicRoute, RoleRoute } from './components/ProtectedRoute';
 import { Header } from './components/Header';
+import { AdminDashboardShell } from './components/DashboardSidebar';
+import { useAuth } from './hooks/useAuth';
+import { isAdminDashboardRole } from './navigation';
 import { roleAccess } from './utils/roleAccess';
+import { getRoleName } from './utils/userDisplay';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -26,14 +30,27 @@ import ProfilePage from './pages/ProfilePage';
 import './index.css';
 
 // Protected Layout Component
-const ProtectedLayout = () => (
-  <div className="min-h-screen">
-    <Header />
-    <main>
-      <Outlet />
-    </main>
-  </div>
-);
+const ProtectedLayout = () => {
+  const { user } = useAuth();
+  const roleName = getRoleName(user);
+
+  if (isAdminDashboardRole(roleName)) {
+    return (
+      <AdminDashboardShell>
+        <Outlet />
+      </AdminDashboardShell>
+    );
+  }
+
+  return (
+    <div className="min-h-screen">
+      <Header />
+      <main>
+        <Outlet />
+      </main>
+    </div>
+  );
+};
 
 function App() {
   return (

@@ -27,3 +27,12 @@ export const getInstitutionName = (user?: User | null): string => {
 
   return institution.name || '';
 };
+
+export const getUserInitials = (name: string) =>
+  name
+    .split(/[.\s_-]/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();

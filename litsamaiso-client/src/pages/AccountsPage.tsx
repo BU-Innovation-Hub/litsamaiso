@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle, Clock, CreditCard, Filter, Receipt, Search, ShieldCheck, Upload, XCircle, Download, Edit } from 'lucide-react';
 import exportData from '../exporters';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import Lightbox from '../components/Lightbox';
 
 const AccountsPage: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const role = getRoleName(user);
   const [reports, setReports] = useState<AccountReports | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -35,7 +36,9 @@ const AccountsPage: React.FC = () => {
     document: null as File | null,
   });
 
-  const [activeTab, setActiveTab] = useState<'records' | 'issues'>('records');
+  const [activeTab, setActiveTab] = useState<'records' | 'issues'>(
+    searchParams.get('tab') === 'issues' ? 'issues' : 'records',
+  );
   const accountsFileRef = useRef<HTMLInputElement | null>(null);
   const paidFileRef = useRef<HTMLInputElement | null>(null);
   const studentsFileRef = useRef<HTMLInputElement | null>(null);
@@ -154,7 +157,7 @@ const AccountsPage: React.FC = () => {
       if (role !== 'Finance') return;
       setIssuesLoading(true);
       try {
-        const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+        const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
         setIssueList(list || []);
       } catch (err: unknown) {
         toast.error(getApiErrorMessage(err, 'Failed to load issues'));
@@ -352,7 +355,7 @@ const AccountsPage: React.FC = () => {
   };
 
   return (
-    <div className="global-bg min-h-screen pt-32 pb-14">
+    <div className="global-bg min-h-screen pt-5 pb-14">
       <div className="mx-auto max-w-6xl px-4 space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-primary-clr">Accounts</h1>
@@ -449,7 +452,7 @@ const AccountsPage: React.FC = () => {
                       onClick={async () => {
                         setIssuesLoading(true);
                         try {
-                          const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+                          const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
                           setIssueList(list || []);
                         } catch (err) {
                           toast.error(getApiErrorMessage(err, 'Failed to load issues'));
@@ -478,12 +481,17 @@ const AccountsPage: React.FC = () => {
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Account</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Student</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Proofs</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Submitted</th>
                             <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {issueList.map((it: any) => (
+                          {issueList.map((it: any) => {
+                            const issueStatus = String(it.status || 'submitted').toLowerCase();
+                            const isPendingIssue = issueStatus === 'submitted' || issueStatus === 'reported';
+
+                            return (
                             <tr key={it._id}>
                               <td className="px-6 py-4 text-sm font-medium text-gray-900">{it.contractNumber}</td>
                               <td className="px-6 py-4 text-sm text-gray-500">{it.bankName}</td>
@@ -502,8 +510,20 @@ const AccountsPage: React.FC = () => {
                                   <span className="text-xs text-muted-foreground">No proofs</span>
                                 )}
                               </td>
+                              <td className="px-6 py-4 text-sm text-gray-500">
+                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                                  isPendingIssue
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : issueStatus === 'resolved' || issueStatus === 'approved'
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {issueStatus}
+                                </span>
+                              </td>
                               <td className="px-6 py-4 text-sm text-gray-500">{new Date(it.createdAt).toLocaleString()}</td>
                               <td className="px-6 py-4 text-right text-sm">
+                                {isPendingIssue ? (
                                 <div className="flex justify-end gap-2">
                                   <button
                                     onClick={async () => {
@@ -512,7 +532,7 @@ const AccountsPage: React.FC = () => {
                                         await adminIssueService.approveIssue(it._id);
                                         toast.success('Issue approved and account updated');
                                         // refresh issues and accounts
-                                        const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+                                        const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
                                         setIssueList(list || []);
                                         if (canViewReports) await loadAccountRows();
                                       } catch (err: any) {
@@ -529,7 +549,7 @@ const AccountsPage: React.FC = () => {
                                       try {
                                         await adminIssueService.rejectIssue(it._id, reason || undefined);
                                         toast.success('Issue rejected');
-                                        const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+                                        const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
                                         setIssueList(list || []);
                                       } catch (err: any) {
                                         toast.error(getApiErrorMessage(err, 'Failed to reject issue'));
@@ -540,9 +560,13 @@ const AccountsPage: React.FC = () => {
                                     Reject
                                   </button>
                                 </div>
+                                ) : (
+                                  <span className="text-sm text-gray-400">Reviewed</span>
+                                )}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

@@ -79,7 +79,7 @@ export const approveIssue = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const id = String(req.params.id || "");
-    const issue = await Issue.findById(id).lean();
+    const issue = await Issue.findById(id);
     if (!issue) return res.status(404).json({ error: "Issue not found" });
 
     // ensure the student belongs to this institution
@@ -105,11 +105,14 @@ export const approveIssue = async (req: Request, res: Response) => {
     account.confirmationDate = new Date();
     await account.save();
 
-    await Issue.deleteOne({ _id: id });
+    issue.status = "resolved";
+    (issue as any).approvedBy = user._id;
+    (issue as any).approvedAt = new Date();
+    await issue.save();
 
     // notify student
     try {
-      await sendIssueStatusToStudent(issue, "approved");
+      await sendIssueStatusToStudent(issue.toObject(), "approved");
     } catch (notifyErr) {
       console.warn("[adminIssue] sendIssueStatusToStudent failed:", notifyErr);
     }

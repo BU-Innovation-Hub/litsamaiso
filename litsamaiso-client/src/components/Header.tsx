@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getRoleName } from '../utils/userDisplay';
-import { canAccess, roleAccess } from '../utils/roleAccess';
+import { getRoleName, getUserInitials } from '../utils/userDisplay';
+import { getVisibleNavItems, isNavItemActive } from '../navigation';
 
 export const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -17,21 +17,14 @@ export const Header: React.FC = () => {
     navigate('/login');
   };
 
-  const getInitials = (name: string) =>
-    name
-      .split(/[.\s_-]/)
-      .filter(Boolean)
-      .map((part) => part[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-
   const navLinkClass = (href: string) =>
     `p-2 sm:p-0 rounded transition-colors ${
-      location.pathname === href
+      isNavItemActive(location.pathname, href)
         ? 'text-active font-semibold'
         : 'text-primary-clr hover:text-active'
     }`;
+
+  const visibleNavItems = getVisibleNavItems(roleName);
 
   return (
     <div className="fixed top-0 z-50 w-full pb-8 backdrop-blur-md">
@@ -72,47 +65,11 @@ export const Header: React.FC = () => {
           } mt-4 w-full flex-col sm:mt-0 sm:flex sm:w-auto sm:flex-row sm:items-center sm:gap-6`}
         >
           <nav className="flex flex-col justify-center gap-4 text-sm font-medium sm:flex-row">
-            {canAccess(roleName, roleAccess.dashboard) && (
-              <Link to="/dashboard" className={navLinkClass('/dashboard')}>
-                Dashboard
+            {visibleNavItems.map((item) => (
+              <Link key={item.id} to={item.href} className={navLinkClass(item.href)}>
+                {item.label}
               </Link>
-            )}
-            {canAccess(roleName, roleAccess.electionManagement) && (
-              <Link
-                to="/elections/manage"
-                className={navLinkClass('/elections/manage')}
-              >
-                Elections Management
-              </Link>
-            )}
-            {roleName === 'Student' ? (
-              <Link to="/issues" className={navLinkClass('/issues')}>Issues</Link>
-            ) : canAccess(roleName, roleAccess.accounts) ? (
-              <Link to="/accounts" className={navLinkClass('/accounts')}>Accounts</Link>
-            ) : null}
-            {canAccess(roleName, roleAccess.accountConfirmation) && (
-              <Link
-                to="/confirmation"
-                className={navLinkClass('/confirmation')}
-              >
-                Confirmation
-              </Link>
-            )}
-            {canAccess(roleName, roleAccess.elections) && (
-              <Link to="/elections" className={navLinkClass('/elections')}>
-                Elections
-              </Link>
-            )}
-            {canAccess(roleName, roleAccess.users) && (
-              <Link to="/users" className={navLinkClass('/users')}>
-                Users
-              </Link>
-            )}
-            {canAccess(roleName, roleAccess.institutions) && (
-              <Link to="/institutions" className={navLinkClass('/institutions')}>
-                Institutions
-              </Link>
-            )}
+            ))}
           </nav>
 
           <div className="mt-2 flex items-center gap-3 sm:mt-0 sm:ml-4">
@@ -122,7 +79,7 @@ export const Header: React.FC = () => {
               type="button"
               aria-label="Open profile"
             >
-              {getInitials(username)}
+              {getUserInitials(username)}
             </button>
             <span className="text-sm font-medium">{username}</span>
             <button type="button" onClick={handleLogout} aria-label="Logout">

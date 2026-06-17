@@ -286,7 +286,7 @@ const InstitutionsPage: React.FC = () => {
   }, [loadInstitutionUsers, usersTarget]);
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-24 mt-5">
+    <div className="min-h-screen bg-gray-50 pt-5 mt-1">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Institutions</h1>
