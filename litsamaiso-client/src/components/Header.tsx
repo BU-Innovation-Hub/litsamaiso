@@ -10,7 +10,7 @@ export const Header: React.FC = () => {
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const roleName = getRoleName(user);
-  const username = user?.email?.split('@')[0] || 'User';
+  const username = user?.name || user?.email?.split('@')[0] || 'User';
 
   const handleLogout = async () => {
     await logout();
@@ -118,8 +118,9 @@ export const Header: React.FC = () => {
           <div className="mt-2 flex items-center gap-3 sm:mt-0 sm:ml-4">
             <button
               className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white"
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/profile')}
               type="button"
+              aria-label="Open profile"
             >
               {getInitials(username)}
             </button>

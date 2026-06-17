@@ -45,6 +45,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionName,
     institutionEmail,
     studentId,
+    studentCardUrl,
     faceImageBase64,
     faceDescriptor,
     faceImageUrl,
@@ -56,6 +57,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionName?: string;
     institutionEmail?: string;
     studentId?: string;
+    studentCardUrl?: string;
     faceImageBase64?: string;
     faceDescriptor?: number[];
     faceImageUrl?: string;
@@ -186,6 +188,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     role: typeof roleDoc._id;
     institution: typeof institution._id;
     studentId?: string;
+    studentCardUrl?: string;
     faceDescriptor?: number[];
     faceImageUrl?: string;
   } = {
@@ -197,6 +200,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   if (studentId) {
     userData.studentId = studentId;
+  }
+
+  if (studentCardUrl) {
+    userData.studentCardUrl = studentCardUrl;
   }
 
   if (Array.isArray(faceDescriptor)) {
@@ -217,6 +224,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       role: roleDoc.name,
       institution: institution._id,
       studentId: user.studentId,
+      studentCardUrl: user.studentCardUrl,
       faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,
     },
@@ -261,6 +269,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       institution: user.institution,
       studentId: user.studentId,
+      studentCardUrl: user.studentCardUrl,
       faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,
     },

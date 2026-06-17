@@ -21,6 +21,7 @@ import UsersPage from './pages/UsersPage';
 import ElectionsManagementPage from './pages/ElectionsManagementPage';
 import InstitutionsPage from './pages/InstitutionsPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ProfilePage from './pages/ProfilePage';
 
 import './index.css';
 
@@ -56,6 +57,7 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route element={<RoleRoute allowedRoles={roleAccess.elections} />}>
                 <Route path="/elections" element={<ElectionsPage />} />
                 <Route path="/elections/:id/vote" element={<VotingPage />} />

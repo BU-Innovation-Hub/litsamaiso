@@ -23,6 +23,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import issueRoutes from "./routes/issueRoutes.js";
 import institutionRoutes from "./routes/institutionRoutes.js";
 import adminIssueRoutes from "./routes/adminIssueRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
 import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
@@ -87,6 +88,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 app.use(auditMiddleware);
 
 app.use("/auth", authRoutes);
+app.use("/profile", profileRoutes);
 app.use("/users", userRoutes);
 app.use("/students", studentRoutes);
 app.use("/accounts", accountRoutes);

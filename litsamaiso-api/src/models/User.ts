@@ -7,6 +7,7 @@ export interface UserDocument {
   role: Types.ObjectId;
   institution: Types.ObjectId;
   studentId?: string;
+  studentCardUrl?: string;
   faceDescriptor: number[];
   faceImageUrl?: string;
   passwordResetTokenHash?: string;
@@ -25,6 +26,7 @@ const userSchema = new Schema<UserDocument>(
       required: true,
     },
     studentId: { type: String, trim: true, unique: true, sparse: true },
+    studentCardUrl: { type: String, trim: true },
     faceDescriptor: { type: [Number], default: [] },
     faceImageUrl: { type: String, trim: true },
     passwordResetTokenHash: { type: String, select: false },
