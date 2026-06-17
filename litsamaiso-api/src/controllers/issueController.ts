@@ -148,6 +148,10 @@ export const updateIssueById = async (req: Request, res: Response) => {
     updates.status = "submitted";
 
     const updated = await Issue.findByIdAndUpdate(id, { $set: updates }, { new: true, runValidators: true }).lean();
+    if (!updated) {
+      res.status(404).json({ error: "Issue not found" });
+      return;
+    }
 
     // Notify finance (best-effort)
     try {

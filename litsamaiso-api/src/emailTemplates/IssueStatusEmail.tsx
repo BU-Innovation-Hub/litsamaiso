@@ -15,12 +15,12 @@ type Issue = {
 type Props = {
   issue: Issue;
   status: "approved" | "rejected";
-  reason?: string;
-  name?: string;
-  appName?: string;
-  logoUrl: string;
-  accentColor?: string;
-  ctaUrl?: string;
+  reason?: string | undefined;
+  name?: string | undefined;
+  appName?: string | undefined;
+  logoUrl?: string | undefined;
+  accentColor?: string | undefined;
+  ctaUrl?: string | undefined;
 };
 
 export default function IssueStatusEmail({

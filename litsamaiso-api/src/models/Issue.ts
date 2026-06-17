@@ -13,6 +13,7 @@ export interface IssueDocument {
   documentFileName?: string;
   proofUrls?: string[];
   notes?: string;
+  attempts?: number;
   status?: string;
   approvedBy?: any;
   approvedAt?: Date;
