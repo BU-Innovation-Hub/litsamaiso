@@ -455,12 +455,16 @@ export const accountConfirmation = async (
     String(accountByContract.bankName || "").toLowerCase() ===
     String(bankName || "").toLowerCase();
 
-  if (!accountMatches || !bankMatches) {
+  // Ensure the logged-in student's record maps to the provided contract number
+  const studentMatches = String(student.contractNumber || "").trim() === contractNumber;
+
+  if (!accountMatches || !bankMatches || !studentMatches) {
     console.log(
-      `[accountConfirmation] Mismatch detected. Account match: ${accountMatches}, Bank match: ${bankMatches}`,
+      `[accountConfirmation] Mismatch detected. Account match: ${accountMatches}, Bank match: ${bankMatches}, Student match: ${studentMatches}`,
     );
 
     const reasons: string[] = [];
+    if (!studentMatches) reasons.push("studentIdMismatch");
     if (!accountMatches) reasons.push("accountNumberMismatch");
     if (!bankMatches) reasons.push("bankNameMismatch");
 

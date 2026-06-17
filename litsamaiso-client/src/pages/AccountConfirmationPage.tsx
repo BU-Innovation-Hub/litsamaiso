@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { CheckCircle, FileImage, Loader, RefreshCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { toast } from 'sonner';
@@ -71,9 +71,52 @@ const AccountConfirmationPage: React.FC = () => {
     graduating: false,
   });
 
+  const ocrAttemptsRef = useRef<number>(0);
+  const MAX_OCR_ATTEMPTS = 2;
+
   // Confidence score is intentionally hidden from students (UX requirement).
 
-  const handleRetry = () => {
+  const escalateToIssues = async () => {
+    const contractNumber = String(formData.contractNumber || '').trim();
+    const studentId = (user && (user as any).studentId) || '';
+    const bankName = String(formData.bankName || extracted?.bankName || 'Unavailable').trim();
+    const accountNumber = String(formData.accountNumber || extracted?.accountNumber || 'Unavailable').trim();
+
+    if (!contractNumber || !studentId) {
+      toast.error('Enter your contract number and ensure you are logged in');
+      return;
+    }
+
+    const proofUrls: string[] = [];
+    const file = (document.querySelector('input[type=file]') as HTMLInputElement | null)?.files?.[0];
+    if (file) {
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const upRes = await apiClient.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        const upJson = upRes?.data;
+        if (upJson && upJson.url) proofUrls.push(upJson.url);
+      } catch (uErr) {
+        console.warn('Upload failed', uErr);
+      }
+    }
+
+    try {
+      const resp = await apiClient.post('/issues', { contractNumber, studentId, bankName, accountNumber, proofUrls });
+      toast.success(resp?.data?.message || 'Issue logged. Redirecting to Issues page.');
+      window.location.href = '/issues';
+    } catch (err: unknown) {
+      toast.error(getApiErrorMessage(err, 'Could not log the issue'));
+    }
+  };
+
+  const handleRetry = async () => {
+    if (ocrAttemptsRef.current >= MAX_OCR_ATTEMPTS) {
+      toast.error("No more retries left. We’ll log this as an issue.");
+      await escalateToIssues();
+      return;
+    }
+
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setExtracted(null);
@@ -156,7 +199,7 @@ const AccountConfirmationPage: React.FC = () => {
     }
   };
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -164,6 +207,15 @@ const AccountConfirmationPage: React.FC = () => {
       toast.error('Upload an image file for OCR');
       return;
     }
+
+    const nextAttempt = ocrAttemptsRef.current + 1;
+    if (nextAttempt > MAX_OCR_ATTEMPTS) {
+      toast.error('Maximum OCR attempts reached. Logging this as an issue.');
+      await escalateToIssues();
+      return;
+    }
+
+    ocrAttemptsRef.current = nextAttempt;
 
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));

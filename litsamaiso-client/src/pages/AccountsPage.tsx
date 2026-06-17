@@ -149,6 +149,26 @@ const AccountsPage: React.FC = () => {
     void loadIssues();
   }, [activeTab, role]);
 
+  // Auto-load issues for Finance users when the page mounts (keeps the manual Refresh button)
+  useEffect(() => {
+    const loadFinanceIssues = async () => {
+      if (role !== 'Finance') return;
+      setIssuesLoading(true);
+      try {
+        const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+        setIssueList(list || []);
+      } catch (err: unknown) {
+        toast.error(getApiErrorMessage(err, 'Failed to load issues'));
+        setIssueList([]);
+      } finally {
+        setIssuesLoading(false);
+      }
+    };
+
+    void loadFinanceIssues();
+    // Intentionally run when role or accountSearch changes so finance users see relevant results
+  }, [role, accountSearch]);
+
   const handleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
     uploadType: 'accounts' | 'paid' | 'students'

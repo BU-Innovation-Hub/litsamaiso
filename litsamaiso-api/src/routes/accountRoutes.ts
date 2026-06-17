@@ -9,6 +9,7 @@ import {
   resolveAccountIssue,
   financeResolveAccountIssue,
   loadPayedStudents,
+  updateAccount,
 } from "../controllers/accountController.js";
 
 const router = Router();
@@ -65,5 +66,8 @@ router.get("/", requireAuth, requireRole(["AppAdmin", "InstitutionAdmin", "Finan
     next(err);
   }
 });
+
+// Update single account (admin/finance/institution admin)
+router.put('/:id', requireAuth, requireRole(["AppAdmin", "InstitutionAdmin", "Finance"]), updateAccount);
 
 export default router;
