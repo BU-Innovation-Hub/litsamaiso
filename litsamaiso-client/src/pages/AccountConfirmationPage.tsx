@@ -4,7 +4,7 @@ import { CheckCircle, FileImage, Loader, RefreshCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { toast } from 'sonner';
 import { accountService } from '../services/accountService';
-import apiClient from '../services/authService';
+import apiClient from '../lib/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { useAuth } from '../hooks/useAuth';
 import Globe from '../components/ui/Globe';

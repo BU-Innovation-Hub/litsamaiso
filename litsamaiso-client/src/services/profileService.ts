@@ -1,4 +1,4 @@
-import apiClient from './authService';
+import apiClient from '../lib/api';
 import type { Institution, User } from '../types';
 
 export interface UserProfile {

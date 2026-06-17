@@ -1,4 +1,4 @@
-import apiClient from './authService';
+import apiClient from '../lib/api';
 import type { Account } from '../types';
 
 export interface AccountReports {

@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { X } from 'lucide-react';
 import Button from './ui/button';
 import { issueService } from '../services/issueService';
 import { accountService } from '../services/accountService';
-import apiClient from '../services/authService';
+import apiClient from '../lib/api';
 
 interface IIssue {
   _id?: string;
@@ -74,12 +75,39 @@ export default function StudentIssues() {
   }, []);
 
   useEffect(() => {
-    void fetchIssues();
-  }, [fetchIssues]);
+    let cancelled = false;
 
-  useEffect(() => {
-    void fetchAccounts();
-  }, [fetchAccounts]);
+    const loadInitialData = async () => {
+      const [issuesResult, accountsResult] = await Promise.allSettled([
+        issueService.listIssues(),
+        accountService.getStudentAccounts(),
+      ]);
+
+      if (cancelled) return;
+
+      if (issuesResult.status === 'fulfilled') {
+        setIssues(issuesResult.value || []);
+      } else {
+        const message = issuesResult.reason?.message || 'Failed to load issues';
+        setError(message);
+        toast.error(message);
+      }
+
+      if (accountsResult.status === 'fulfilled') {
+        setAccounts(accountsResult.value || []);
+      } else {
+        toast.error(`Failed to fetch accounts: ${accountsResult.reason?.message || accountsResult.reason}`);
+      }
+
+      setLoading(false);
+    };
+
+    void loadInitialData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const openEditModal = (issue: IIssue, account?: Account | undefined) => {
     setEditingIssue(issue);

@@ -1,4 +1,4 @@
-import apiClient from './authService';
+import apiClient from '../lib/api';
 
 export const studentService = {
   getStudentStats: async () => {

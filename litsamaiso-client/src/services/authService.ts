@@ -1,20 +1,7 @@
-import axios, {
-  type AxiosInstance,
-  AxiosError,
-  type InternalAxiosRequestConfig,
-} from 'axios';
+import { AxiosError } from 'axios';
+import apiClient from '../lib/api';
 import type { AuthResponse, LoginRequest, RegisterRequest } from '../types';
 import type { Institution, Role, User } from '../types';
-
-const API_BASE_URL = '/api';
-
-// Create axios instance
-const apiClient: AxiosInstance = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
 
 const normalizeRole = (role: User['role'] | string): Role => {
   if (typeof role === 'string') {
@@ -42,35 +29,6 @@ const normalizeAuthResponse = (data: AuthResponse): AuthResponse => ({
   },
 });
 
-// Request interceptor — attach JWT to every request
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor — only redirect on 401 for protected routes (not auth endpoints)
-// This prevents an infinite redirect loop when a login/register attempt returns 401/400.
-apiClient.interceptors.response.use(
-  (response) => response,
-  (error: AxiosError) => {
-    const url = error.config?.url ?? '';
-    const isAuthEndpoint = url.startsWith('/auth/');
-    if (error.response?.status === 401 && !isAuthEndpoint) {
-      // Session expired — clear local state and send to login
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
@@ -83,7 +41,6 @@ export const authService = {
   },
 
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
-    // Send as JSON — the Express authController reads from req.body (not multipart/form-data).
     const payload: Record<string, unknown> = {
       email: data.email,
       password: data.password,
@@ -95,7 +52,6 @@ export const authService = {
     if (data.institutionEmail) payload.institutionEmail = data.institutionEmail;
     if (data.studentId) payload.studentId = data.studentId;
     if (data.faceImageBase64) payload.faceImageBase64 = data.faceImageBase64;
-    // faceDescriptor must stay as number[] — never JSON.stringify it
     if (Array.isArray(data.faceDescriptor)) payload.faceDescriptor = data.faceDescriptor;
 
     const response = await apiClient.post<AuthResponse>('/auth/register', payload);

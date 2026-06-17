@@ -1,4 +1,4 @@
-import apiClient from './authService';
+import apiClient from '../lib/api';
 import type { Role, User } from '../types';
 
 export const userService = {

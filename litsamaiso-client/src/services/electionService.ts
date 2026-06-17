@@ -1,4 +1,4 @@
-import apiClient from './authService';
+import apiClient from '../lib/api';
 import type { Election, Position, Candidate, CandidateImportResult, ResultPositionDetail, ResultSnapshot, Vote } from '../types';
 
 const noCacheRequest = (params?: Record<string, unknown>) => ({
