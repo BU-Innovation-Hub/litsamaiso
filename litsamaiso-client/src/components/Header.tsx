@@ -85,11 +85,11 @@ export const Header: React.FC = () => {
                 Elections Management
               </Link>
             )}
-            {canAccess(roleName, roleAccess.accounts) && (
-              <Link to="/accounts" className={navLinkClass('/accounts')}>
-                {roleName === 'Student' ? 'Issues' : 'Accounts'}
-              </Link>
-            )}
+            {roleName === 'Student' ? (
+              <Link to="/issues" className={navLinkClass('/issues')}>Issues</Link>
+            ) : canAccess(roleName, roleAccess.accounts) ? (
+              <Link to="/accounts" className={navLinkClass('/accounts')}>Accounts</Link>
+            ) : null}
             {canAccess(roleName, roleAccess.accountConfirmation) && (
               <Link
                 to="/confirmation"

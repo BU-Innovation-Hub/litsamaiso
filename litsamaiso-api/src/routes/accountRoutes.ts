@@ -5,9 +5,11 @@ import {
   uploadAccounts,
   confirmAccount,
   getConfirmationStatus,
+  getStudentAccounts,
   resolveAccountIssue,
   financeResolveAccountIssue,
   loadPayedStudents,
+  updateAccount,
 } from "../controllers/accountController.js";
 
 const router = Router();
@@ -22,8 +24,13 @@ router.post(
   uploadAccounts,
 );
 
-router.post("/confirm", requireAuth, requireRole("Student"), confirmAccount);
+router.post("/confirm", requireAuth, requireRole("Student"), upload.single("document"), confirmAccount);
 router.get("/status", requireAuth, requireRole("Student"), getConfirmationStatus);
+// Compatibility alias used by the client: /accounts/confirmation-status
+router.get("/confirmation-status", requireAuth, requireRole("Student"), getConfirmationStatus);
+
+// Student-scoped accounts (used by student Issues UI)
+router.get("/students", requireAuth, requireRole("Student"), getStudentAccounts);
 
 router.post(
   "/resolve",
@@ -59,5 +66,8 @@ router.get("/", requireAuth, requireRole(["AppAdmin", "InstitutionAdmin", "Finan
     next(err);
   }
 });
+
+// Update single account (admin/finance/institution admin)
+router.put('/:id', requireAuth, requireRole(["AppAdmin", "InstitutionAdmin", "Finance"]), updateAccount);
 
 export default router;

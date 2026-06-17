@@ -109,6 +109,11 @@ export const accountService = {
     return response.data;
   },
 
+  getStudentAccounts: async () => {
+    const response = await apiClient.get<{ data: any[] }>('/accounts/students');
+    return response.data.data;
+  },
+
   getReports: async (params?: { institutionId?: string }) => {
     const response = await apiClient.get<AccountReports>('/reports/accounts', { params });
     return response.data;

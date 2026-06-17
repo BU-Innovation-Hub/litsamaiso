@@ -16,6 +16,7 @@ import ElectionsPage from './pages/ElectionsPage';
 import VotingPage from './pages/VotingPage';
 import AccountsPage from './pages/AccountsPage';
 import AccountConfirmationPage from './pages/AccountConfirmationPage';
+import IssuesPage from './pages/IssuesPage';
 import UsersPage from './pages/UsersPage';
 import ElectionsManagementPage from './pages/ElectionsManagementPage';
 import InstitutionsPage from './pages/InstitutionsPage';
@@ -68,6 +69,7 @@ function App() {
               <Route element={<RoleRoute allowedRoles={roleAccess.accountConfirmation} />}>
                 <Route path="/accounts/confirm" element={<AccountConfirmationPage />} />
                 <Route path="/confirmation" element={<AccountConfirmationPage />} />
+                <Route path="/issues" element={<IssuesPage />} />
               </Route>
               <Route element={<RoleRoute allowedRoles={roleAccess.users} />}>
                 <Route path="/users" element={<UsersPage />} />

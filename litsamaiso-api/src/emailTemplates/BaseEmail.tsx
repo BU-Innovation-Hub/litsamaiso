@@ -42,10 +42,14 @@ export default function BaseEmail({
   const mutedColor = "#94a3b8";
   const borderStyle = "1px solid #1e293b";
 
+  // Provide a small inline SVG fallback logo when no `logoUrl` is configured.
+  const initials = (appName || "L").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'><rect rx='8' width='100%' height='100%' fill='${accentColor}'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial, Helvetica, sans-serif' font-size='16' fill='white'>${initials}</text></svg>`;
+  const logoSrc = logoUrl || `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+
   const bodyStyle: React.CSSProperties = {
     backgroundColor: outerBg,
-    fontFamily:
-      '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    fontFamily: '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     margin: "0",
     padding: "40px 0",
   };
@@ -92,7 +96,7 @@ export default function BaseEmail({
           <Section style={{ paddingBottom: "12px" }}>
             <Row>
               <Column align="left" style={{ verticalAlign: "middle", width: "40px" }}>
-                {logoUrl && <Img src={logoUrl} width="36" height="36" alt={appName} style={{ display: "block" }} />}
+                <Img src={logoSrc} width="36" height="36" alt={appName} style={{ display: "block" }} />
               </Column>
               <Column align="left" style={{ verticalAlign: "middle", paddingLeft: "12px" }}>
                 <Text style={{ color: textColor, margin: 0, fontSize: "20px", fontWeight: 700, letterSpacing: "0.5px" }}>
@@ -123,7 +127,7 @@ export default function BaseEmail({
           <Section style={{ marginTop: "32px" }}>
             <Hr style={{ borderColor: "#1e293b", margin: "0 0 24px 0" }} />
             <Text style={{ color: mutedColor, fontSize: "13px", margin: "0 0 8px 0", lineHeight: "1.5" }}>
-              Need help? Contact us at {" "}
+              Need help? Contact us at{" "}
               <Link href="mailto:support@litsamaiso.com" style={{ color: accentColor, textDecoration: "underline" }}>
                 support@litsamaiso.com
               </Link>

@@ -189,7 +189,7 @@ export const confirmAccount = async (req: Request, res: Response) => {
       }
     }
 
-    const confirmationInput: {
+    let confirmationInput: {
       contractNumber: string;
       bankName: string;
       accountNumber: string;
@@ -210,7 +210,32 @@ export const confirmAccount = async (req: Request, res: Response) => {
       confirmationInput.graduating = graduatingFlag;
     }
 
-    const result = await accountConfirmation(confirmationInput);
+    // If student uploaded a document during confirm, attempt to upload it and include proofUrls
+    const document = (req as any).file as
+      | {
+          buffer: Buffer;
+          mimetype: string;
+          originalname: string;
+        }
+      | undefined;
+
+    if (document && document.buffer) {
+      try {
+        const { uploadImageBuffer } = await import("../utils/cloudinary.js");
+        const uploadRes = await uploadImageBuffer({ buffer: document.buffer, fileName: document.originalname, folder: "issues" });
+        confirmationInput = { ...confirmationInput, proofUrls: [uploadRes.url] } as any;
+      } catch (uErr) {
+        // fallback to embedding base64 in the issue payload
+        confirmationInput = {
+          ...confirmationInput,
+          documentBase64: document.buffer.toString("base64"),
+          documentMimeType: document.mimetype,
+          documentFileName: document.originalname,
+        } as any;
+      }
+    }
+
+    const result = await accountConfirmation(confirmationInput as any);
 
     // Audit: account confirmation attempt/result
     await recordAudit({
@@ -227,6 +252,16 @@ export const confirmAccount = async (req: Request, res: Response) => {
         alreadyConfirmed: result.alreadyConfirmed,
       },
     });
+
+    // accountConfirmation may return a special result when it created an Issue or when proof is required
+    if ((result as any).issueCreated) {
+      res.status(201).json({ message: "Issue created for finance review", issue: (result as any).issue });
+      return;
+    }
+    if ((result as any).needsProof) {
+      res.status(400).json({ message: (result as any).message || "Account details do not match. Please upload proof and try again.", needsProof: true });
+      return;
+    }
 
     res.json({
       message: result.alreadyConfirmed
@@ -297,6 +332,42 @@ export const getConfirmationStatus = async (req: Request, res: Response) => {
     res.json({ confirmed, status: account.status, confirmationDate: account.confirmationDate });
   } catch (err: any) {
     console.error("getConfirmationStatus error:", err);
+    res.status(500).json({ message: err.message || String(err) });
+  }
+};
+
+export const getStudentAccounts = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const instId = user.institution;
+
+    if (!user?.studentId) {
+      res.status(400).json({ message: 'Student identifier (studentId) is required' });
+      return;
+    }
+
+    const student = await Student.findOne({ institution: instId, studentId: user.studentId }).lean();
+    if (!student) {
+      res.status(404).json({ message: 'Student record not found' });
+      return;
+    }
+
+    const q: any = { institution: instId };
+    const or: any[] = [];
+    if (student.contractNumber) {
+      or.push({ contractNumber: student.contractNumber });
+    }
+    // accounts confirmed by this student
+    if (student._id) {
+      or.push({ confirmedBy: student._id });
+    }
+
+    if (or.length > 0) q.$or = or;
+
+    const accounts = await Account.find(q).lean();
+    res.json({ data: accounts });
+  } catch (err: any) {
+    console.error('[getStudentAccounts] Error:', err);
     res.status(500).json({ message: err.message || String(err) });
   }
 };
@@ -595,5 +666,79 @@ export const financeResolveAccountIssue = async (
     });
 
     res.status(400).json({ message: err.message || String(err) });
+  }
+};
+
+// Update an account by id (allowed for AppAdmin, InstitutionAdmin, Finance)
+export const updateAccount = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id || "").trim();
+    if (!id) return res.status(400).json({ message: "Account id is required" });
+
+    const user = (req as any).user;
+    const instId = user.institution;
+
+    const updates = req.body || {};
+
+    // Only allow certain fields to be updated via this endpoint
+    const allowed: Array<string> = [
+      "fullnames",
+      "contractNumber",
+      "courseOfStudy",
+      "bankName",
+      "accountNumber",
+      "batchNumber",
+      "graduating",
+      "status",
+    ];
+
+    const setObj: any = {};
+    for (const k of Object.keys(updates)) {
+      if (allowed.includes(k)) setObj[k] = updates[k];
+    }
+
+    if (Object.keys(setObj).length === 0) {
+      return res.status(400).json({ message: "No valid fields provided for update" });
+    }
+
+    // find account scoped to institution (AppAdmin may provide institution filter via query)
+    const q: any = { _id: id };
+    if (!((user.role && (user.role as any).name) || "").toLowerCase().includes("appadmin")) {
+      q.institution = instId;
+    }
+
+    const account = await Account.findOne(q);
+    if (!account) return res.status(404).json({ message: "Account not found" });
+
+    for (const key of Object.keys(setObj)) {
+      (account as any)[key] = setObj[key];
+    }
+
+    // if status set to confirmed, update confirmation metadata if student context provided
+    if (setObj.status && String(setObj.status).toLowerCase() === "confirmed") {
+      account.confirmationDate = new Date();
+      // if request includes confirmedByStudentId, try to set confirmedBy
+      if ((req.body as any).confirmedByStudentId) {
+        const stud = await Student.findOne({ institution: instId, studentId: String((req.body as any).confirmedByStudentId) });
+        if (stud) account.confirmedBy = stud._id;
+      }
+    }
+
+    await account.save();
+
+    await recordAudit({
+      action: "account.update",
+      actorId: user._id?.toString(),
+      actorEmail: user.email,
+      actorRole: (user.role && (user.role as any).name) || undefined,
+      targetCollection: "Account",
+      targetId: account._id?.toString(),
+      details: { updates: setObj },
+    });
+
+    res.json({ message: "Account updated", account });
+  } catch (err: any) {
+    console.error("updateAccount error:", err);
+    res.status(500).json({ message: err.message || String(err) });
   }
 };

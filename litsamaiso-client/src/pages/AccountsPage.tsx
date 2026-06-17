@@ -9,9 +9,11 @@ import { accountService, type AccountReports } from '../services/accountService'
 import { institutionService } from '../services/institutionService';
 import { studentService } from '../services/studentService';
 import { issueService } from '../services/issueService';
+import { adminIssueService } from '../services/adminIssueService';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getRoleName } from '../utils/userDisplay';
 import type { Account, Institution } from '../types';
+import Lightbox from '../components/Lightbox';
 
 const AccountsPage: React.FC = () => {
   const { user } = useAuth();
@@ -27,7 +29,6 @@ const AccountsPage: React.FC = () => {
   const [accountEndDate, setAccountEndDate] = useState('');
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [selectedInstitutionId, setSelectedInstitutionId] = useState('');
-  const [financeStudentId, setFinanceStudentId] = useState('');
   const [correction, setCorrection] = useState({
     correctedBankName: '',
     correctedAccountNumber: '',
@@ -42,6 +43,9 @@ const AccountsPage: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [issueList, setIssueList] = useState<any[] | null>(null);
   const [issuesLoading, setIssuesLoading] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   // issue service (student-scoped)
   // lazy import to avoid circular deps - using local service
@@ -144,6 +148,26 @@ const AccountsPage: React.FC = () => {
     void loadIssues();
   }, [activeTab, role]);
 
+  // Auto-load issues for Finance users when the page mounts (keeps the manual Refresh button)
+  useEffect(() => {
+    const loadFinanceIssues = async () => {
+      if (role !== 'Finance') return;
+      setIssuesLoading(true);
+      try {
+        const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+        setIssueList(list || []);
+      } catch (err: unknown) {
+        toast.error(getApiErrorMessage(err, 'Failed to load issues'));
+        setIssueList([]);
+      } finally {
+        setIssuesLoading(false);
+      }
+    };
+
+    void loadFinanceIssues();
+    // Intentionally run when role or accountSearch changes so finance users see relevant results
+  }, [role, accountSearch]);
+
   const handleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
     uploadType: 'accounts' | 'paid' | 'students'
@@ -193,23 +217,6 @@ const AccountsPage: React.FC = () => {
       });
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Correction submission failed'));
-    }
-  };
-
-  const handleFinanceResolve = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    try {
-      const response = await accountService.financeResolveIssue(financeStudentId);
-      toast.success(response.message || 'Issue resolved');
-      setFinanceStudentId('');
-      if (canViewReports) {
-        setReports(await accountService.getReports({
-          institutionId: selectedInstitutionId || undefined,
-        }));
-      }
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to resolve issue'));
     }
   };
 
@@ -437,14 +444,111 @@ const AccountsPage: React.FC = () => {
               )}
 
               {role === 'Finance' && (
-                <form className="max-w-md space-y-3" onSubmit={handleFinanceResolve}>
-                  <label className="text-sm font-medium">Resolve student issue</label>
-                  <input value={financeStudentId} onChange={(e) => setFinanceStudentId(e.target.value)} placeholder="Student ID" className="w-full rounded-md border border-gray-300 px-3 py-2" />
-                  <div className="flex gap-2">
-                    <button type="submit" className="rounded-md bg-button px-4 py-2 text-white">Resolve</button>
-                    <button type="button" onClick={() => setFinanceStudentId('')} className="rounded-md border px-4 py-2">Clear</button>
+                <div>
+                  <div className="flex items-center gap-3 mb-4">
+                    <button
+                      onClick={async () => {
+                        setIssuesLoading(true);
+                        try {
+                          const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+                          setIssueList(list || []);
+                        } catch (err) {
+                          toast.error(getApiErrorMessage(err, 'Failed to load issues'));
+                          setIssueList([]);
+                        } finally {
+                          setIssuesLoading(false);
+                        }
+                      }}
+                      className="rounded-md bg-button px-3 py-2 text-white"
+                    >
+                      Refresh
+                    </button>
                   </div>
-                </form>
+
+                  {issuesLoading ? (
+                    <p className="text-gray-500">Loading issues...</p>
+                  ) : !issueList || issueList.length === 0 ? (
+                    <p className="text-gray-500">No issues found</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Contract</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Bank</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Account</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Student</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Proofs</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Submitted</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {issueList.map((it: any) => (
+                            <tr key={it._id}>
+                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{it.contractNumber}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{it.bankName}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{it.accountNumber}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{(it.student && it.student.studentId) || it.studentId}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">
+                                {it.proofUrls && it.proofUrls.length > 0 ? (
+                                  <div className="flex gap-2">
+                                    {it.proofUrls.map((u: string, idx: number) => (
+                                      <button key={u + idx} onClick={() => { setLightboxImages(it.proofUrls); setLightboxIndex(idx); setLightboxOpen(true); }} className="inline-block rounded-md border p-1">
+                                        <img src={u} alt={`proof-${idx}`} className="h-10 w-16 object-cover" />
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">No proofs</span>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{new Date(it.createdAt).toLocaleString()}</td>
+                              <td className="px-6 py-4 text-right text-sm">
+                                <div className="flex justify-end gap-2">
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm('Approve this issue and update account records?')) return;
+                                      try {
+                                        await adminIssueService.approveIssue(it._id);
+                                        toast.success('Issue approved and account updated');
+                                        // refresh issues and accounts
+                                        const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+                                        setIssueList(list || []);
+                                        if (canViewReports) await loadAccountRows();
+                                      } catch (err: any) {
+                                        toast.error(getApiErrorMessage(err, 'Failed to approve issue'));
+                                      }
+                                    }}
+                                    className="rounded-md bg-green-600 px-3 py-2 text-white"
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      const reason = prompt('Enter reason for rejection (optional):');
+                                      try {
+                                        await adminIssueService.rejectIssue(it._id, reason || undefined);
+                                        toast.success('Issue rejected');
+                                        const list = await adminIssueService.listIssues({ status: 'submitted', search: accountSearch || undefined });
+                                        setIssueList(list || []);
+                                      } catch (err: any) {
+                                        toast.error(getApiErrorMessage(err, 'Failed to reject issue'));
+                                      }
+                                    }}
+                                    className="rounded-md border px-3 py-2"
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               )}
 
               {role !== 'Student' && role !== 'Finance' && (
@@ -489,6 +593,10 @@ const AccountsPage: React.FC = () => {
             </div>
           </div>
         )}
+
+          {lightboxOpen && (
+            <Lightbox images={lightboxImages} startIndex={lightboxIndex} onClose={() => setLightboxOpen(false)} />
+          )}
 
         {summary && (
           <div className="grid gap-4 md:grid-cols-4">
