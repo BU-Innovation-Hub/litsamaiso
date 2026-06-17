@@ -171,12 +171,6 @@ const AccountsPage: React.FC = () => {
     // Intentionally run when role or accountSearch changes so finance users see relevant results
   }, [role, accountSearch]);
 
-  useEffect(() => {
-    if (searchParams.get('tab') === 'issues') {
-      setActiveTab('issues');
-    }
-  }, [searchParams]);
-
   const handleUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
     uploadType: 'accounts' | 'paid' | 'students'
