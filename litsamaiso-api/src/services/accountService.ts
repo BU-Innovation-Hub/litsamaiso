@@ -456,11 +456,27 @@ export const accountConfirmation = async (
     String(bankName || "").toLowerCase();
 
   // Ensure the logged-in student's record maps to the provided contract number
-  const studentMatches = String(student.contractNumber || "").trim() === contractNumber;
+  const studentContract = String(student.contractNumber || "").trim();
+  const confirmedByMatches = !!(
+    accountByContract &&
+    (accountByContract as any).confirmedBy &&
+    String((accountByContract as any).confirmedBy) === String(student._id)
+  );
+
+  // Consider a student a match if:
+  // - their stored contractNumber equals the provided contractNumber, OR
+  // - they previously confirmed this account (confirmedBy), OR
+  // - they have no stored contractNumber but are the logged-in student and the account's contractNumber matches the input
+  const studentMatches =
+    (studentContract !== "" && studentContract === contractNumber) ||
+    confirmedByMatches ||
+    (!studentContract &&
+      String(input.studentId || "").trim() === String(student.studentId || "").trim() &&
+      String(accountByContract.contractNumber || "").trim() === contractNumber);
 
   if (!accountMatches || !bankMatches || !studentMatches) {
     console.log(
-      `[accountConfirmation] Mismatch detected. Account match: ${accountMatches}, Bank match: ${bankMatches}, Student match: ${studentMatches}`,
+      `[accountConfirmation] Mismatch detected. Account match: ${accountMatches}, Bank match: ${bankMatches}, Student match: ${studentMatches}. Debug: student._id=${String(student._id)}, student.studentId=${String(student.studentId)}, student.contractNumber=${studentContract}, account.contractNumber=${String(accountByContract.contractNumber)}, account.confirmedBy=${String((accountByContract as any).confirmedBy) || "null"}, input.studentId=${String(input.studentId)}`,
     );
 
     const reasons: string[] = [];
