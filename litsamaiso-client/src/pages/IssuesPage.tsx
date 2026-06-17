@@ -1,10 +1,8 @@
 import React from 'react';
 import StudentIssues from '../components/StudentIssues';
-import { useAuth } from '../hooks/useAuth';
 
 const IssuesPage: React.FC = () => {
-  const { user } = useAuth();
-  const studentId = user?.studentId;
+  // No auth-dependent logic needed here currently
 
   return (
     <div className="global-bg">
@@ -14,7 +12,7 @@ const IssuesPage: React.FC = () => {
             <div className="sticky top-0 bg-white z-10 py-4 px-5">
               <h2 className="text-2xl font-bold">Account Verification Issues</h2>
             </div>
-            <StudentIssues studentId={studentId} />
+            <StudentIssues />
           </div>
         </div>
       </div>

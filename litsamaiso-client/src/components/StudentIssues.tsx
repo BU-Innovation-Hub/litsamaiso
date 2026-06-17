@@ -29,13 +29,12 @@ interface Account {
   confirmationDate?: string;
 }
 
-export default function StudentIssues({ studentId }: { studentId?: string }) {
+export default function StudentIssues() {
   const [issues, setIssues] = useState<IIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editingIssue, setEditingIssue] = useState<IIssue | null>(null);
   const [editForm, setEditForm] = useState({
     fullnames: '',
@@ -84,7 +83,7 @@ export default function StudentIssues({ studentId }: { studentId?: string }) {
 
   const openEditModal = (issue: IIssue, account?: Account | undefined) => {
     setEditingIssue(issue);
-    setEditingAccount(account || null);
+    // account parameter used to populate the edit form; we don't store it in state
     setEditForm({
       fullnames: account?.fullnames || '',
       contractNumber: issue.contractNumber || '',
@@ -125,11 +124,11 @@ export default function StudentIssues({ studentId }: { studentId?: string }) {
       } as any;
       if (uploadedUrls.length) payload.proofUrls = uploadedUrls;
 
-      const response = await issueService.updateIssue(editingIssue._id || '', payload);
+      await issueService.updateIssue(editingIssue._id || '', payload);
       toast.success('Issue updated successfully');
       setShowEditModal(false);
       setEditingIssue(null);
-      setEditingAccount(null);
+      // editing account is not stored in state
       await fetchAccounts();
       await fetchIssues();
     } catch (err: any) {
@@ -195,9 +194,9 @@ export default function StudentIssues({ studentId }: { studentId?: string }) {
       {showEditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-semibold">Edit Account Record</h3>
-              <button onClick={() => { setShowEditModal(false); setEditingAccount(null); setEditingIssue(null); setEditProofFiles(null); }} className="text-gray-500 hover:text-gray-700"><X className="w-5 h-5" /></button>
+              <button onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }} className="text-gray-500 hover:text-gray-700"><X className="w-5 h-5" /></button>
             </div>
 
             <form onSubmit={handleEditSubmit} className="space-y-4">
@@ -223,8 +222,8 @@ export default function StudentIssues({ studentId }: { studentId?: string }) {
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-3 pt-4">
-                <Button type="button" variant="outline" onClick={() => { setShowEditModal(false); setEditingAccount(null); setEditingIssue(null); setEditProofFiles(null); }}>Cancel</Button>
+                <div className="flex justify-end space-x-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }}>Cancel</Button>
                 <Button type="submit">Update Account</Button>
               </div>
             </form>

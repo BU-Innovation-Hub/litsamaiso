@@ -29,7 +29,6 @@ const AccountsPage: React.FC = () => {
   const [accountEndDate, setAccountEndDate] = useState('');
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [selectedInstitutionId, setSelectedInstitutionId] = useState('');
-  const [financeStudentId, setFinanceStudentId] = useState('');
   const [correction, setCorrection] = useState({
     correctedBankName: '',
     correctedAccountNumber: '',
@@ -218,23 +217,6 @@ const AccountsPage: React.FC = () => {
       });
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Correction submission failed'));
-    }
-  };
-
-  const handleFinanceResolve = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    try {
-      const response = await accountService.financeResolveIssue(financeStudentId);
-      toast.success(response.message || 'Issue resolved');
-      setFinanceStudentId('');
-      if (canViewReports) {
-        setReports(await accountService.getReports({
-          institutionId: selectedInstitutionId || undefined,
-        }));
-      }
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to resolve issue'));
     }
   };
 
