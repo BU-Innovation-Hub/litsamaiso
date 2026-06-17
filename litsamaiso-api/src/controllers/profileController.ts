@@ -22,6 +22,7 @@ export const getProfile = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
+  res.set("Cache-Control", "no-store");
   const currentUser = (req as any).user;
 
   const user = await User.findById(currentUser._id)
@@ -41,6 +42,7 @@ export const updateProfile = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
+  res.set("Cache-Control", "no-store");
   const currentUser = (req as any).user;
   const { name, email, studentCardUrl } = req.body as {
     name?: string;

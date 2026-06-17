@@ -19,10 +19,13 @@ const ensureConfigured = (): void => {
   });
 };
 
-export const uploadImageBuffer = async (params: {
+type CloudinaryResourceType = "image" | "video" | "raw" | "auto";
+
+export const uploadFileBuffer = async (params: {
   buffer: Buffer;
   fileName?: string;
   folder?: string;
+  resourceType?: CloudinaryResourceType;
 }): Promise<{ url: string; publicId: string }> => {
   ensureConfigured();
 
@@ -32,7 +35,7 @@ export const uploadImageBuffer = async (params: {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder,
-        resource_type: "image",
+        resource_type: params.resourceType || "auto",
         use_filename: true,
         unique_filename: true,
         ...(params.fileName && { filename_override: params.fileName }),
@@ -49,3 +52,5 @@ export const uploadImageBuffer = async (params: {
     stream.end(params.buffer);
   });
 };
+
+export const uploadImageBuffer = uploadFileBuffer;

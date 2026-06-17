@@ -90,8 +90,15 @@ const ProfilePage: React.FC = () => {
     setUploadingImage(true);
     try {
       const { url } = await profileService.uploadProfileImage(file);
-      setFormData((previous) => ({ ...previous, studentCardUrl: url }));
-      toast.success('Image uploaded successfully');
+      const nextFormData = { ...formData, studentCardUrl: url };
+      setFormData(nextFormData);
+
+      const updatedProfile = await profileService.updateProfile(nextFormData);
+      setProfile(updatedProfile);
+      const updatedUser = mergeProfileIntoUser(user, updatedProfile);
+      setUser(updatedUser);
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      toast.success('Image uploaded and saved successfully');
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Failed to upload image'));
     } finally {
