@@ -125,15 +125,7 @@ const AccountConfirmationPage: React.FC = () => {
     setReviewAccepted(Boolean(details.bankName && details.accountNumber));
   };
 
-  const acceptEnteredDetails = () => {
-    if (!formData.bankName.trim() || !formData.accountNumber.trim()) {
-      toast.error('Enter both bank name and account number first');
-      return;
-    }
-
-    setReviewAccepted(true);
-    toast.success('Bank details applied. You can confirm now.');
-  };
+  // User can edit bank/account fields manually — accepting edited values simply marks review accepted
 
   const runOcr = async (file: File) => {
     setIsExtracting(true);
@@ -213,9 +205,10 @@ const AccountConfirmationPage: React.FC = () => {
           const data = resp.data;
           toast.success(data.message || 'Account confirmed');
           setIsConfirmed(true);
-        } catch (err: any) {
+        } catch (err: unknown) {
           // axios throws for non-2xx; inspect response for server-provided indicators
-          const respErr = err?.response?.data;
+          type RespErrShape = { needsProof?: boolean; issue?: unknown; [key: string]: unknown };
+          const respErr = (err as unknown as { response?: { data?: RespErrShape } } | undefined)?.response?.data;
           if (respErr) {
             if (respErr.needsProof) {
               toast.message('Account mismatch — redirected to Issues for resolution.');
@@ -330,6 +323,60 @@ const AccountConfirmationPage: React.FC = () => {
                   </p>
                 </div>
 
+                {/* Preview: moved here from the globe card to sit directly under the upload input */}
+                <div className="mt-4 rounded-2xl bg-white p-2 shadow-sm">
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt="Bank proof preview"
+                      className="w-full rounded-lg object-contain"
+                    />
+                  ) : (
+                    <div className="flex min-h-28 flex-col items-center justify-center rounded-lg border border-gray-200 text-center text-sm text-muted-foreground p-6">
+                      <FileImage className="mb-3" size={28} />
+                      Your bank proof preview appears here.
+                    </div>
+                  )}
+
+                  {ocrText && (
+                    <details className="mt-3 rounded-lg bg-gray-50 p-3 text-sm">
+                      <summary className="cursor-pointer text-sm">View OCR text</summary>
+                      <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-xs text-gray-700">
+                        {ocrText}
+                      </pre>
+                    </details>
+                  )}
+
+                  <div className="mt-3 flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewUrl(null);
+                        setExtracted(null);
+                        setOcrText('');
+                        setReviewAccepted(false);
+                        // clear file input if present
+                        const fileInput = document.querySelector('input[type=file]') as HTMLInputElement | null;
+                        if (fileInput) fileInput.value = '';
+                      }}
+                      className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold"
+                    >
+                      <RefreshCcw size={16} />
+                      Reset upload
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preview moved here (under upload) for better UX and responsiveness) */}
+                {/* {previewUrl && (
+                  <div className="mt-4 rounded-lg bg-white p-3 shadow-sm">
+                    <p className="text-sm font-medium mb-2">Bank proof preview</p>
+                    <div className="w-full rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
+                      <img src={previewUrl} alt="Bank proof preview" className="w-full max-h-64 object-contain" />
+                    </div>
+                  </div>
+                )} */}
+
                 {isExtracting && (
                   <div className="flex items-center gap-2 rounded-md bg-white/70 p-3 text-sm text-muted-foreground">
                     <Loader className="animate-spin" size={16} />
@@ -421,41 +468,7 @@ const AccountConfirmationPage: React.FC = () => {
                 <div className="absolute -right-20 -bottom-20 z-10 mx-auto flex h-full w-full max-w-sm items-center justify-center transition-all duration-700 hover:scale-105 md:-right-28 md:-bottom-28 md:max-w-xl">
                   <Globe scale={1.1} baseColor={[1, 0, 0.3]} markerColor={[0, 0, 0]} glowColor={[1, 0.3, 0.4]} />
                 </div>
-                <div className="mt-8 rounded-2xl bg-white/10 p-4 backdrop-blur">
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt="Bank proof preview"
-                      className="max-h-65 w-full rounded-lg object-contain"
-                    />
-                  ) : (
-                    <div className="flex min-h-55 flex-col items-center justify-center rounded-lg border border-white/20 text-center text-base text-white/80">
-                      <FileImage className="mb-3" size={32} />
-                      Your bank proof preview appears here.
-                    </div>
-                  )}
-                </div>
-                {ocrText && (
-                  <details className="mt-4 rounded-lg bg-black/20 p-3 text-sm">
-                    <summary className="cursor-pointer">View OCR text</summary>
-                    <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-xs text-white/80">
-                      {ocrText}
-                    </pre>
-                  </details>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPreviewUrl(null);
-                    setExtracted(null);
-                    setOcrText('');
-                    setReviewAccepted(false);
-                  }}
-                  className="mt-4 inline-flex items-center gap-2 rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/20"
-                >
-                  <RefreshCcw size={16} />
-                  Reset upload
-                </button>
+                {/* Preview moved to the left column for consistency with Next.js UI */}
               </article>
             </div>
           </div>
