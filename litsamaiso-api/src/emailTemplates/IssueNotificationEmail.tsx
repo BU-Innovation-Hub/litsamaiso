@@ -1,5 +1,5 @@
 import React from "react";
-import BaseEmail from "./BaseEmail";
+import BaseEmail from "./BaseEmail.js";
 import { Text, Link, Row, Column } from "@react-email/components";
 
 type Issue = {
