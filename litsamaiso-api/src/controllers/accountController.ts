@@ -189,7 +189,7 @@ export const confirmAccount = async (req: Request, res: Response) => {
       }
     }
 
-    const confirmationInput: {
+    let confirmationInput: {
       contractNumber: string;
       bankName: string;
       accountNumber: string;
