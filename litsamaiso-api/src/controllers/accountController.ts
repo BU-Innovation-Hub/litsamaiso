@@ -87,9 +87,9 @@ export const listAccounts = async (req: Request, res: Response) => {
 
     if (params.status) {
       const s = String(params.status).trim();
-      // frontend uses 'pending' to mean the default 'undefined' status
+      // Include legacy rows where blank imports were previously stored as "undefined".
       if (s.toLowerCase() === 'pending') {
-        q.status = 'undefined';
+        q.status = { $in: ['pending', 'undefined', '', null] };
       } else {
         // allow case-insensitive match for other statuses
         q.status = new RegExp(`^${s}$`, 'i');
@@ -548,7 +548,7 @@ export const financeResolveAccountIssue = async (
       return;
     }
 
-    const issue = await Issue.findOne({ studentId: targetStudentId }).lean();
+    const issue = await Issue.findOne({ studentId: targetStudentId });
     if (!issue) {
       res.status(404).json({ message: "Issue not found for studentId" });
       return;
@@ -604,7 +604,10 @@ export const financeResolveAccountIssue = async (
     account.accountNumber = correctedAccountNumber;
     await account.save();
 
-    await Issue.deleteOne({ studentId: targetStudentId });
+    issue.status = "resolved";
+    (issue as any).approvedBy = financeUser._id;
+    (issue as any).approvedAt = new Date();
+    await issue.save();
 
     const studentUser = await User.findOne({ studentId: targetStudentId })
       .select("email")
@@ -694,7 +697,7 @@ export const updateAccount = async (req: Request, res: Response) => {
 
     const setObj: any = {};
     for (const k of Object.keys(updates)) {
-      if (allowed.includes(k)) setObj[k] = updates[k];
+      if (allowed.includes(k)) setObj[k] = k === "status" && String(updates[k] || "").trim() === "" ? "pending" : updates[k];
     }
 
     if (Object.keys(setObj).length === 0) {

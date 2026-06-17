@@ -69,6 +69,11 @@ const dashboardElectionRoles: RoleName[] = ['SAAD', 'Student'];
 const formatStatus = (status?: string) =>
   status ? status.replace(/[_-]/g, ' ') : 'Not available';
 
+const isPendingIssueStatus = (status?: string) => {
+  const normalized = String(status || 'submitted').toLowerCase();
+  return normalized === 'submitted' || normalized === 'reported';
+};
+
 const formatDate = (date?: string) => {
   if (!date) return '';
   const parsed = new Date(date);
@@ -184,7 +189,7 @@ const DashboardPage: React.FC = () => {
   const accountSummary = accountReports?.reports.summary;
   const openElections = elections.filter((election) => election.status === 'OPEN').length;
   const scheduledElections = elections.filter((election) => election.status === 'SCHEDULED').length;
-  const pendingIssues = adminIssues.filter((issue) => issue.status === 'reported' || !issue.status).length;
+  const pendingIssues = adminIssues.filter((issue) => isPendingIssueStatus(issue.status)).length;
   const rejectedIssues = adminIssues.filter((issue) => issue.status === 'rejected').length;
   const activeInstitutions = institutions.filter((institution) => !institution.locked).length;
 
@@ -350,7 +355,7 @@ const DashboardPage: React.FC = () => {
     users.length,
   ]);
 
-  const recentRecords = canViewAdminIssues ? adminIssues.slice(0, 5) : studentIssues.slice(0, 5);
+  const recentRecords = canViewAdminIssues ? adminIssues : studentIssues.slice(0, 5);
   const hasStatusBreakdown = Boolean(accountReports?.reports.statusBreakdown?.length);
   const totalStatusCount = accountReports?.reports.statusBreakdown?.reduce((sum, item) => sum + item.count, 0) ?? 0;
 
@@ -444,7 +449,7 @@ const DashboardPage: React.FC = () => {
                   })}
                 </div>
               ) : canViewElections && elections.length > 0 ? (
-                <div className="divide-y divide-slate-100">
+                <div className={`divide-y divide-slate-100 ${canViewAdminIssues ? 'max-h-[28rem] overflow-y-auto pr-1' : ''}`}>
                   {elections.slice(0, 5).map((election) => (
                     <div key={election._id} className="flex items-center justify-between gap-4 py-3">
                       <div>
@@ -480,8 +485,10 @@ const DashboardPage: React.FC = () => {
             <div className="mt-5">
               {(canViewAdminIssues || canViewStudentActions) && recentRecords.length > 0 ? (
                 <div className="divide-y divide-slate-100">
-                  {recentRecords.map((issue) => (
-                    <div key={issue._id} className="py-3">
+                  {recentRecords.map((issue) => {
+                    const isPending = canViewAdminIssues && isPendingIssueStatus(issue.status);
+                    const rowContent = (
+                      <>
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-semibold text-primary-clr">
                           {issue.contractNumber || issue.studentId || 'Issue record'}
@@ -493,10 +500,23 @@ const DashboardPage: React.FC = () => {
                       <p className="mt-1 text-sm text-slate-500">
                         {[issue.bankName, formatDate(issue.createdAt)].filter(Boolean).join(' • ') || 'No additional details'}
                       </p>
-                    </div>
-                  ))}
+                      </>
+                    );
+
+                    return (
+                      <div key={issue._id} className="py-3">
+                        {isPending ? (
+                          <Link to="/accounts?tab=issues" className="block rounded-lg p-2 transition hover:bg-slate-50">
+                            {rowContent}
+                          </Link>
+                        ) : (
+                          rowContent
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ) : canViewReports && recentAccounts.length > 0 ? (
+              ) : !canViewAdminIssues && canViewReports && recentAccounts.length > 0 ? (
                 <div className="divide-y divide-slate-100">
                   {recentAccounts.map((account) => (
                     <div key={account._id} className="flex items-center justify-between gap-4 py-3">

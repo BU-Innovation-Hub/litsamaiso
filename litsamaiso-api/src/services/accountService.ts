@@ -36,6 +36,14 @@ const REQUIRED_COLUMNS = [
 
 const PAID_REQUIRED_COLUMNS = [...REQUIRED_COLUMNS, "status"];
 
+const normalizeAccountStatus = (value: unknown): "pending" | "confirmed" | "erroneous" | "paid" => {
+  const status = String(value || "").trim().toLowerCase();
+  if (status === "confirmed" || status === "erroneous" || status === "paid") {
+    return status;
+  }
+  return "pending";
+};
+
 export const loadAccountsFromExcel = async (
   fileBuffer: Buffer,
   institutionId: Types.ObjectId,
@@ -116,7 +124,7 @@ export const loadAccountsFromExcel = async (
           : String(graduatingRaw).toLowerCase().trim();
       const graduating =
         gval === "true" || gval === "1" || gval === "yes" || gval === "y";
-      const status = String(row["status"]).trim();
+      const status = normalizeAccountStatus(row["status"]);
       const paidDateRaw = row["paiddate"];
       const paidDate = paidDateRaw ? new Date(paidDateRaw) : undefined;
 
@@ -272,7 +280,7 @@ export const loadPayedStudentsFromExcel = async (
         skippedDetails.push({
           row: idx + 2,
           reasons: [
-            `Current account status must be confirmed before marking paid (found: ${account.status || "undefined"})`,
+            `Current account status must be confirmed before marking paid (found: ${account.status || "pending"})`,
           ],
         });
         continue;

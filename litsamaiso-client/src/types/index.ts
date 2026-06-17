@@ -155,7 +155,7 @@ export interface Account {
   batchNumber?: number;
   courseOfStudy: string;
   graduating?: boolean;
-  status: 'undefined' | 'pending' | 'confirmed' | 'erroneous' | 'paid';
+  status: 'pending' | 'undefined' | 'confirmed' | 'erroneous' | 'paid';
   student?: User;
   institution: Institution;
   issues?: Issue[];

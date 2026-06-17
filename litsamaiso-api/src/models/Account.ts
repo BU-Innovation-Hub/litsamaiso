@@ -8,7 +8,7 @@ export interface AccountDocument {
   courseOfStudy: string;
   fullnames: string;
   graduating: boolean;
-  status: string;
+  status: "pending" | "confirmed" | "erroneous" | "paid" | "undefined";
   paidDate?: Date;
   paidAt?: Date;
   institution: Types.ObjectId;
@@ -25,7 +25,12 @@ const accountSchema = new Schema<AccountDocument>(
     courseOfStudy: { type: String, required: true, trim: true },
     fullnames: { type: String, required: true, trim: true },
     graduating: { type: Boolean, default: false },
-    status: { type: String, default: "undefined", trim: true },
+    status: {
+      type: String,
+      enum: ["pending", "confirmed", "erroneous", "paid", "undefined"],
+      default: "pending",
+      trim: true,
+    },
     paidDate: { type: Date },
     paidAt: { type: Date },
     institution: {
