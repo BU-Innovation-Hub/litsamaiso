@@ -595,14 +595,38 @@ const LandingPage = () => {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <TeamPhoto member={teamMembers[0]} className="lg:row-span-2" />
-              <TeamBio member={teamMembers[1]} />
-              <TeamPhoto member={teamMembers[2]} />
-              <TeamBio member={teamMembers[3]} />
-              <TeamPhoto member={teamMembers[1]} />
-              <TeamBio member={teamMembers[0]} />
-              <TeamPhoto member={teamMembers[3]} className="lg:row-span-2" />
-              <TeamBio member={teamMembers[2]} />
+              <TeamPhoto
+                member={teamMembers[0]}
+                className="order-1 md:order-1 lg:order-0 lg:row-span-2"
+              />
+              <TeamBio
+                member={teamMembers[1]}
+                className="order-3 md:order-2 lg:order-0"
+              />
+              <TeamPhoto
+                member={teamMembers[2]}
+                className="order-5 md:order-5 lg:order-0"
+              />
+              <TeamBio
+                member={teamMembers[3]}
+                className="order-7 md:order-6 lg:order-0"
+              />
+              <TeamPhoto
+                member={teamMembers[1]}
+                className="order-4 md:order-4 lg:order-0"
+              />
+              <TeamBio
+                member={teamMembers[2]}
+                className="order-6 md:order-7 lg:order-0"
+              />
+              <TeamPhoto
+                member={teamMembers[3]}
+                className="order-8 md:order-8 lg:order-0 lg:row-span-2"
+              />
+              <TeamBio
+                member={teamMembers[0]}
+                className="order-2 md:order-3 lg:order-0"
+              />
             </div>
           </div>
         </section>
@@ -816,9 +840,18 @@ const TeamPhoto = ({
   </motion.figure>
 );
 
-const TeamBio = ({ member }: { member: (typeof teamMembers)[number] }) => (
+const TeamBio = ({
+  member,
+  className,
+}: {
+  member: (typeof teamMembers)[number];
+  className?: string;
+}) => (
   <motion.article
-    className="min-h-44 rounded-3xl border border-white/10 bg-white/5.5 p-5 shadow-xl shadow-black/10"
+    className={cn(
+      "min-h-44 rounded-3xl border border-white/10 bg-white/5.5 p-5 shadow-xl shadow-black/10",
+      className,
+    )}
     initial="hidden"
     whileInView="visible"
     viewport={{ once: true, margin: "-80px" }}
