@@ -113,6 +113,25 @@ const VotingPage: React.FC = () => {
     }
   };
 
+  const handleCandidateSelect = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    positionId: string,
+    candidateId: string,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    setSelectedCandidates((prev) => {
+      if (prev[positionId] === candidateId) {
+        const next = { ...prev };
+        delete next[positionId];
+        return next;
+      }
+
+      return { ...prev, [positionId]: candidateId };
+    });
+  };
+
   return (
     <div className="global-bg min-h-screen pt-32">
       <div className="mx-auto max-w-4xl px-4">
@@ -151,16 +170,11 @@ const VotingPage: React.FC = () => {
                       position.candidates.map((candidate) => (
                         <button
                           key={candidate._id || getCandidateName(candidate)}
-                          onClick={() => position._id && candidate._id && setSelectedCandidates((prev) => {
-                            const positionId = position._id as string;
-                            if (prev[positionId] === candidate._id) {
-                              const next = { ...prev };
-                              delete next[positionId];
-                              return next;
+                          onClick={(event) => {
+                            if (position._id && candidate._id) {
+                              handleCandidateSelect(event, position._id, candidate._id);
                             }
-
-                            return { ...prev, [positionId]: candidate._id as string };
-                          })}
+                          }}
                           className={`rounded-lg border-2 p-4 text-left transition-all ${
                             position._id && selectedCandidates[position._id] === candidate._id
                               ? 'border-blue-600 bg-blue-50 shadow-md'

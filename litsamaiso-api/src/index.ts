@@ -31,9 +31,20 @@ import { initAgenda } from "./scheduler/agenda.js";
 
 const app = express();
 
+app.set("etag", false);
 app.use(cors());
 // Allow larger JSON payloads (base64 images for AI validation)
 app.use(express.json({ limit: "10mb" }));
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === "GET") {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Surrogate-Control", "no-store");
+  }
+  next();
+});
 
 const REDACT_KEYS = new Set([
   "password",

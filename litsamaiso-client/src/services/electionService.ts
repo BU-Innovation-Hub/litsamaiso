@@ -1,16 +1,27 @@
 import apiClient from './authService';
 import type { Election, Position, Candidate, CandidateImportResult, ResultPositionDetail, ResultSnapshot, Vote } from '../types';
 
+const noCacheRequest = (params?: Record<string, unknown>) => ({
+  params: { ...(params || {}), _: Date.now() },
+  headers: {
+    'Cache-Control': 'no-cache',
+    Pragma: 'no-cache',
+  },
+});
+
 export const electionService = {
   // Get all active elections for the current institution
   getElections: async () => {
-    const response = await apiClient.get<{ elections: Election[] }>('/elections');
+    const response = await apiClient.get<{ elections: Election[] }>('/elections', noCacheRequest());
     return response.data.elections;
   },
 
   // Get a specific election by ID
   getElection: async (electionId: string) => {
-    const response = await apiClient.get<{ election: Election }>(`/elections/${electionId}`);
+    const response = await apiClient.get<{ election: Election }>(
+      `/elections/${electionId}`,
+      noCacheRequest()
+    );
     return response.data.election;
   },
 
@@ -78,7 +89,8 @@ export const electionService = {
 
   getPositions: async (electionId: string) => {
     const response = await apiClient.get<{ positions: Position[] }>(
-      `/elections/${electionId}/positions`
+      `/elections/${electionId}/positions`,
+      noCacheRequest()
     );
     return response.data.positions;
   },
@@ -126,7 +138,8 @@ export const electionService = {
 
   getCandidates: async (positionId: string) => {
     const response = await apiClient.get<{ candidates: Candidate[] }>(
-      `/elections/positions/${positionId}/candidates`
+      `/elections/positions/${positionId}/candidates`,
+      noCacheRequest()
     );
     return response.data.candidates;
   },
@@ -158,7 +171,10 @@ export const electionService = {
 
   // Get election results
   getResults: async (electionId: string) => {
-    const response = await apiClient.get<{ snapshot: ResultSnapshot }>(`/elections/${electionId}/results`);
+    const response = await apiClient.get<{ snapshot: ResultSnapshot }>(
+      `/elections/${electionId}/results`,
+      noCacheRequest()
+    );
     return response.data.snapshot;
   },
 
@@ -171,7 +187,8 @@ export const electionService = {
 
   getResultsByPosition: async (electionId: string, positionId: string) => {
     const response = await apiClient.get<{ position: ResultPositionDetail }>(
-      `/elections/${electionId}/results/positions/${positionId}`
+      `/elections/${electionId}/results/positions/${positionId}`,
+      noCacheRequest()
     );
     return response.data.position;
   },
@@ -179,9 +196,7 @@ export const electionService = {
   getVoteStatus: async (electionId: string) => {
     const response = await apiClient.get<{
       status: { hasVoted: boolean; receiptId?: string; submittedAt?: string };
-    }>('/vote/status', {
-      params: { electionId },
-    });
+    }>('/vote/status', noCacheRequest({ electionId }));
     return response.data.status;
   },
 
