@@ -137,21 +137,21 @@ const teamMembers = [
     role: "Product Manager",
     description:
       "Shapes the student-service experience around clarity, trust, and institutional accountability.",
-    image: "/team/joel.jpg",
+    image: "/team/joel.webp",
   },
   {
     name: "Poloko Nkolanyane",
     role: "Technical Lead",
     description:
       "Turns complex funding and governance rules into dependable, quiet infrastructure.",
-    image: "/team/poloko.jpg",
+    image: "/team/poloko.webp",
   },
   {
     name: "Bokang Mahlaka",
     role: "Frontend Lead",
     description:
       "Keeps the platform grounded in the daily reality of students, admins, and support teams.",
-    image: "/team/bokang.jpg",
+    image: "/team/bokang.webp",
   },
   {
     name: "Rethabile Lebelo",
