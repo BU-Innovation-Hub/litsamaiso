@@ -14,10 +14,10 @@ type Issue = {
 
 type Props = {
   issue: Issue;
-  adminLink?: string;
-  appName?: string;
-  logoUrl: string;
-  accentColor?: string;
+  adminLink?: string | undefined;
+  appName?: string | undefined;
+  logoUrl?: string | undefined;
+  accentColor?: string | undefined;
 };
 
 export default function IssueNotificationEmail({
@@ -29,10 +29,10 @@ export default function IssueNotificationEmail({
 }: Props) {
   const title = `Issue submitted — ${issue.contractNumber || "Unknown"}`;
 
-  const textColor = "#0f172a";
+  const textColor = "#f1f5f9";
   const headingStyle: React.CSSProperties = {
     color: textColor,
-    fontSize: 15,
+    fontSize: "15px",
     lineHeight: "1.6",
     margin: "0 0 12px 0",
   };

@@ -36,13 +36,11 @@ export default function BaseEmail({
   ctaUrl,
   accentColor = "#535BC0",
 }: Props) {
-  // Use a light, widely-compatible email theme by default to ensure
-  // high contrast in a variety of mail clients (many strip background colors).
-  const outerBg = "#f6f8fb";
-  const cardBg = "#ffffff";
-  const textColor = "#0f172a";
-  const mutedColor = "#6b7280";
-  const borderStyle = "1px solid #e6e7ea";
+  const outerBg = "#020618";
+  const cardBg = "#0b0f19";
+  const textColor = "#f1f5f9";
+  const mutedColor = "#94a3b8";
+  const borderStyle = "1px solid #1e293b";
 
   // Provide a small inline SVG fallback logo when no `logoUrl` is configured.
   const initials = (appName || "L").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
@@ -51,8 +49,7 @@ export default function BaseEmail({
 
   const bodyStyle: React.CSSProperties = {
     backgroundColor: outerBg,
-    fontFamily:
-      '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    fontFamily: '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     margin: "0",
     padding: "40px 0",
   };
@@ -130,7 +127,7 @@ export default function BaseEmail({
           <Section style={{ marginTop: "32px" }}>
             <Hr style={{ borderColor: "#1e293b", margin: "0 0 24px 0" }} />
             <Text style={{ color: mutedColor, fontSize: "13px", margin: "0 0 8px 0", lineHeight: "1.5" }}>
-              Need help? Contact us at {" "}
+              Need help? Contact us at{" "}
               <Link href="mailto:support@litsamaiso.com" style={{ color: accentColor, textDecoration: "underline" }}>
                 support@litsamaiso.com
               </Link>

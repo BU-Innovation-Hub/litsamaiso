@@ -7,7 +7,7 @@ import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 import { Student } from "../models/Student.js";
 import type { Types } from "mongoose";
-import { sendEmail } from "../utils/email.js";
+import { getEmailBranding, sendEmail } from "../utils/email.js";
 import React from "react";
 import { render } from "@react-email/render";
 import IssueNotificationEmail from "../emailTemplates/IssueNotificationEmail.js";
@@ -370,27 +370,31 @@ export const notifyFinanceUsersAboutIssue = async (input: {
       `Account Number: ${input.accountNumber}`,
       `Reasons: ${reasonText}`,
     ].join("\n");
-    const html = `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937;">
-        <h2 style="margin: 0 0 16px;">Account issue ${actionLabel}</h2>
-        <p>An account issue was ${actionLabel} for <strong>${institutionName}</strong>.</p>
-        <ul>
-          <li><strong>Student ID:</strong> ${input.studentId}</li>
-          <li><strong>Student Email:</strong> ${input.studentEmail}</li>
-          <li><strong>Contract Number:</strong> ${input.contractNumber}</li>
-          <li><strong>Bank Name:</strong> ${input.bankName}</li>
-          <li><strong>Account Number:</strong> ${input.accountNumber}</li>
-          <li><strong>Reasons:</strong> ${reasonText}</li>
-        </ul>
-      </div>
-    `;
+    const { appName, logoUrl, accentColor, attachments } = getEmailBranding();
+    const html = await Promise.resolve(
+      render(
+        React.createElement(IssueNotificationEmail, {
+          issue: {
+            contractNumber: input.contractNumber,
+            studentId: input.studentId,
+            bankName: input.bankName,
+            accountNumber: input.accountNumber,
+            notes: `Student email: ${input.studentEmail}. Reasons: ${reasonText}.`,
+          },
+          appName,
+          logoUrl,
+          accentColor,
+        }),
+      ),
+    );
 
-    // Send simple HTML notification to finance users
+    // Send branded notification to finance users.
     await sendEmail({
       to: (financeUsers.map((user) => user.email).filter(Boolean) as string[]),
       subject,
       text,
       html,
+      attachments,
     });
   } catch (error) {
     console.warn(

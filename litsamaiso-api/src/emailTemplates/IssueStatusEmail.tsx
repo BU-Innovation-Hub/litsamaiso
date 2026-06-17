@@ -36,7 +36,7 @@ export default function IssueStatusEmail({
   const title = status === "approved" ? "Your account verification has been approved" : "Your account verification requires attention";
   const greeting = name ? `Hi ${name},` : "Hi,";
 
-  const textColor = "#0f172a";
+  const textColor = "#f1f5f9";
 
   return (
     <BaseEmail
