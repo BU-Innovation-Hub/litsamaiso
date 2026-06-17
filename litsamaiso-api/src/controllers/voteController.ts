@@ -9,9 +9,17 @@ const handleError = (res: Response, err: any): void => {
   }
   res.status(500).json({ message: err.message || String(err) });
 };
+
+const disableResponseCache = (res: Response): void => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  res.setHeader("Surrogate-Control", "no-store");
+};
 // Handler function to cast a vote for an election, with support for idempotency and capturing client metadata
 export const castVoteHandler = async (req: Request, res: Response) => {
   try {
+    disableResponseCache(res);
     const body = req.body || {};
     const selections = Array.isArray(body.selections) ? body.selections : [];
     const idempotencyKey = req.headers["idempotency-key"]
@@ -38,6 +46,7 @@ export const castVoteHandler = async (req: Request, res: Response) => {
 // Handler function to get the voting status of the current user for a specific election
 export const submitVoteHandler = async (req: Request, res: Response) => {
   try {
+    disableResponseCache(res);
     const body = req.body || {};
     const selections = Array.isArray(body.selections) ? body.selections : [];
     const electionId = body.electionId ? String(body.electionId) : "";
@@ -67,6 +76,7 @@ export const submitVoteHandler = async (req: Request, res: Response) => {
 // Handler function to get the voting status of the current user for a specific election
 export const getVoteStatusHandler = async (req: Request, res: Response) => {
   try {
+    disableResponseCache(res);
     const electionId = req.query.electionId ? String(req.query.electionId) : "";
     if (!electionId) {
       res.status(400).json({ message: "electionId is required" });
@@ -86,6 +96,7 @@ export const getVoteStatusHandler = async (req: Request, res: Response) => {
 // Handler function to get the vote receipt by ID, with access control to ensure users can only access their own receipts
 export const getVoteReceiptHandler = async (req: Request, res: Response) => {
   try {
+    disableResponseCache(res);
     const receipt = await getVoteReceipt({
       user: (req as any).user,
       receiptId: req.params.id as string,

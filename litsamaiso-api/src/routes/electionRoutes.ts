@@ -27,6 +27,7 @@ import {
   listCandidatesByPositionHandler,
   approveCandidateHandler,
   disqualifyCandidateHandler,
+  importCandidatesHandler,
 } from "../controllers/candidateController.js";
 import { castVoteHandler } from "../controllers/voteController.js";
 import {
@@ -48,6 +49,29 @@ const upload = multer({
     cb(null, true);
   },
 });
+const spreadsheetUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = new Set([
+      "text/csv",
+      "application/csv",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ]);
+    const lowerName = (file.originalname || "").toLowerCase();
+    const hasAllowedExtension =
+      lowerName.endsWith(".csv") ||
+      lowerName.endsWith(".xls") ||
+      lowerName.endsWith(".xlsx");
+
+    if (!allowedMimeTypes.has(file.mimetype) && !hasAllowedExtension) {
+      cb(new Error("Only CSV or Excel spreadsheet uploads are allowed"));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 const uploadCandidateImage = (
   req: Request,
@@ -57,6 +81,19 @@ const uploadCandidateImage = (
   upload.single("image")(req, res, (err: any) => {
     if (err) {
       res.status(400).json({ message: err.message || "Invalid image upload" });
+      return;
+    }
+    next();
+  });
+};
+const uploadCandidateSpreadsheet = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  spreadsheetUpload.single("file")(req, res, (err: any) => {
+    if (err) {
+      res.status(400).json({ message: err.message || "Invalid spreadsheet upload" });
       return;
     }
     next();
@@ -95,6 +132,12 @@ router.post(
   requireRole("SAAD"),
   uploadCandidateImage,
   createCandidateHandler,
+);
+router.post(
+  "/:electionId/candidates/import",
+  requireRole("SAAD"),
+  uploadCandidateSpreadsheet,
+  importCandidatesHandler,
 );
 router.get(
   "/positions/:positionId/candidates",
