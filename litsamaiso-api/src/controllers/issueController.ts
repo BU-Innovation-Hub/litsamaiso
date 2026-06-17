@@ -84,3 +84,90 @@ export const deleteIssuesForStudent = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Failed to delete issues", details: err.message });
   }
 };
+
+export const getIssueById = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const id = String(req.params.id || "");
+    const issue = await Issue.findById(id).lean();
+    if (!issue) {
+      res.status(404).json({ error: "Issue not found" });
+      return;
+    }
+
+    // allow finance to fetch any issue, student only their own
+    const roleName = (user.role && (user.role as any).name) || user.role;
+    if (String(roleName).toLowerCase() === "finance") {
+      res.json({ issue });
+      return;
+    }
+
+    if (!user?.studentId || issue.studentId !== user.studentId) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    res.json({ issue });
+  } catch (err: any) {
+    console.error("Error fetching issue:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+export const updateIssueById = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const id = String(req.params.id || "");
+    const issue = await Issue.findById(id);
+    if (!issue) {
+      res.status(404).json({ error: "Issue not found" });
+      return;
+    }
+
+    const roleName = (user.role && (user.role as any).name) || user.role;
+    const isFinance = String(roleName).toLowerCase() === "finance";
+    const isOwner = user?.studentId && issue.studentId === user.studentId;
+
+    if (!isFinance && !isOwner) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const { bankName, accountNumber, notes, proofUrls } = req.body || {};
+
+    const updates: any = {};
+    if (typeof bankName === "string" && bankName.trim() !== "") updates.bankName = bankName.trim();
+    if (typeof accountNumber === "string" && accountNumber.trim() !== "") updates.accountNumber = accountNumber.trim();
+    if (typeof notes === "string") updates.notes = notes;
+    if (Array.isArray(proofUrls) && proofUrls.length) {
+      // merge unique
+      const existing = Array.isArray(issue.proofUrls) ? issue.proofUrls : [];
+      updates.proofUrls = Array.from(new Set([...existing, ...proofUrls]));
+    }
+
+    updates.status = "submitted";
+
+    const updated = await Issue.findByIdAndUpdate(id, { $set: updates }, { new: true, runValidators: true }).lean();
+
+    // Notify finance (best-effort)
+    try {
+      await notifyFinanceUsersAboutIssue({
+        institutionId: (req as any).user.institution,
+        studentId: updated.studentId,
+        studentEmail: (req as any).user.email,
+        contractNumber: updated.contractNumber || "",
+        bankName: updated.correctedBankName || updated.bankName || "",
+        accountNumber: updated.correctedAccountNumber || updated.accountNumber || "",
+        reasons: ["studentUpdated"],
+        notificationType: "updated",
+      });
+    } catch (notifyErr) {
+      console.warn("[Issue Notification Error] update:", notifyErr);
+    }
+
+    res.json({ message: "Issue updated", issue: updated });
+  } catch (err: any) {
+    console.error("Error updating issue:", err);
+    res.status(500).json({ error: "Failed to update issue", details: err.message });
+  }
+};

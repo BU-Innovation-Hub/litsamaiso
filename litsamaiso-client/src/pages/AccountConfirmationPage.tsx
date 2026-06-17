@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, FileImage, Loader, Pencil, RefreshCcw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CheckCircle, FileImage, Loader, RefreshCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { toast } from 'sonner';
 import { accountService } from '../services/accountService';
+import apiClient from '../services/authService';
 import { getApiErrorMessage } from '../utils/apiError';
 import { useAuth } from '../hooks/useAuth';
+import Globe from '../components/ui/Globe';
 
 type ExtractedDetails = {
   bankName: string;
@@ -69,12 +71,18 @@ const AccountConfirmationPage: React.FC = () => {
     graduating: false,
   });
 
-  const confidenceTone = useMemo(() => {
-    const confidence = extracted?.confidence || 0;
-    if (confidence >= 85) return 'bg-green-100 text-green-800';
-    if (confidence >= 60) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
-  }, [extracted?.confidence]);
+  // Confidence score is intentionally hidden from students (UX requirement).
+
+  const handleRetry = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setExtracted(null);
+    setOcrText('');
+    setReviewAccepted(false);
+    // clear file input if present
+    const fileInput = document.querySelector('input[type=file]') as HTMLInputElement | null;
+    if (fileInput) fileInput.value = '';
+  };
 
   useEffect(() => {
     const checkConfirmationStatus = async () => {
@@ -191,9 +199,44 @@ const AccountConfirmationPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await accountService.confirmAccount(formData);
-      toast.success(response.message || 'Account confirmed');
-      setIsConfirmed(true);
+      // If a preview image is present (user uploaded), send it as multipart to allow server to attach proof
+      if ((document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0]) {
+        const file = (document.querySelector('input[type=file]') as HTMLInputElement).files![0];
+        const form = new FormData();
+        form.append('contractNumber', formData.contractNumber);
+        form.append('bankName', formData.bankName);
+        form.append('accountNumber', formData.accountNumber);
+        form.append('graduating', String(formData.graduating));
+        form.append('document', file);
+        try {
+          const resp = await apiClient.post('/accounts/confirm', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+          const data = resp.data;
+          toast.success(data.message || 'Account confirmed');
+          setIsConfirmed(true);
+        } catch (err: any) {
+          // axios throws for non-2xx; inspect response for server-provided indicators
+          const respErr = err?.response?.data;
+          if (respErr) {
+            if (respErr.needsProof) {
+              toast.message('Account mismatch — redirected to Issues for resolution.');
+              window.location.href = '/issues';
+              return;
+            }
+            if (respErr.issue) {
+              toast.message('Issue created — redirected to Issues for resolution.');
+              window.location.href = '/issues';
+              return;
+            }
+            toast.error(getApiErrorMessage(respErr, 'Account confirmation failed'));
+          } else {
+            toast.error(getApiErrorMessage(err, 'Account confirmation failed'));
+          }
+        }
+      } else {
+        const response = await accountService.confirmAccount(formData);
+        toast.success(response.message || 'Account confirmed');
+        setIsConfirmed(true);
+      }
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Account confirmation failed'));
     } finally {
@@ -298,9 +341,6 @@ const AccountConfirmationPage: React.FC = () => {
                   <div className="space-y-3 rounded-md border bg-background/60 p-4">
                     <div className="flex items-center justify-between">
                       <p className="font-medium">Extracted details</p>
-                      <span className={`rounded px-2 py-1 text-xs ${confidenceTone}`}>
-                        {extracted.confidence}% confidence
-                      </span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Check these values carefully. Edit below if the OCR got anything wrong.
@@ -310,20 +350,20 @@ const AccountConfirmationPage: React.FC = () => {
                         type="button"
                         onClick={() => {
                           applyExtractedDetails(extracted);
-                          toast.success('Extracted details accepted');
+                          toast.success("Details accepted");
                         }}
                         className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white"
                       >
                         <CheckCircle size={16} />
-                        Accept details
+                        Yes, they're correct
                       </button>
                       <button
                         type="button"
-                        onClick={acceptEnteredDetails}
+                        onClick={handleRetry}
                         className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold"
                       >
-                        <Pencil size={16} />
-                        Use entered details
+                        <RefreshCcw size={16} />
+                        Retry upload
                       </button>
                     </div>
                   </div>
@@ -378,6 +418,9 @@ const AccountConfirmationPage: React.FC = () => {
             <div className="flex items-center justify-center">
               <article className="relative mx-auto min-h-112.5 w-full overflow-hidden rounded-3xl border bg-linear-to-b from-[#e60a64] to-[#e60a64]/5 p-6 text-3xl tracking-tight text-white shadow-lg md:p-8 md:text-4xl md:leading-[1.05] lg:text-5xl">
                 Why walk to campus when you can tap?
+                <div className="absolute -right-20 -bottom-20 z-10 mx-auto flex h-full w-full max-w-sm items-center justify-center transition-all duration-700 hover:scale-105 md:-right-28 md:-bottom-28 md:max-w-xl">
+                  <Globe scale={1.1} baseColor={[1, 0, 0.3]} markerColor={[0, 0, 0]} glowColor={[1, 0.3, 0.4]} />
+                </div>
                 <div className="mt-8 rounded-2xl bg-white/10 p-4 backdrop-blur">
                   {previewUrl ? (
                     <img

@@ -210,7 +210,32 @@ export const confirmAccount = async (req: Request, res: Response) => {
       confirmationInput.graduating = graduatingFlag;
     }
 
-    const result = await accountConfirmation(confirmationInput);
+    // If student uploaded a document during confirm, attempt to upload it and include proofUrls
+    const document = (req as any).file as
+      | {
+          buffer: Buffer;
+          mimetype: string;
+          originalname: string;
+        }
+      | undefined;
+
+    if (document && document.buffer) {
+      try {
+        const { uploadImageBuffer } = await import("../utils/cloudinary.js");
+        const uploadRes = await uploadImageBuffer({ buffer: document.buffer, fileName: document.originalname, folder: "issues" });
+        confirmationInput = { ...confirmationInput, proofUrls: [uploadRes.url] } as any;
+      } catch (uErr) {
+        // fallback to embedding base64 in the issue payload
+        confirmationInput = {
+          ...confirmationInput,
+          documentBase64: document.buffer.toString("base64"),
+          documentMimeType: document.mimetype,
+          documentFileName: document.originalname,
+        } as any;
+      }
+    }
+
+    const result = await accountConfirmation(confirmationInput as any);
 
     // Audit: account confirmation attempt/result
     await recordAudit({
@@ -227,6 +252,16 @@ export const confirmAccount = async (req: Request, res: Response) => {
         alreadyConfirmed: result.alreadyConfirmed,
       },
     });
+
+    // accountConfirmation may return a special result when it created an Issue or when proof is required
+    if ((result as any).issueCreated) {
+      res.status(201).json({ message: "Issue created for finance review", issue: (result as any).issue });
+      return;
+    }
+    if ((result as any).needsProof) {
+      res.status(400).json({ message: (result as any).message || "Account details do not match. Please upload proof and try again.", needsProof: true });
+      return;
+    }
 
     res.json({
       message: result.alreadyConfirmed
@@ -297,6 +332,42 @@ export const getConfirmationStatus = async (req: Request, res: Response) => {
     res.json({ confirmed, status: account.status, confirmationDate: account.confirmationDate });
   } catch (err: any) {
     console.error("getConfirmationStatus error:", err);
+    res.status(500).json({ message: err.message || String(err) });
+  }
+};
+
+export const getStudentAccounts = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const instId = user.institution;
+
+    if (!user?.studentId) {
+      res.status(400).json({ message: 'Student identifier (studentId) is required' });
+      return;
+    }
+
+    const student = await Student.findOne({ institution: instId, studentId: user.studentId }).lean();
+    if (!student) {
+      res.status(404).json({ message: 'Student record not found' });
+      return;
+    }
+
+    const q: any = { institution: instId };
+    const or: any[] = [];
+    if (student.contractNumber) {
+      or.push({ contractNumber: student.contractNumber });
+    }
+    // accounts confirmed by this student
+    if (student._id) {
+      or.push({ confirmedBy: student._id });
+    }
+
+    if (or.length > 0) q.$or = or;
+
+    const accounts = await Account.find(q).lean();
+    res.json({ data: accounts });
+  } catch (err: any) {
+    console.error('[getStudentAccounts] Error:', err);
     res.status(500).json({ message: err.message || String(err) });
   }
 };

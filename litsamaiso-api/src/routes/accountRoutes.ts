@@ -5,6 +5,7 @@ import {
   uploadAccounts,
   confirmAccount,
   getConfirmationStatus,
+  getStudentAccounts,
   resolveAccountIssue,
   financeResolveAccountIssue,
   loadPayedStudents,
@@ -22,8 +23,13 @@ router.post(
   uploadAccounts,
 );
 
-router.post("/confirm", requireAuth, requireRole("Student"), confirmAccount);
+router.post("/confirm", requireAuth, requireRole("Student"), upload.single("document"), confirmAccount);
 router.get("/status", requireAuth, requireRole("Student"), getConfirmationStatus);
+// Compatibility alias used by the client: /accounts/confirmation-status
+router.get("/confirmation-status", requireAuth, requireRole("Student"), getConfirmationStatus);
+
+// Student-scoped accounts (used by student Issues UI)
+router.get("/students", requireAuth, requireRole("Student"), getStudentAccounts);
 
 router.post(
   "/resolve",

@@ -4,7 +4,7 @@ export type RoleName = Role['name'];
 
 export const roleAccess = {
   dashboard: ['AppAdmin', 'InstitutionAdmin', 'Finance', 'SAAD', 'Student'],
-  accounts: ['AppAdmin', 'InstitutionAdmin', 'Finance', 'Student'],
+  accounts: ['AppAdmin', 'InstitutionAdmin', 'Finance'],
   accountConfirmation: ['Student'],
   elections: ['Student'],
   electionManagement: ['SAAD'],

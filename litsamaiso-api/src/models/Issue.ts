@@ -11,6 +11,13 @@ export interface IssueDocument {
   documentBase64?: string;
   documentMimeType?: string;
   documentFileName?: string;
+  proofUrls?: string[];
+  notes?: string;
+  status?: string;
+  approvedBy?: any;
+  approvedAt?: Date;
+  rejectedBy?: any;
+  rejectedAt?: Date;
 }
 
 const issueSchema = new Schema<IssueDocument>(
@@ -25,6 +32,14 @@ const issueSchema = new Schema<IssueDocument>(
     documentBase64: { type: String },
     documentMimeType: { type: String, trim: true },
     documentFileName: { type: String, trim: true },
+    proofUrls: { type: [String], default: [] },
+    notes: { type: String, trim: true },
+    attempts: { type: Number, default: 0 },
+    status: { type: String, trim: true, default: 'submitted' },
+    approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    approvedAt: { type: Date },
+    rejectedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+    rejectedAt: { type: Date },
   },
   {
     timestamps: true,

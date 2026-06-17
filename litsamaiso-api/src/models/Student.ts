@@ -8,6 +8,7 @@ export interface StudentDocument {
   studentStatus: boolean;
   institution: Types.ObjectId;
   contractNumber?: string;
+  confirmationAttempts?: number;
 }
 
 const studentSchema = new Schema<StudentDocument>(
@@ -23,6 +24,7 @@ const studentSchema = new Schema<StudentDocument>(
       required: true,
     },
     contractNumber: { type: String, trim: true },
+    confirmationAttempts: { type: Number, default: 0 },
   },
   {
     timestamps: true,

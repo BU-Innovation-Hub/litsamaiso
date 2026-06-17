@@ -8,6 +8,9 @@ import { User } from "../models/User.js";
 import { Student } from "../models/Student.js";
 import type { Types } from "mongoose";
 import { sendEmail } from "../utils/email.js";
+import React from "react";
+import { render } from "@react-email/render";
+import IssueNotificationEmail from "../emailTemplates/IssueNotificationEmail.js";
 
 interface LoadResult {
   inserted: number;
@@ -295,6 +298,10 @@ interface AccountConfirmationInput {
   studentId?: string;
   studentEmail?: string;
   graduating?: boolean;
+  proofUrls?: string[];
+  documentBase64?: string;
+  documentMimeType?: string;
+  documentFileName?: string;
 }
 
 interface AccountConfirmationResult {
@@ -378,8 +385,9 @@ export const notifyFinanceUsersAboutIssue = async (input: {
       </div>
     `;
 
+    // Send simple HTML notification to finance users
     await sendEmail({
-      to: financeUsers.map((user) => user.email),
+      to: (financeUsers.map((user) => user.email).filter(Boolean) as string[]),
       subject,
       text,
       html,
@@ -457,31 +465,45 @@ export const accountConfirmation = async (
     if (!bankMatches) reasons.push("bankNameMismatch");
 
     // Create or update Issue for mismatches
-    const existingIssue = await Issue.findOne({
-      studentId: input.studentId,
-    }).lean();
+    // If student provided proof URLs or a document, or they've already tried once,
+    // create/update an Issue and notify finance. Otherwise, increment the student's
+    // confirmationAttempts and ask them to upload proof and try again.
+    const existingIssue = await Issue.findOne({ studentId: input.studentId });
 
-    const issuePayload = {
+    const hasProof = (Array.isArray(input.proofUrls) && input.proofUrls.length > 0) || Boolean(input.documentBase64);
+
+    if (!hasProof && ( !(student as any).confirmationAttempts || (student as any).confirmationAttempts < 1 )) {
+      // Give student a chance to upload proof first
+      (student as any).confirmationAttempts = ((student as any).confirmationAttempts || 0) + 1;
+      await (student as any).save();
+      return { accountId: accountByContract._id, confirmationDate: new Date(), status: 'mismatch', alreadyConfirmed: false, needsProof: true, message: 'Account details do not match. Please upload a clearer bank confirmation and try again.' } as any;
+    }
+
+    // Build issue payload
+    const issuePayload: any = {
       contractNumber,
       studentId: input.studentId,
       bankName,
       accountNumber,
       reasons,
+      status: 'submitted',
     };
 
-    // Ensure contractNumber is always in the payload
-    if (!issuePayload.contractNumber) {
-      throw new Error(
-        "[Critical] Cannot create/update Issue without contractNumber",
-      );
+    if (Array.isArray(input.proofUrls) && input.proofUrls.length) issuePayload.proofUrls = input.proofUrls;
+    if (input.documentBase64) {
+      issuePayload.documentBase64 = input.documentBase64;
+      issuePayload.documentMimeType = input.documentMimeType;
+      issuePayload.documentFileName = input.documentFileName;
     }
 
+    // Ensure contractNumber present
+    if (!issuePayload.contractNumber) {
+      throw new Error("[Critical] Cannot create/update Issue without contractNumber");
+    }
+
+    let issue: any = null;
     if (existingIssue) {
-      await Issue.findOneAndUpdate(
-        { studentId: input.studentId },
-        { $set: issuePayload },
-        { new: true, runValidators: true },
-      );
+      issue = await Issue.findOneAndUpdate({ studentId: input.studentId }, { $set: issuePayload, $inc: { attempts: 1 } }, { new: true, runValidators: true });
       await notifyFinanceUsersAboutIssue({
         institutionId: input.institutionId,
         studentId: input.studentId,
@@ -490,10 +512,10 @@ export const accountConfirmation = async (
         bankName,
         accountNumber,
         reasons,
-        notificationType: "updated",
+        notificationType: 'updated',
       });
     } else {
-      await Issue.create(issuePayload);
+      issue = await Issue.create(issuePayload);
       await notifyFinanceUsersAboutIssue({
         institutionId: input.institutionId,
         studentId: input.studentId,
@@ -502,13 +524,15 @@ export const accountConfirmation = async (
         bankName,
         accountNumber,
         reasons,
-        notificationType: "created",
+        notificationType: 'created',
       });
     }
 
-    throw new Error(
-      "Account details do not match. Issue created for finance review",
-    );
+    // reset student's confirmation attempts after creating an issue
+    (student as any).confirmationAttempts = 0;
+    await (student as any).save();
+
+    return { issueCreated: true, issue } as any;
   }
 
   // Step 4: Account details match - confirm

@@ -36,11 +36,18 @@ export default function BaseEmail({
   ctaUrl,
   accentColor = "#535BC0",
 }: Props) {
-  const outerBg = "#020618";
-  const cardBg = "#0b0f19";
-  const textColor = "#f1f5f9";
-  const mutedColor = "#94a3b8";
-  const borderStyle = "1px solid #1e293b";
+  // Use a light, widely-compatible email theme by default to ensure
+  // high contrast in a variety of mail clients (many strip background colors).
+  const outerBg = "#f6f8fb";
+  const cardBg = "#ffffff";
+  const textColor = "#0f172a";
+  const mutedColor = "#6b7280";
+  const borderStyle = "1px solid #e6e7ea";
+
+  // Provide a small inline SVG fallback logo when no `logoUrl` is configured.
+  const initials = (appName || "L").split(" ").map((s) => s[0]).join("").slice(0, 2).toUpperCase();
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'><rect rx='8' width='100%' height='100%' fill='${accentColor}'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='Arial, Helvetica, sans-serif' font-size='16' fill='white'>${initials}</text></svg>`;
+  const logoSrc = logoUrl || `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 
   const bodyStyle: React.CSSProperties = {
     backgroundColor: outerBg,
@@ -92,7 +99,7 @@ export default function BaseEmail({
           <Section style={{ paddingBottom: "12px" }}>
             <Row>
               <Column align="left" style={{ verticalAlign: "middle", width: "40px" }}>
-                {logoUrl && <Img src={logoUrl} width="36" height="36" alt={appName} style={{ display: "block" }} />}
+                <Img src={logoSrc} width="36" height="36" alt={appName} style={{ display: "block" }} />
               </Column>
               <Column align="left" style={{ verticalAlign: "middle", paddingLeft: "12px" }}>
                 <Text style={{ color: textColor, margin: 0, fontSize: "20px", fontWeight: 700, letterSpacing: "0.5px" }}>
