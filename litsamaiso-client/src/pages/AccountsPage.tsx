@@ -309,7 +309,6 @@ const AccountsPage: React.FC = () => {
   };
 
   const summary = reports?.reports.summary;
-  const confirmedNotPaid = reports?.reports.confirmedNotPaid;
 
   const percentages = useMemo(() => {
     const total = summary?.total || 0;
@@ -353,7 +352,7 @@ const AccountsPage: React.FC = () => {
   };
 
   return (
-    <div className="global-bg min-h-screen pt-32">
+    <div className="global-bg min-h-screen pt-32 pb-14">
       <div className="mx-auto max-w-6xl px-4 space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-primary-clr">Accounts</h1>
@@ -694,7 +693,7 @@ const AccountsPage: React.FC = () => {
         {/* Finance upload panels and resolve controls are integrated into the table toolbar below */}
 
         {activeTab === 'records' && canViewReports && (
-          <div className="rounded-lg bg-white shadow overflow-hidden">
+          <div className="rounded-lg bg-white shadow overflow-hidden pb-5">
             <div className="border-b px-6 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
@@ -936,35 +935,6 @@ const AccountsPage: React.FC = () => {
           </div>
         )}
 
-        {confirmedNotPaid && confirmedNotPaid.accounts.length > 0 && (
-          <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="border-b px-6 py-4">
-              <h2 className="font-semibold text-gray-900">Confirmed Not Paid</h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Student</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Contract</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Bank</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Course</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {confirmedNotPaid.accounts.slice(0, 10).map((account) => (
-                    <tr key={`${account.contractNumber}-${account.accountNumber}`}>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{account.fullnames}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{account.contractNumber}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{account.bankName}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500">{account.courseOfStudy}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -986,27 +956,5 @@ const ReportCard = ({ label, value, percent }: { label: string; value: number; p
     )}
   </div>
 );
-
-// const UploadPanel = ({
-//   title,
-//   description,
-//   onChange,
-// }: {
-//   title: string;
-//   description: string;
-//   onChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
-// }) => (
-//   <div className="bg-white rounded-lg border border-border p-6 shadow-sm">
-//     <FileUp className="text-active mb-4" size={32} />
-//     <h2 className="text-xl font-semibold text-primary-clr mb-2">{title}</h2>
-//     <p className="text-muted-foreground mb-5">{description}</p>
-//     <input
-//       type="file"
-//       accept=".xlsx,.xls,.csv"
-//       onChange={onChange}
-//       className="block w-full text-sm"
-//     />
-//   </div>
-// );
 
 export default AccountsPage;

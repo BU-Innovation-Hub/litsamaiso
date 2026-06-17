@@ -126,7 +126,7 @@ const ProfilePage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-50 to-indigo-100 pt-32">
+      <div className="min-h-screen bg-linear-to-br from-purple-100 via-blue-50 to-indigo-100 pt-32">
         <div className="mx-auto flex max-w-7xl items-center justify-center px-4 py-24">
           <div className="flex items-center gap-3 text-gray-600">
             <Loader2 className="h-6 w-6 animate-spin text-active" />
@@ -139,7 +139,7 @@ const ProfilePage: React.FC = () => {
 
   if (!profile || !previewProfile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-100 via-blue-50 to-indigo-100 pt-32">
+      <div className="min-h-screen bg-linear-to-br from-purple-100 via-blue-50 to-indigo-100 pt-32">
         <div className="mx-auto max-w-7xl px-4 py-24 text-center text-red-600">
           Failed to load profile
         </div>
@@ -273,7 +273,7 @@ const ProfilePage: React.FC = () => {
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl sm:p-8 mt-6">
+        <section className="w-full max-w-lg mx-auto lg:mx-0 rounded-2xl bg-white p-6 shadow-xl sm:p-8 mt-6">
           <h2 className="mb-6 text-2xl font-bold text-primary-clr">
             Student Information
           </h2>
