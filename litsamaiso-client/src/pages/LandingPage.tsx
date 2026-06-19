@@ -252,7 +252,7 @@ const LandingPage = () => {
           </div>
         </nav>
 
-        <div className="relative z-10 flex justify-center items-center min-h-[calc(100vh-96px)] max-w-7xl pb-16 pt-10 md:px-8">
+        <div className="relative z-10 flex justify-center items-center min-h-[calc(100vh-96px)] w-full pb-16 pt-10 md:px-8">
           <motion.div
             className="mx-auto max-w-4xl text-center"
             initial="hidden"

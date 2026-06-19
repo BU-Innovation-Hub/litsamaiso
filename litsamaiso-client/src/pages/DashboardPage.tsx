@@ -200,21 +200,21 @@ const DashboardPage: React.FC = () => {
           value: confirmation?.confirmed ? 'Confirmed' : 'Pending',
           description: confirmation?.message || 'Account confirmation status',
           icon: confirmation?.confirmed ? BadgeCheck : Clock3,
-          tone: confirmation?.confirmed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
+          tone: confirmation?.confirmed ? 'bg-gray-100 text-active-clr' : 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Open elections',
           value: openElections,
           description: 'Available election workflows',
           icon: CalendarDays,
-          tone: 'bg-indigo-50 text-active-clr',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Submitted issues',
           value: studentIssues.length,
           description: 'Corrections or account issues',
           icon: FileWarning,
-          tone: 'bg-rose-50 text-rose-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
       ];
     }
@@ -254,28 +254,28 @@ const DashboardPage: React.FC = () => {
           value: accountSummary?.total ?? 0,
           description: 'Accounts available in report scope',
           icon: Banknote,
-          tone: 'bg-indigo-50 text-active-clr',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Confirmed accounts',
           value: accountSummary?.confirmed ?? 0,
           description: `${accountSummary?.confirmationRate ?? 0}% confirmation rate`,
           icon: BadgeCheck,
-          tone: 'bg-emerald-50 text-emerald-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Paid accounts',
           value: accountSummary?.paid ?? 0,
           description: `${accountSummary?.paymentRate ?? 0}% payment rate`,
           icon: Banknote,
-          tone: 'bg-sky-50 text-sky-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Pending confirmations',
           value: accountSummary?.unconfirmed ?? 0,
           description: 'Accounts still awaiting confirmation',
           icon: AlertCircle,
-          tone: 'bg-amber-50 text-amber-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
       );
     }
@@ -287,7 +287,7 @@ const DashboardPage: React.FC = () => {
           value: pendingIssues,
           description: 'Student corrections awaiting finance review',
           icon: FileWarning,
-          tone: 'bg-rose-50 text-rose-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Rejected issues',
@@ -305,7 +305,7 @@ const DashboardPage: React.FC = () => {
         value: users.length,
         description: 'Users available to your role',
         icon: Users,
-        tone: 'bg-violet-50 text-violet-700',
+        tone: 'bg-gray-100 text-active-clr',
       });
     }
 
@@ -316,14 +316,14 @@ const DashboardPage: React.FC = () => {
           value: institutions.length,
           description: 'Institutions registered in Litsamaiso',
           icon: Building2,
-          tone: 'bg-cyan-50 text-cyan-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Active institutions',
           value: activeInstitutions,
           description: 'Institutions without an active lock',
           icon: ShieldCheck,
-          tone: 'bg-emerald-50 text-emerald-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
       );
     }
@@ -444,7 +444,7 @@ const DashboardPage: React.FC = () => {
                   })}
                 </div>
               ) : canViewElections && elections.length > 0 ? (
-                <div className={`divide-y divide-slate-100 ${canViewAdminIssues ? 'max-h-[28rem] overflow-y-auto pr-1' : ''}`}>
+                <div className={`divide-y divide-slate-100 ${canViewAdminIssues ? 'max-h-112 overflow-y-auto pr-1' : ''}`}>
                   {elections.slice(0, 5).map((election) => (
                     <div key={election._id} className="flex items-center justify-between gap-4 py-3">
                       <div>
