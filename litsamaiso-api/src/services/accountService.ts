@@ -36,12 +36,189 @@ const REQUIRED_COLUMNS = [
 
 const PAID_REQUIRED_COLUMNS = [...REQUIRED_COLUMNS, "status"];
 
+const ACCOUNT_EXPORT_HEADERS = [
+  "First Name",
+  "Surname",
+  "Full Names",
+  "Contract Number",
+  "Course of Study",
+  "Bank Name",
+  "Account Number",
+  "Student ID",
+  "Status",
+  "Graduating",
+  "Batch Number",
+  "Confirmation Date",
+  "Paid Date",
+  "Signature",
+  "Created At",
+  "Updated At",
+] as const;
+
+type AccountExportFormat = "csv" | "xlsx";
+
+interface AccountQueryParams {
+  search?: unknown;
+  status?: unknown;
+  batchNumber?: unknown;
+  startDate?: unknown;
+  endDate?: unknown;
+  institutionId?: unknown;
+  limit?: unknown;
+}
+
+interface AccountExportResult {
+  buffer: Buffer;
+  contentType: string;
+  filename: string;
+}
+
+const safeString = (value: unknown): string => String(value ?? "").trim();
+
 const normalizeAccountStatus = (value: unknown): "pending" | "confirmed" | "erroneous" | "paid" => {
   const status = String(value || "").trim().toLowerCase();
   if (status === "confirmed" || status === "erroneous" || status === "paid") {
     return status;
   }
   return "pending";
+};
+
+const getUserRoleName = (user: any): string =>
+  safeString((user?.role && (user.role as any).name) || user?.role);
+
+const buildAccountFilter = (user: any, params: AccountQueryParams): Record<string, unknown> => {
+  const q: any = {};
+  const userRoleName = getUserRoleName(user);
+
+  if (userRoleName.toLowerCase() === "appadmin") {
+    const institutionId = safeString(params.institutionId);
+    if (institutionId) {
+      q.institution = institutionId;
+    }
+  } else {
+    q.institution = user.institution;
+  }
+
+  const search = safeString(params.search);
+  if (search) {
+    q.$or = [
+      { contractNumber: { $regex: search, $options: "i" } },
+      { accountNumber: { $regex: search, $options: "i" } },
+      { fullnames: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const status = safeString(params.status);
+  if (status) {
+    if (status.toLowerCase() === "pending") {
+      q.status = { $in: ["pending", "undefined", "", null] };
+    } else {
+      q.status = new RegExp(`^${escapeRegex(status)}$`, "i");
+    }
+  }
+
+  const batchNumber = Number(params.batchNumber);
+  if (Number.isFinite(batchNumber)) {
+    q.batchNumber = batchNumber;
+  }
+
+  if (params.startDate || params.endDate) {
+    q.confirmationDate = {};
+    const startDate = safeString(params.startDate);
+    const endDate = safeString(params.endDate);
+    if (startDate) q.confirmationDate.$gte = new Date(startDate);
+    if (endDate) q.confirmationDate.$lte = new Date(endDate);
+  }
+
+  return q;
+};
+
+export const getAccountListFilter = buildAccountFilter;
+
+const parseAccountLimit = (value: unknown, fallback = 200, max = 2000): number => {
+  const parsed = Number.parseInt(String(value || fallback), 10);
+  return Math.min(Number.isFinite(parsed) && parsed > 0 ? parsed : fallback, max);
+};
+
+export const getAccountListLimit = parseAccountLimit;
+
+const toIsoString = (value: unknown): string => {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+};
+
+const splitFullName = (value: unknown): { firstName: string; surname: string } => {
+  const parts = safeString(value).split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: "", surname: "" };
+  return {
+    firstName: parts[0] || "",
+    surname: parts.slice(1).join(" "),
+  };
+};
+
+const buildExportRows = (accounts: any[]) =>
+  accounts.map((account) => {
+    const confirmedBy = account.confirmedBy || {};
+    const fallbackName = splitFullName(account.fullnames);
+    const paidDate = account.paidAt || account.paidDate;
+
+    return {
+      "First Name": safeString(confirmedBy.name) || fallbackName.firstName,
+      Surname: safeString(confirmedBy.surname) || fallbackName.surname,
+      "Full Names": safeString(account.fullnames),
+      "Contract Number": safeString(account.contractNumber),
+      "Course of Study": safeString(account.courseOfStudy),
+      "Bank Name": safeString(account.bankName),
+      "Account Number": safeString(account.accountNumber),
+      "Student ID": safeString(confirmedBy.studentId),
+      Status: safeString(account.status) || "pending",
+      Graduating: account.graduating ? "Yes" : "No",
+      "Batch Number": account.batchNumber ?? "",
+      "Confirmation Date": toIsoString(account.confirmationDate),
+      "Paid Date": toIsoString(paidDate),
+      Signature: "",
+      "Created At": toIsoString(account.createdAt),
+      "Updated At": toIsoString(account.updatedAt),
+    };
+  });
+
+export const exportAccounts = async (params: {
+  user: any;
+  query: AccountQueryParams;
+  format: AccountExportFormat;
+}): Promise<AccountExportResult> => {
+  const filter = buildAccountFilter(params.user, params.query);
+  const limit = parseAccountLimit(params.query.limit, 5000, 50000);
+  const accounts = await Account.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate("confirmedBy", "name surname studentId")
+    .lean();
+
+  const rows = buildExportRows(accounts);
+  const worksheet = XLSX.utils.json_to_sheet(rows, {
+    header: [...ACCOUNT_EXPORT_HEADERS],
+  });
+
+  const stamp = new Date().toISOString().slice(0, 10);
+
+  if (params.format === "csv") {
+    return {
+      buffer: Buffer.from(XLSX.utils.sheet_to_csv(worksheet), "utf8"),
+      contentType: "text/csv; charset=utf-8",
+      filename: `accounts-export-${stamp}.csv`,
+    };
+  }
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Accounts");
+
+  return {
+    buffer: XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }),
+    contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    filename: `accounts-export-${stamp}.xlsx`,
+  };
 };
 
 export const loadAccountsFromExcel = async (

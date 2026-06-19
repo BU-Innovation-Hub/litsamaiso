@@ -4,6 +4,9 @@ import {
   loadPayedStudentsFromExcel,
   accountConfirmation,
   notifyFinanceUsersAboutIssue,
+  exportAccounts,
+  getAccountListFilter,
+  getAccountListLimit,
 } from "../services/accountService.js";
 import { Institution } from "../models/Institution.js";
 import { Issue } from "../models/Issue.js";
@@ -56,57 +59,9 @@ export const uploadAccounts = async (req: Request, res: Response) => {
 export const listAccounts = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const params = req.query || {} as any;
-
-    // pagination / limit
-    const limit = Math.min(parseInt(String(params.limit || "200"), 10) || 200, 2000);
-
-    // determine institution scope:
-    // - AppAdmin: if `institutionId` query provided, scope to that; otherwise no institution filter (see all)
-    // - Others: scope to the user's institution
-    let institutionFilter: any = {};
-    const userRoleName = (user.role && (user.role as any).name) || (user.role as string) || "";
-    if (String(userRoleName).toLowerCase() === "appadmin") {
-      if (params.institutionId) {
-        institutionFilter.institution = params.institutionId;
-      }
-    } else {
-      institutionFilter.institution = user.institution;
-    }
-
-    const q: any = { ...institutionFilter };
-
-    if (params.search) {
-      const s = String(params.search).trim();
-      q.$or = [
-        { contractNumber: { $regex: s, $options: "i" } },
-        { accountNumber: { $regex: s, $options: "i" } },
-        { fullnames: { $regex: s, $options: "i" } },
-      ];
-    }
-
-    if (params.status) {
-      const s = String(params.status).trim();
-      // Include legacy rows where blank imports were previously stored as "undefined".
-      if (s.toLowerCase() === 'pending') {
-        q.status = { $in: ['pending', 'undefined', '', null] };
-      } else {
-        // allow case-insensitive match for other statuses
-        q.status = new RegExp(`^${s}$`, 'i');
-      }
-    }
-
-    if (params.batchNumber) {
-      const bn = parseInt(String(params.batchNumber), 10);
-      if (!Number.isNaN(bn)) q.batchNumber = bn;
-    }
-
-    // date range filter (applies to confirmationDate if provided)
-    if (params.startDate || params.endDate) {
-      q.confirmationDate = {} as any;
-      if (params.startDate) q.confirmationDate.$gte = new Date(String(params.startDate));
-      if (params.endDate) q.confirmationDate.$lte = new Date(String(params.endDate));
-    }
+    const params = (req.query || {}) as any;
+    const limit = getAccountListLimit(params.limit);
+    const q = getAccountListFilter(user, params);
 
     const accounts = await Account.find(q).limit(limit).lean();
 
@@ -116,6 +71,32 @@ export const listAccounts = async (req: Request, res: Response) => {
     res.json({ accounts, batches });
   } catch (err: any) {
     console.error("[listAccounts] Error:", err);
+    res.status(500).json({ message: err.message || String(err) });
+  }
+};
+
+export const exportAccountRecords = async (req: Request, res: Response) => {
+  try {
+    const formatInput = String(req.query.format || "csv").trim().toLowerCase();
+    const format = formatInput === "xlsx" ? "xlsx" : formatInput === "csv" ? "csv" : null;
+
+    if (!format) {
+      res.status(400).json({ message: "format must be csv or xlsx" });
+      return;
+    }
+
+    const result = await exportAccounts({
+      user: (req as any).user,
+      query: req.query,
+      format,
+    });
+
+    res.setHeader("Content-Type", result.contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="${result.filename}"`);
+    res.setHeader("Content-Length", String(result.buffer.length));
+    res.send(result.buffer);
+  } catch (err: any) {
+    console.error("[exportAccountRecords] Error:", err);
     res.status(500).json({ message: err.message || String(err) });
   }
 };

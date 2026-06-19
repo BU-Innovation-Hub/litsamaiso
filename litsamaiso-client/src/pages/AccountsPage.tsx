@@ -1012,6 +1012,15 @@ const AccountsPage: React.FC = () => {
                     </button>
                     {showExportMenu && (
                       <div className="absolute right-0 mt-2 w-72 rounded-md border bg-white shadow z-20 p-2">
+                        <div className="px-3 py-2">
+                          <div className="text-sm font-medium text-gray-900 mb-1">Account Records</div>
+                          <p className="text-xs text-gray-500 mb-2">Exports respect current filters</p>
+                          <div className="flex gap-2">
+                            <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const blob = await accountService.exportAccounts({ format: 'csv', search: accountSearch || undefined, status: accountStatus || undefined, batchNumber: accountBatch || undefined, startDate: accountStartDate || undefined, endDate: accountEndDate || undefined, institutionId: selectedInstitutionId || undefined }); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `accounts-${new Date().toISOString().split('T')[0]}.csv`; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">CSV</button>
+                            <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const blob = await accountService.exportAccounts({ format: 'xlsx', search: accountSearch || undefined, status: accountStatus || undefined, batchNumber: accountBatch || undefined, startDate: accountStartDate || undefined, endDate: accountEndDate || undefined, institutionId: selectedInstitutionId || undefined }); const url = window.URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `accounts-${new Date().toISOString().split('T')[0]}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">XLSX</button>
+                          </div>
+                        </div>
+                        <div className="border-t my-2" />
                         <div className="p-2">
                           <div className="flex gap-2">
                             <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export reports')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full JSON</button>
