@@ -40,8 +40,8 @@ const parseBankProofText = (rawText: string): ExtractedDetails => {
   const accountNumber = labelMatch?.[1]
     ? labelMatch[1].replace(/[\s-]/g, '')
     : Array.from(normalized.matchAll(/\b\d{8,20}\b/g))
-        .map((match) => match[0])
-        .sort((left, right) => right.length - left.length)[0] || '';
+      .map((match) => match[0])
+      .sort((left, right) => right.length - left.length)[0] || '';
 
   const bankName = bankMatch?.name || fallbackBankLine || '';
   const confidence = Number(
@@ -262,7 +262,7 @@ const AccountConfirmationPage: React.FC = () => {
           setIsConfirmed(true);
         } catch (err: unknown) {
           // axios throws for non-2xx; inspect response for server-provided indicators
-          type RespErrShape = { needsProof?: boolean; issue?: unknown; [key: string]: unknown };
+          type RespErrShape = { needsProof?: boolean; issue?: unknown;[key: string]: unknown };
           const respErr = (err as unknown as { response?: { data?: RespErrShape } } | undefined)?.response?.data;
           if (respErr) {
             if (respErr.needsProof) {

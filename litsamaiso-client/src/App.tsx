@@ -24,6 +24,7 @@ import IssuesPage from './pages/IssuesPage';
 import UsersPage from './pages/UsersPage';
 import ElectionsManagementPage from './pages/ElectionsManagementPage';
 import InstitutionsPage from './pages/InstitutionsPage';
+import AuditLogsPage from './pages/AuditLogsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
 
@@ -95,6 +96,9 @@ function App() {
               </Route>
               <Route element={<RoleRoute allowedRoles={roleAccess.institutions} />}>
                 <Route path="/institutions" element={<InstitutionsPage />} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={['AppAdmin']} />}>
+                <Route path="/audit-logs" element={<AuditLogsPage />} />
               </Route>
             </Route>
           </Route>

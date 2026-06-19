@@ -894,9 +894,9 @@ const AccountsPage: React.FC = () => {
           </div>
         )}
 
-          {lightboxOpen && (
-            <Lightbox images={lightboxImages} startIndex={lightboxIndex} onClose={() => setLightboxOpen(false)} />
-          )}
+        {lightboxOpen && (
+          <Lightbox images={lightboxImages} startIndex={lightboxIndex} onClose={() => setLightboxOpen(false)} />
+        )}
 
         {summary && (
           <div className="grid gap-4 md:grid-cols-4">
@@ -995,66 +995,66 @@ const AccountsPage: React.FC = () => {
 
         {activeTab === 'records' && canViewReports && (
           <div className="rounded-lg bg-white shadow overflow-hidden pb-5">
-            <div className="border-b px-6 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <h2 className="font-semibold text-gray-900">Account Records</h2>
-                    <p className="text-sm text-muted-foreground">
-                      View uploaded accounts and track confirmation/payment status.
-                    </p>
-                  </div>
+            <div className="px-6 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="font-semibold text-gray-900">Account Records</h2>
+                  <p className="text-sm text-muted-foreground">
+                    View uploaded accounts and track confirmation/payment status.
+                  </p>
+                </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="rounded bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">{accounts.length} loaded</span>
-                    <div className="relative">
-                      <button onClick={() => setShowExportMenu((s) => !s)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold">
-                        <Download className="w-4 h-4" /> Export
-                      </button>
-                      {showExportMenu && (
-                        <div className="absolute right-0 mt-2 w-72 rounded-md border bg-white shadow z-20 p-2">
-                          <div className="p-2">
-                            <div className="flex gap-2">
-                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export reports')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full JSON</button>
-                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'csv', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full CSV</button>
-                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'xlsx', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full XLSX</button>
-                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'pdf', data, meta: { title: 'All Reports' }, logoSrc: '/logo-1.png' }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export PDF')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full PDF</button>
+                <div className="flex items-center gap-3">
+                  <span className="rounded bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">{accounts.length} loaded</span>
+                  <div className="relative">
+                    <button onClick={() => setShowExportMenu((s) => !s)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold">
+                      <Download className="w-4 h-4" /> Export
+                    </button>
+                    {showExportMenu && (
+                      <div className="absolute right-0 mt-2 w-72 rounded-md border bg-white shadow z-20 p-2">
+                        <div className="p-2">
+                          <div className="flex gap-2">
+                            <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export reports')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full JSON</button>
+                            <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'csv', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full CSV</button>
+                            <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'xlsx', data, meta: { title: 'All Reports' } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full XLSX</button>
+                            <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const data = await accountService.getReports({ institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'pdf', data, meta: { title: 'All Reports' }, logoSrc: '/logo-1.png' }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export PDF')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">Full PDF</button>
+                          </div>
+                        </div>
+                        <div className="border-t my-2" />
+                        {reports?.catalog?.map((c) => (
+                          <div key={(c as any).key} className="px-3 py-2">
+                            <div className="text-sm font-medium">{(c as any).title}</div>
+                            <div className="mt-1 flex gap-2">
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export report')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">JSON</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'csv', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">CSV</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'xlsx', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">XLSX</button>
+                              <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'pdf', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope }, logoSrc: '/logo-1.png' }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export PDF')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">PDF</button>
                             </div>
                           </div>
-                          <div className="border-t my-2" />
-                          {reports?.catalog?.map((c) => (
-                            <div key={(c as any).key} className="px-3 py-2">
-                              <div className="text-sm font-medium">{(c as any).title}</div>
-                              <div className="mt-1 flex gap-2">
-                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'json', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export report')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">JSON</button>
-                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'csv', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export CSV')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">CSV</button>
-                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'xlsx', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope } }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export XLSX')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">XLSX</button>
-                                <button disabled={exporting} onClick={async () => { setShowExportMenu(false); setExporting(true); try { const r = await accountService.getReport((c as any).key, { institutionId: selectedInstitutionId || undefined }); await exportData({ format: 'pdf', data: r.report, meta: { title: (c as any).title, reportKey: (c as any).key, scope: r.scope }, logoSrc: '/logo-1.png' }); } catch (err) { toast.error(getApiErrorMessage(err, 'Failed to export PDF')); } finally { setExporting(false); } }} className="text-xs rounded-md border px-2 py-1">PDF</button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <button onClick={() => accountsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white">Import Accounts</button>
-                      <input ref={accountsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'accounts')} className="hidden" />
-                    </div>
-                    <div>
-                      <button onClick={() => paidFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Paid</button>
-                      <input ref={paidFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'paid')} className="hidden" />
-                    </div>
-                    {isAppAdmin || role === 'InstitutionAdmin' ? (
-                      <div>
-                        <button onClick={() => studentsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Students</button>
-                        <input ref={studentsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'students')} className="hidden" />
+                        ))}
                       </div>
-                    ) : null}
+                    )}
                   </div>
+
+                  <div>
+                    <button onClick={() => accountsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white">Import Accounts</button>
+                    <input ref={accountsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'accounts')} className="hidden" />
+                  </div>
+                  <div>
+                    <button onClick={() => paidFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Paid</button>
+                    <input ref={paidFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'paid')} className="hidden" />
+                  </div>
+                  {isAppAdmin || role === 'InstitutionAdmin' ? (
+                    <div>
+                      <button onClick={() => studentsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Students</button>
+                      <input ref={studentsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'students')} className="hidden" />
+                    </div>
+                  ) : null}
                 </div>
+              </div>
             </div>
 
-            <div className="space-y-4 border-b p-6">
+            <div className="space-y-4 p-6">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
