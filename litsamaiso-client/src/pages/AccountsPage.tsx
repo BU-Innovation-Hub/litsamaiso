@@ -705,7 +705,7 @@ const AccountsPage: React.FC = () => {
                 <article className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                   <div className="grid gap-0 lg:grid-cols-[1fr_auto_1fr]">
                     <section className="px-5 py-5">
-                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-red-700">
+                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary-clr">
                         <XCircle className="h-4 w-4" />
                         Current record
                       </div>
@@ -814,7 +814,7 @@ const AccountsPage: React.FC = () => {
                           setReviewingIssue(null);
                         }
                       }}
-                      className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-md bg-primary-clr px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {selectedIssueAction === 'approve' ? <Loader className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                       {selectedIssueAction === 'approve' ? 'Approving...' : 'Approve correction'}
