@@ -200,21 +200,21 @@ const DashboardPage: React.FC = () => {
           value: confirmation?.confirmed ? 'Confirmed' : 'Pending',
           description: confirmation?.message || 'Account confirmation status',
           icon: confirmation?.confirmed ? BadgeCheck : Clock3,
-          tone: confirmation?.confirmed ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700',
+          tone: confirmation?.confirmed ? 'bg-gray-100 text-active-clr' : 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Open elections',
           value: openElections,
           description: 'Available election workflows',
           icon: CalendarDays,
-          tone: 'bg-indigo-50 text-active-clr',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Submitted issues',
           value: studentIssues.length,
           description: 'Corrections or account issues',
           icon: FileWarning,
-          tone: 'bg-rose-50 text-rose-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
       ];
     }
