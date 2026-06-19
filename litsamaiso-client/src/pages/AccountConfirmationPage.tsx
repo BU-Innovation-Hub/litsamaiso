@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle, FileImage, Loader, RefreshCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { toast } from 'sonner';
@@ -56,13 +57,14 @@ const parseBankProofText = (rawText: string): ExtractedDetails => {
 
 const AccountConfirmationPage: React.FC = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [statusError, setStatusError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoggingIssue, setIsLoggingIssue] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [ocrText, setOcrText] = useState('');
   const [extracted, setExtracted] = useState<ExtractedDetails | null>(null);
   const [reviewAccepted, setReviewAccepted] = useState(false);
   const [formData, setFormData] = useState({
@@ -88,6 +90,7 @@ const AccountConfirmationPage: React.FC = () => {
       return;
     }
 
+    setIsLoggingIssue(true);
     const proofUrls: string[] = [];
     const file = (document.querySelector('input[type=file]') as HTMLInputElement | null)?.files?.[0];
     if (file) {
@@ -105,15 +108,17 @@ const AccountConfirmationPage: React.FC = () => {
     try {
       const resp = await apiClient.post('/issues', { contractNumber, studentId, bankName, accountNumber, proofUrls });
       toast.success(resp?.data?.message || 'Issue logged. Redirecting to Issues page.');
-      window.location.href = '/issues';
+      navigate('/issues', { replace: true, state: { issueLogged: true } });
     } catch (err: unknown) {
       toast.error(getApiErrorMessage(err, 'Could not log the issue'));
+    } finally {
+      setIsLoggingIssue(false);
     }
   };
 
   const handleRetry = async () => {
     if (ocrAttemptsRef.current >= MAX_OCR_ATTEMPTS) {
-      toast.error("No more retries left. We’ll log this as an issue.");
+      toast.error("No more retries left. We'll log this as an issue.");
       await escalateToIssues();
       return;
     }
@@ -121,7 +126,6 @@ const AccountConfirmationPage: React.FC = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setExtracted(null);
-    setOcrText('');
     setReviewAccepted(false);
     // clear file input if present
     const fileInput = document.querySelector('input[type=file]') as HTMLInputElement | null;
@@ -166,15 +170,14 @@ const AccountConfirmationPage: React.FC = () => {
       bankName: details.bankName || prev.bankName,
       accountNumber: details.accountNumber || prev.accountNumber,
     }));
-    setReviewAccepted(Boolean(details.bankName && details.accountNumber));
+    setReviewAccepted(false);
   };
 
-  // User can edit bank/account fields manually — accepting edited values simply marks review accepted
+  // Bank/account fields are OCR-populated only; students explicitly accept the extracted values.
 
   const runOcr = async (file: File) => {
     setIsExtracting(true);
     setReviewAccepted(false);
-    setOcrText('');
     setExtracted(null);
 
     try {
@@ -183,18 +186,17 @@ const AccountConfirmationPage: React.FC = () => {
       });
       const text = result.data.text || '';
       const details = parseBankProofText(text);
-      setOcrText(text);
       setExtracted(details);
       applyExtractedDetails(details);
 
       if (details.bankName && details.accountNumber) {
         toast.success('Bank details extracted. Please review before confirming.');
       } else {
-        toast.message('OCR finished. Please fill in any missing bank details.');
+        toast.message('OCR finished, but some bank details could not be read. Please retry upload.');
       }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
-      toast.error('Could not read the image. You can still enter the details manually.');
-      setOcrText(error instanceof Error ? error.message : '');
+      toast.error('Could not read the image. Please retry with a clearer bank confirmation image.');
     } finally {
       setIsExtracting(false);
     }
@@ -264,13 +266,13 @@ const AccountConfirmationPage: React.FC = () => {
           const respErr = (err as unknown as { response?: { data?: RespErrShape } } | undefined)?.response?.data;
           if (respErr) {
             if (respErr.needsProof) {
-              toast.message('Account mismatch — redirected to Issues for resolution.');
-              window.location.href = '/issues';
+              toast.message('Account mismatch. Redirected to Issues for resolution.');
+              navigate('/issues', { replace: true });
               return;
             }
             if (respErr.issue) {
-              toast.message('Issue created — redirected to Issues for resolution.');
-              window.location.href = '/issues';
+              toast.message('Issue created. Redirected to Issues for resolution.');
+              navigate('/issues', { replace: true });
               return;
             }
             toast.error(getApiErrorMessage(respErr, 'Account confirmation failed'));
@@ -376,60 +378,6 @@ const AccountConfirmationPage: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Preview: moved here from the globe card to sit directly under the upload input */}
-                <div className="mt-4 rounded-2xl bg-white p-2 shadow-sm">
-                  {previewUrl ? (
-                    <img
-                      src={previewUrl}
-                      alt="Bank proof preview"
-                      className="w-full rounded-lg object-contain"
-                    />
-                  ) : (
-                    <div className="flex min-h-28 flex-col items-center justify-center rounded-lg border border-gray-200 text-center text-sm text-muted-foreground p-6">
-                      <FileImage className="mb-3" size={28} />
-                      Your bank proof preview appears here.
-                    </div>
-                  )}
-
-                  {ocrText && (
-                    <details className="mt-3 rounded-lg bg-gray-50 p-3 text-sm">
-                      <summary className="cursor-pointer text-sm">View OCR text</summary>
-                      <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-xs text-gray-700">
-                        {ocrText}
-                      </pre>
-                    </details>
-                  )}
-
-                  <div className="mt-3 flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPreviewUrl(null);
-                        setExtracted(null);
-                        setOcrText('');
-                        setReviewAccepted(false);
-                        // clear file input if present
-                        const fileInput = document.querySelector('input[type=file]') as HTMLInputElement | null;
-                        if (fileInput) fileInput.value = '';
-                      }}
-                      className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold"
-                    >
-                      <RefreshCcw size={16} />
-                      Reset upload
-                    </button>
-                  </div>
-                </div>
-
-                {/* Preview moved here (under upload) for better UX and responsiveness) */}
-                {/* {previewUrl && (
-                  <div className="mt-4 rounded-lg bg-white p-3 shadow-sm">
-                    <p className="text-sm font-medium mb-2">Bank proof preview</p>
-                    <div className="w-full rounded-lg overflow-hidden bg-gray-50 flex items-center justify-center">
-                      <img src={previewUrl} alt="Bank proof preview" className="w-full max-h-64 object-contain" />
-                    </div>
-                  </div>
-                )} */}
-
                 {isExtracting && (
                   <div className="flex items-center gap-2 rounded-md bg-white/70 p-3 text-sm text-muted-foreground">
                     <Loader className="animate-spin" size={16} />
@@ -443,27 +391,30 @@ const AccountConfirmationPage: React.FC = () => {
                       <p className="font-medium">Extracted details</p>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Check these values carefully. Edit below if the OCR got anything wrong.
+                      Check these values carefully. Retry upload if the OCR got anything wrong.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
+                        disabled={!formData.bankName.trim() || !formData.accountNumber.trim() || isLoggingIssue}
                         onClick={() => {
                           applyExtractedDetails(extracted);
+                          setReviewAccepted(true);
                           toast.success("Details accepted");
                         }}
-                        className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white"
+                        className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <CheckCircle size={16} />
                         Yes, they're correct
                       </button>
                       <button
                         type="button"
+                        disabled={isLoggingIssue}
                         onClick={handleRetry}
-                        className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold"
+                        className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <RefreshCcw size={16} />
-                        Retry upload
+                        {isLoggingIssue ? <Loader size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
+                        {isLoggingIssue ? 'Logging issue...' : 'Retry upload'}
                       </button>
                     </div>
                   </div>
@@ -474,9 +425,9 @@ const AccountConfirmationPage: React.FC = () => {
                   <input
                     name="bankName"
                     value={formData.bankName}
-                    onChange={handleChange}
+                    readOnly
                     required
-                    className="w-full rounded-md border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-active"
+                    className="w-full rounded-md border border-border bg-gray-100 px-4 py-2 text-muted-foreground"
                     placeholder="e.g. FNB"
                   />
                 </div>
@@ -486,9 +437,9 @@ const AccountConfirmationPage: React.FC = () => {
                   <input
                     name="accountNumber"
                     value={formData.accountNumber}
-                    onChange={handleChange}
+                    readOnly
                     required
-                    className="w-full rounded-md border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-active"
+                    className="w-full rounded-md border border-border bg-gray-100 px-4 py-2 text-muted-foreground"
                     placeholder="Bank account number"
                   />
                 </div>
@@ -506,11 +457,11 @@ const AccountConfirmationPage: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || isExtracting}
-                  className="flex w-full items-center justify-center gap-2 rounded-md bg-button py-3 font-semibold text-white transition-colors disabled:opacity-50"
+                  disabled={isSubmitting || isExtracting || isLoggingIssue || !reviewAccepted}
+                  className="flex w-full items-center justify-center gap-2 rounded-md bg-button py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isSubmitting && <Loader size={18} className="animate-spin" />}
-                  {isSubmitting ? 'Confirming...' : 'Confirm Account'}
+                  {(isSubmitting || isLoggingIssue) && <Loader size={18} className="animate-spin" />}
+                  {isLoggingIssue ? 'Logging issue...' : isSubmitting ? 'Confirming...' : 'Confirm Account'}
                 </button>
               </form>
             </div>

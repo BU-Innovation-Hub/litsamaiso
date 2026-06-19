@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle, Clock, CreditCard, Filter, Receipt, Search, ShieldCheck, Upload, XCircle, Download, Edit } from 'lucide-react';
+import { CheckCircle, Clock, CreditCard, Filter, Receipt, Search, ShieldCheck, Upload, XCircle, Download, Edit, Loader } from 'lucide-react';
 import exportData from '../exporters';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
@@ -46,6 +46,7 @@ const AccountsPage: React.FC = () => {
   const [exporting, setExporting] = useState(false);
   const [issueList, setIssueList] = useState<any[] | null>(null);
   const [issuesLoading, setIssuesLoading] = useState(false);
+  const [reviewingIssue, setReviewingIssue] = useState<{ id: string; action: 'approve' | 'reject' } | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -490,6 +491,11 @@ const AccountsPage: React.FC = () => {
                           {issueList.map((it: any) => {
                             const issueStatus = String(it.status || 'submitted').toLowerCase();
                             const isPendingIssue = issueStatus === 'submitted' || issueStatus === 'reported';
+                            const currentReviewingIssue = reviewingIssue;
+                            const activeReviewAction = currentReviewingIssue && currentReviewingIssue.id === it._id
+                              ? currentReviewingIssue.action
+                              : null;
+                            const isReviewActionDisabled = Boolean(currentReviewingIssue);
 
                             return (
                             <tr key={it._id}>
@@ -526,8 +532,10 @@ const AccountsPage: React.FC = () => {
                                 {isPendingIssue ? (
                                 <div className="flex justify-end gap-2">
                                   <button
+                                    disabled={isReviewActionDisabled}
                                     onClick={async () => {
                                       if (!confirm('Approve this issue and update account records?')) return;
+                                      setReviewingIssue({ id: it._id, action: 'approve' });
                                       try {
                                         await adminIssueService.approveIssue(it._id);
                                         toast.success('Issue approved and account updated');
@@ -537,15 +545,20 @@ const AccountsPage: React.FC = () => {
                                         if (canViewReports) await loadAccountRows();
                                       } catch (err: any) {
                                         toast.error(getApiErrorMessage(err, 'Failed to approve issue'));
+                                      } finally {
+                                        setReviewingIssue(null);
                                       }
                                     }}
-                                    className="rounded-md bg-green-600 px-3 py-2 text-white"
+                                    className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60"
                                   >
-                                    Approve
+                                    {activeReviewAction === 'approve' && <Loader className="h-4 w-4 animate-spin" />}
+                                    {activeReviewAction === 'approve' ? 'Approving...' : 'Approve'}
                                   </button>
                                   <button
+                                    disabled={isReviewActionDisabled}
                                     onClick={async () => {
                                       const reason = prompt('Enter reason for rejection (optional):');
+                                      setReviewingIssue({ id: it._id, action: 'reject' });
                                       try {
                                         await adminIssueService.rejectIssue(it._id, reason || undefined);
                                         toast.success('Issue rejected');
@@ -553,11 +566,14 @@ const AccountsPage: React.FC = () => {
                                         setIssueList(list || []);
                                       } catch (err: any) {
                                         toast.error(getApiErrorMessage(err, 'Failed to reject issue'));
+                                      } finally {
+                                        setReviewingIssue(null);
                                       }
                                     }}
-                                    className="rounded-md border px-3 py-2"
+                                    className="inline-flex items-center gap-2 rounded-md border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-60"
                                   >
-                                    Reject
+                                    {activeReviewAction === 'reject' && <Loader className="h-4 w-4 animate-spin" />}
+                                    {activeReviewAction === 'reject' ? 'Rejecting...' : 'Reject'}
                                   </button>
                                 </div>
                                 ) : (

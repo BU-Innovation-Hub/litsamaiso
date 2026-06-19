@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { X } from 'lucide-react';
+import { Loader, X } from 'lucide-react';
 import Button from './ui/button';
 import { issueService } from '../services/issueService';
 import { accountService } from '../services/accountService';
@@ -48,6 +48,7 @@ export default function StudentIssues() {
   });
   const [editNotes, setEditNotes] = useState<string>('');
   const [editProofFiles, setEditProofFiles] = useState<FileList | null>(null);
+  const [isUpdatingIssue, setIsUpdatingIssue] = useState(false);
 
   const fetchIssues = useCallback(async () => {
     try {
@@ -128,8 +129,9 @@ export default function StudentIssues() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingIssue) return;
+    if (!editingIssue || isUpdatingIssue) return;
 
+    setIsUpdatingIssue(true);
     try {
       const uploadedUrls: string[] = [];
       if (editProofFiles && editProofFiles.length) {
@@ -161,6 +163,8 @@ export default function StudentIssues() {
       await fetchIssues();
     } catch (err: any) {
       toast.error(`Failed to update issue: ${err?.message || err}`);
+    } finally {
+      setIsUpdatingIssue(false);
     }
   };
 
@@ -202,13 +206,13 @@ export default function StudentIssues() {
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
-                    className="px-4 py-3"
+                    className="px-4 py-3 bg-primary-clr hover:bg-black"
                     onClick={() => {
                       const matchingAccount = accounts.find((acc) => acc.contractNumber === issue.contractNumber);
                       openEditModal(issue as IIssue, matchingAccount);
                     }}
                   >
-                    Update Bank Details
+                    Enter Correct Bank Details
                   </Button>
                   <Button variant="outline" className="px-4 py-3">Contact Support</Button>
                 </div>
@@ -224,35 +228,44 @@ export default function StudentIssues() {
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-semibold">Edit Account Record</h3>
-              <button onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }} className="text-gray-500 hover:text-gray-700"><X className="w-5 h-5" /></button>
+              <button
+                disabled={isUpdatingIssue}
+                onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }}
+                className="text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
-                  <input type="text" value={editForm.bankName} onChange={(e) => setEditForm((prev) => ({ ...prev, bankName: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="text" value={editForm.bankName} disabled={isUpdatingIssue} onChange={(e) => setEditForm((prev) => ({ ...prev, bankName: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" required />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
-                  <input type="text" value={editForm.accountNumber} onChange={(e) => setEditForm((prev) => ({ ...prev, accountNumber: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                  <input type="text" value={editForm.accountNumber} disabled={isUpdatingIssue} onChange={(e) => setEditForm((prev) => ({ ...prev, accountNumber: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" required />
                 </div>
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Additional notes (optional)</label>
-                  <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" rows={3} />
+                  <textarea value={editNotes} disabled={isUpdatingIssue} onChange={(e) => setEditNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" rows={3} />
                 </div>
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Upload proof images (optional)</label>
-                  <input type="file" multiple accept="image/*" onChange={(e) => setEditProofFiles(e.target.files)} className="w-full" />
+                  <input type="file" multiple accept="image/*" disabled={isUpdatingIssue} onChange={(e) => setEditProofFiles(e.target.files)} className="w-full disabled:cursor-not-allowed disabled:opacity-60" />
                 </div>
               </div>
 
                 <div className="flex justify-end space-x-3 pt-4">
-                <Button type="button" variant="outline" onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }}>Cancel</Button>
-                <Button type="submit">Update Account</Button>
+                <Button type="button" variant="outline" disabled={isUpdatingIssue} onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }}>Cancel</Button>
+                <Button type="submit" disabled={isUpdatingIssue} className="inline-flex items-center gap-2 bg-primary-clr hover:bg-black disabled:cursor-not-allowed disabled:opacity-60">
+                  {isUpdatingIssue && <Loader className="h-4 w-4 animate-spin" />}
+                  {isUpdatingIssue ? 'Updating bank details...' : 'Update Bank Details'}
+                </Button>
               </div>
             </form>
           </div>
