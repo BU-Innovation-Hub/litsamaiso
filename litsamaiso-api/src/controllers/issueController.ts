@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import Issue from "../models/Issue.js";
+import { Account } from "../models/Account.js";
 import { extractAccountCandidates } from "../services/geminiService.js";
 import { notifyFinanceUsersAboutIssue } from "../services/accountService.js";
 
@@ -37,6 +38,10 @@ export const createIssue = async (req: Request, res: Response) => {
     }
 
     const smartBankName = bankName; // keep as-is; client normalizes where possible
+    const recordedAccount = await Account.findOne({
+      contractNumber,
+      institution: user.institution,
+    }).select("bankName accountNumber").lean();
 
     const updatePayload: any = {
       contractNumber,
@@ -45,6 +50,10 @@ export const createIssue = async (req: Request, res: Response) => {
       accountNumber,
       status: "submitted",
     };
+    if (recordedAccount) {
+      updatePayload.recordedBankName = recordedAccount.bankName;
+      updatePayload.recordedAccountNumber = recordedAccount.accountNumber;
+    }
     if (Array.isArray(proofUrls) && proofUrls.length) updatePayload.proofUrls = proofUrls;
     if (typeof notes === "string") updatePayload.notes = notes;
 
@@ -146,6 +155,19 @@ export const updateIssueById = async (req: Request, res: Response) => {
       // merge unique
       const existing = Array.isArray(issue.proofUrls) ? issue.proofUrls : [];
       updates.proofUrls = Array.from(new Set([...existing, ...proofUrls]));
+    }
+
+    if (!issue.recordedBankName || !issue.recordedAccountNumber) {
+      const recordedAccount = issue.contractNumber
+        ? await Account.findOne({
+            contractNumber: issue.contractNumber,
+            institution: user.institution,
+          }).select("bankName accountNumber").lean()
+        : null;
+      if (recordedAccount) {
+        if (!issue.recordedBankName) updates.recordedBankName = recordedAccount.bankName;
+        if (!issue.recordedAccountNumber) updates.recordedAccountNumber = recordedAccount.accountNumber;
+      }
     }
 
     updates.status = "submitted";

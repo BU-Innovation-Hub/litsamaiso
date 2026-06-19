@@ -448,6 +448,19 @@ export const resolveAccountIssue = async (req: Request, res: Response) => {
       issuePayload.contractNumber = student.contractNumber;
     }
 
+    const recordContractNumber = String(issuePayload.contractNumber || existingIssue?.contractNumber || "").trim();
+    if (recordContractNumber) {
+      const recordedAccount = await Account.findOne({
+        contractNumber: recordContractNumber,
+        institution: instId,
+      }).select("bankName accountNumber").lean();
+
+      if (recordedAccount) {
+        issuePayload.recordedBankName = existingIssue?.recordedBankName || recordedAccount.bankName;
+        issuePayload.recordedAccountNumber = existingIssue?.recordedAccountNumber || recordedAccount.accountNumber;
+      }
+    }
+
     const studentUser = await User.findOne({ studentId: user.studentId })
       .select("email")
       .lean();

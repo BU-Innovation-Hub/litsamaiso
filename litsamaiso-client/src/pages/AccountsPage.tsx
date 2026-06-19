@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle, Clock, CreditCard, Filter, Receipt, Search, ShieldCheck, Upload, XCircle, Download, Edit, Loader } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle, Clock, CreditCard, FileText, Filter, Image as ImageIcon, Receipt, RefreshCcw, Search, ShieldCheck, Upload, XCircle, Download, Edit, Loader } from 'lucide-react';
 import exportData from '../exporters';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
@@ -355,6 +355,46 @@ const AccountsPage: React.FC = () => {
     }
   };
 
+  const getIssueStatusBadgeClass = (status?: string) => {
+    const normalized = String(status || 'submitted').toLowerCase();
+    if (normalized === 'resolved' || normalized === 'approved') return 'bg-green-100 text-green-800';
+    if (normalized === 'rejected') return 'bg-red-100 text-red-800';
+    return 'bg-yellow-100 text-yellow-800';
+  };
+
+  const formatIssueReason = (reason: string) => {
+    const labels: Record<string, string> = {
+      accountNumberMismatch: 'Account number mismatch',
+      bankNameMismatch: 'Bank name mismatch',
+      studentIdMismatch: 'Student does not match account',
+      studentSubmitted: 'Student logged issue',
+      studentUpdated: 'Student updated correction',
+      studentResolutionSubmitted: 'Student submitted correction',
+    };
+    return labels[reason] || reason.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
+  };
+
+  const displayValue = (value: unknown) => {
+    const text = String(value || '').trim();
+    return text || '-';
+  };
+
+  const normalizeComparable = (value: unknown) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+  const hasChanged = (original: unknown, proposed: unknown) => {
+    const originalValue = normalizeComparable(original);
+    const proposedValue = normalizeComparable(proposed);
+    return Boolean(originalValue && proposedValue && originalValue !== proposedValue);
+  };
+
+  const getIssueProofImages = (issue: any) => {
+    const urls = Array.isArray(issue.proofUrls) ? issue.proofUrls.filter(Boolean) : [];
+    if (issue.documentBase64 && String(issue.documentMimeType || '').startsWith('image/')) {
+      return [...urls, `data:${issue.documentMimeType};base64,${issue.documentBase64}`];
+    }
+    return urls;
+  };
+
   return (
     <div className="global-bg min-h-screen pt-5 pb-14">
       <div className="mx-auto max-w-6xl px-4 space-y-8">
@@ -450,6 +490,7 @@ const AccountsPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-3 mb-4">
                     <button
+                      disabled={issuesLoading}
                       onClick={async () => {
                         setIssuesLoading(true);
                         try {
@@ -462,129 +503,210 @@ const AccountsPage: React.FC = () => {
                           setIssuesLoading(false);
                         }
                       }}
-                      className="rounded-md bg-button px-3 py-2 text-white"
+                      className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      Refresh
+                      {issuesLoading ? <Loader className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+                      {issuesLoading ? 'Refreshing...' : 'Refresh'}
                     </button>
                   </div>
 
                   {issuesLoading ? (
-                    <p className="text-gray-500">Loading issues...</p>
+                    <div className="flex items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-4 py-6 text-gray-600">
+                      <Loader className="h-5 w-5 animate-spin text-active" />
+                      Loading issue history...
+                    </div>
                   ) : !issueList || issueList.length === 0 ? (
-                    <p className="text-gray-500">No issues found</p>
+                    <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-6 text-gray-600">No issues found</div>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Contract</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Bank</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Account</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Student</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Proofs</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Submitted</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {issueList.map((it: any) => {
-                            const issueStatus = String(it.status || 'submitted').toLowerCase();
-                            const isPendingIssue = issueStatus === 'submitted' || issueStatus === 'reported';
-                            const currentReviewingIssue = reviewingIssue;
-                            const activeReviewAction = currentReviewingIssue && currentReviewingIssue.id === it._id
-                              ? currentReviewingIssue.action
-                              : null;
-                            const isReviewActionDisabled = Boolean(currentReviewingIssue);
+                    <div className="space-y-4">
+                      {issueList.map((it: any) => {
+                        const issueStatus = String(it.status || 'submitted').toLowerCase();
+                        const isPendingIssue = issueStatus === 'submitted' || issueStatus === 'reported';
+                        const currentReviewingIssue = reviewingIssue;
+                        const activeReviewAction = currentReviewingIssue && currentReviewingIssue.id === it._id
+                          ? currentReviewingIssue.action
+                          : null;
+                        const isReviewActionDisabled = Boolean(currentReviewingIssue);
+                        const currentBankName = it.recordedBankName || it.account?.bankName;
+                        const currentAccountNumber = it.recordedAccountNumber || it.account?.accountNumber;
+                        const proposedBankName = it.correctedBankName || it.bankName;
+                        const proposedAccountNumber = it.correctedAccountNumber || it.accountNumber;
+                        const bankChanged = hasChanged(currentBankName, proposedBankName);
+                        const accountChanged = hasChanged(currentAccountNumber, proposedAccountNumber);
+                        const proofImages = getIssueProofImages(it);
+                        const reasons = Array.isArray(it.reasons) ? it.reasons : [];
 
-                            return (
-                            <tr key={it._id}>
-                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{it.contractNumber}</td>
-                              <td className="px-6 py-4 text-sm text-gray-500">{it.bankName}</td>
-                              <td className="px-6 py-4 text-sm text-gray-500">{it.accountNumber}</td>
-                              <td className="px-6 py-4 text-sm text-gray-500">{(it.student && it.student.studentId) || it.studentId}</td>
-                              <td className="px-6 py-4 text-sm text-gray-500">
-                                {it.proofUrls && it.proofUrls.length > 0 ? (
-                                  <div className="flex gap-2">
-                                    {it.proofUrls.map((u: string, idx: number) => (
-                                      <button key={u + idx} onClick={() => { setLightboxImages(it.proofUrls); setLightboxIndex(idx); setLightboxOpen(true); }} className="inline-block rounded-md border p-1">
-                                        <img src={u} alt={`proof-${idx}`} className="h-10 w-16 object-cover" />
-                                      </button>
-                                    ))}
+                        return (
+                          <article key={it._id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                            <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="font-semibold text-slate-950">{displayValue(it.contractNumber)}</h3>
+                                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getIssueStatusBadgeClass(issueStatus)}`}>
+                                    {issueStatus}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-sm text-slate-600">
+                                  Student {(it.student && it.student.studentId) || it.studentId || '-'} submitted this on {it.createdAt ? new Date(it.createdAt).toLocaleString() : '-'}.
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                {reasons.length > 0 ? reasons.map((reason: string) => (
+                                  <span key={reason} className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    {formatIssueReason(reason)}
+                                  </span>
+                                )) : (
+                                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">Manual review</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid gap-0 lg:grid-cols-[1fr_auto_1fr]">
+                              <section className="px-5 py-5">
+                                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-red-700">
+                                  <XCircle className="h-4 w-4" />
+                                  Current record
+                                </div>
+                                <dl className="space-y-3">
+                                  <div>
+                                    <dt className="text-xs uppercase text-slate-500">Bank name in system</dt>
+                                    <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(currentBankName)}</dd>
+                                  </div>
+                                  <div>
+                                    <dt className="text-xs uppercase text-slate-500">Account number in system</dt>
+                                    <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(currentAccountNumber)}</dd>
+                                  </div>
+                                  {!it.account && (
+                                    <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                                      No matching account record was returned for this contract.
+                                    </p>
+                                  )}
+                                </dl>
+                              </section>
+
+                              <div className="hidden items-center justify-center border-x border-slate-200 px-4 lg:flex">
+                                <div className="rounded-full bg-slate-100 p-2 text-slate-500">
+                                  <ArrowRight className="h-5 w-5" />
+                                </div>
+                              </div>
+
+                              <section className="border-t border-slate-200 px-5 py-5 lg:border-t-0">
+                                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-green-700">
+                                  <CheckCircle className="h-4 w-4" />
+                                  Student says correct
+                                </div>
+                                <dl className="space-y-3">
+                                  <div>
+                                    <dt className="flex items-center gap-2 text-xs uppercase text-slate-500">
+                                      Correct bank name
+                                      {bankChanged && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">changed</span>}
+                                    </dt>
+                                    <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(proposedBankName)}</dd>
+                                  </div>
+                                  <div>
+                                    <dt className="flex items-center gap-2 text-xs uppercase text-slate-500">
+                                      Correct account number
+                                      {accountChanged && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">changed</span>}
+                                    </dt>
+                                    <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(proposedAccountNumber)}</dd>
+                                  </div>
+                                  {it.notes && (
+                                    <div>
+                                      <dt className="text-xs uppercase text-slate-500">Student notes</dt>
+                                      <dd className="mt-1 text-sm text-slate-700">{it.notes}</dd>
+                                    </div>
+                                  )}
+                                </dl>
+                              </section>
+                            </div>
+
+                            <div className="border-t border-slate-200 px-5 py-4">
+                              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                                <div>
+                                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                    <ImageIcon className="h-4 w-4" />
+                                    Proof submitted
+                                  </div>
+                                  {proofImages.length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      {proofImages.map((url: string, idx: number) => (
+                                        <button
+                                          key={`${url}-${idx}`}
+                                          type="button"
+                                          onClick={() => { setLightboxImages(proofImages); setLightboxIndex(idx); setLightboxOpen(true); }}
+                                          className="group overflow-hidden rounded-md border border-slate-200 bg-white p-1 transition hover:border-active"
+                                          aria-label={`Open proof ${idx + 1}`}
+                                        >
+                                          <img src={url} alt={`proof-${idx}`} className="h-16 w-20 rounded object-cover transition group-hover:opacity-90" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  ) : it.documentFileName ? (
+                                    <div className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                                      <FileText className="h-4 w-4" />
+                                      {it.documentFileName}
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-slate-500">No proof uploaded.</p>
+                                  )}
+                                </div>
+
+                                {isPendingIssue ? (
+                                  <div className="flex flex-wrap justify-end gap-2">
+                                    <button
+                                      disabled={isReviewActionDisabled}
+                                      onClick={async () => {
+                                        if (!confirm('Approve this issue and update account records?')) return;
+                                        setReviewingIssue({ id: it._id, action: 'approve' });
+                                        try {
+                                          await adminIssueService.approveIssue(it._id);
+                                          toast.success('Issue approved and account updated');
+                                          const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
+                                          setIssueList(list || []);
+                                          if (canViewReports) await loadAccountRows();
+                                        } catch (err: any) {
+                                          toast.error(getApiErrorMessage(err, 'Failed to approve issue'));
+                                        } finally {
+                                          setReviewingIssue(null);
+                                        }
+                                      }}
+                                      className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {activeReviewAction === 'approve' ? <Loader className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                                      {activeReviewAction === 'approve' ? 'Approving...' : 'Approve correction'}
+                                    </button>
+                                    <button
+                                      disabled={isReviewActionDisabled}
+                                      onClick={async () => {
+                                        const reason = prompt('Enter reason for rejection (optional):');
+                                        setReviewingIssue({ id: it._id, action: 'reject' });
+                                        try {
+                                          await adminIssueService.rejectIssue(it._id, reason || undefined);
+                                          toast.success('Issue rejected');
+                                          const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
+                                          setIssueList(list || []);
+                                        } catch (err: any) {
+                                          toast.error(getApiErrorMessage(err, 'Failed to reject issue'));
+                                        } finally {
+                                          setReviewingIssue(null);
+                                        }
+                                      }}
+                                      className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                    >
+                                      {activeReviewAction === 'reject' ? <Loader className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                                      {activeReviewAction === 'reject' ? 'Rejecting...' : 'Reject'}
+                                    </button>
                                   </div>
                                 ) : (
-                                  <span className="text-xs text-muted-foreground">No proofs</span>
+                                  <span className="text-sm text-slate-500">Reviewed</span>
                                 )}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-500">
-                                <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                                  isPendingIssue
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : issueStatus === 'resolved' || issueStatus === 'approved'
-                                      ? 'bg-green-100 text-green-800'
-                                      : 'bg-red-100 text-red-800'
-                                }`}>
-                                  {issueStatus}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-500">{new Date(it.createdAt).toLocaleString()}</td>
-                              <td className="px-6 py-4 text-right text-sm">
-                                {isPendingIssue ? (
-                                <div className="flex justify-end gap-2">
-                                  <button
-                                    disabled={isReviewActionDisabled}
-                                    onClick={async () => {
-                                      if (!confirm('Approve this issue and update account records?')) return;
-                                      setReviewingIssue({ id: it._id, action: 'approve' });
-                                      try {
-                                        await adminIssueService.approveIssue(it._id);
-                                        toast.success('Issue approved and account updated');
-                                        // refresh issues and accounts
-                                        const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
-                                        setIssueList(list || []);
-                                        if (canViewReports) await loadAccountRows();
-                                      } catch (err: any) {
-                                        toast.error(getApiErrorMessage(err, 'Failed to approve issue'));
-                                      } finally {
-                                        setReviewingIssue(null);
-                                      }
-                                    }}
-                                    className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-white disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    {activeReviewAction === 'approve' && <Loader className="h-4 w-4 animate-spin" />}
-                                    {activeReviewAction === 'approve' ? 'Approving...' : 'Approve'}
-                                  </button>
-                                  <button
-                                    disabled={isReviewActionDisabled}
-                                    onClick={async () => {
-                                      const reason = prompt('Enter reason for rejection (optional):');
-                                      setReviewingIssue({ id: it._id, action: 'reject' });
-                                      try {
-                                        await adminIssueService.rejectIssue(it._id, reason || undefined);
-                                        toast.success('Issue rejected');
-                                        const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
-                                        setIssueList(list || []);
-                                      } catch (err: any) {
-                                        toast.error(getApiErrorMessage(err, 'Failed to reject issue'));
-                                      } finally {
-                                        setReviewingIssue(null);
-                                      }
-                                    }}
-                                    className="inline-flex items-center gap-2 rounded-md border px-3 py-2 disabled:cursor-not-allowed disabled:opacity-60"
-                                  >
-                                    {activeReviewAction === 'reject' && <Loader className="h-4 w-4 animate-spin" />}
-                                    {activeReviewAction === 'reject' ? 'Rejecting...' : 'Reject'}
-                                  </button>
-                                </div>
-                                ) : (
-                                  <span className="text-sm text-gray-400">Reviewed</span>
-                                )}
-                              </td>
-                            </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                              </div>
+                            </div>
+                          </article>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

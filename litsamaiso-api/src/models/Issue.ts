@@ -5,6 +5,8 @@ export interface IssueDocument {
   studentId: string;
   bankName?: string;
   accountNumber?: string;
+  recordedBankName?: string;
+  recordedAccountNumber?: string;
   reasons: string[];
   correctedBankName?: string;
   correctedAccountNumber?: string;
@@ -27,6 +29,8 @@ const issueSchema = new Schema<IssueDocument>(
     studentId: { type: String, required: true, trim: true, unique: true },
     bankName: { type: String, trim: true },
     accountNumber: { type: String, trim: true },
+    recordedBankName: { type: String, trim: true },
+    recordedAccountNumber: { type: String, trim: true },
     reasons: { type: [String], default: [] },
     correctedBankName: { type: String, trim: true },
     correctedAccountNumber: { type: String, trim: true },
