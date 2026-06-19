@@ -29,20 +29,34 @@ npm install
 
 Configure environment variables:
 
-- `MONGO_URI` or `MONGODB_URI`
-- `JWT_SECRET`
-- `JWT_EXPIRES_IN`  
-  Optional token lifetime, for example `1d` or `30d`
-- `PASSWORD_RESET_BASE_URL`  
-  Optional frontend base URL used to generate password reset links, for example `http://localhost:3000`.
-- `APP_ADMIN_EMAIL`  
-  Optional. If set, the app seeds an AppAdmin user on startup.
-- `APP_ADMIN_PASSWORD`  
-  Optional. Required with `APP_ADMIN_EMAIL`.
-- `SYSTEM_INSTITUTION_NAME`  
-  Optional. Used when seeding the AppAdmin account.
-- `SYSTEM_INSTITUTION_EMAIL`  
-  Optional. Used when seeding the AppAdmin account.
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `MONGO_URI` / `MONGODB_URI` | Yes | — | MongoDB connection string |
+| `JWT_SECRET` | Yes | — | Secret key for signing JWT tokens |
+| `JWT_EXPIRES_IN` | No | `1d` | Token lifetime, e.g. `1d` or `30d` (overridden to `30d` when `rememberMe=true`) |
+| `PORT` | No | `5000` | Server listen port |
+| `PASSWORD_RESET_BASE_URL` | No | — | Frontend base URL for password reset links, e.g. `http://localhost:3000` |
+| `APP_ADMIN_EMAIL` | No | — | Seeds an AppAdmin user on startup if set |
+| `APP_ADMIN_PASSWORD` | No | — | Password for the seeded AppAdmin |
+| `SYSTEM_INSTITUTION_NAME` | No | — | Institution name for the AppAdmin seed |
+| `SYSTEM_INSTITUTION_EMAIL` | No | — | Institution email for the AppAdmin seed |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | No | — | Google Gemini API key for AI account validation |
+| `ELECTION_HMAC_SECRET` | No | — | HMAC secret for ballot hashing and result snapshot integrity |
+| `CLOUDINARY_CLOUD_NAME` | No | — | Cloudinary cloud name for image/file uploads |
+| `CLOUDINARY_API_KEY` | No | — | Cloudinary API key |
+| `CLOUDINARY_API_SECRET` | No | — | Cloudinary API secret |
+| `CLOUDINARY_FOLDER` | No | `litsamaiso` | Cloudinary upload folder |
+| `AGENDA_COLLECTION` | No | `agendaJobs` | MongoDB collection name for Agenda scheduled jobs |
+| `APP_NAME` | No | `Litsamaiso` | Application name for email branding |
+| `EMAIL_ACCENT_COLOR` | No | `#535BC0` | Accent color for email templates |
+| `EMAIL_LOGO_URL` | No | — | Logo URL for email templates |
+| `EMAIL_LOGO_PATH` | No | — | Local filesystem path to logo image |
+| `EMAIL_SMTP_HOST` / `EMAIL_HOST` | No | — | SMTP server hostname |
+| `EMAIL_SMTP_PORT` / `EMAIL_PORT` | No | `587` | SMTP server port |
+| `EMAIL_SMTP_USER` / `EMAIL_USER` | No | — | SMTP username / email |
+| `EMAIL_SMTP_PASS` / `EMAIL_PASS` | No | — | SMTP password or app-specific password |
+| `EMAIL_SMTP_SECURE` / `EMAIL_SECURE` | No | — | Use TLS (`true` for port 465) |
+| `EMAIL_FROM` | No | — | From address shown on outgoing messages |
 
 Build the project:
 
@@ -69,8 +83,13 @@ npm start
 - `src/routes/` - route definitions
 - `src/services/` - business logic
 - `src/models/` - Mongoose models
-- `src/scheduler/` - jobs scheduling 
-- `src/utils/` - shared helpers such as audit logging
+- `src/middleware/` - Express middleware (auth, audit, rate limiting)
+- `src/scheduler/` - job scheduling (Agenda)
+- `src/utils/` - shared helpers such as audit logging, email, validation, seeding
+- `src/constants/` - constant definitions
+- `src/emailTemplates/` - React email templates
+- `src/scripts/` - CLI utility scripts
+- `src/types/` - TypeScript type declarations
 
 ## Roles
 
@@ -136,6 +155,171 @@ curl -X GET "http://<HOST>/feedback" \
   - **Scheduling**: The system utilizes `agenda` to automatically transition election states based on `startDate` and `endDate` (auto-open, auto-close, and auto-count).
   - **Voting**: Students submit their ballots. The system validates selections to prevent duplicate votes for the same candidate and ensures constraints like `maxVotesAllowed` per position are respected.
   - **Results**: Once an election is closed, background jobs safely compute the final tally and generate a `ResultSnapshot` for authorized publication.
+
+## Models
+
+### Account
+
+Represents a student's financial account record tied to an institution.
+
+Fields:
+
+- `institution` (ObjectId, ref Institution) — required
+- `fullnames` — string
+- `contractNumber` — string, required
+- `courseOfStudy` — string
+- `bankName` — string
+- `accountNumber` — string
+- `status` — `unconfirmed` | `confirmed` | `paid`, default `unconfirmed`
+- `graduating` — boolean
+- `batchNumber` — number
+- `confirmationDate` — Date
+- `paidAt` — Date
+- `accountHolder` — ObjectId, ref Student
+- `importedBy` — ObjectId, ref User (Finance user who uploaded)
+- `paymentProof` — string (base64)
+
+Indexes:
+
+- `(institution, contractNumber)` unique
+- `(institution, accountNumber)` unique
+
+### User
+
+Represents an admin or staff account (not a student).
+
+Fields:
+
+- `email` — string, unique, required
+- `password` — string (hashed)
+- `name` — string
+- `surname` — string
+- `role` — ref Role
+- `institution` — ObjectId, ref Institution (optional, null for AppAdmin)
+- `isActive` — boolean, default `true`
+- `resetPasswordToken` — string
+- `resetPasswordExpires` — Date
+
+### Student
+
+Represents a student user.
+
+Fields:
+
+- `studentId` — string, unique within institution
+- `email` — string, unique, required
+- `password` — string (hashed)
+- `name` — string
+- `surname` — string
+- `institution` — ObjectId, ref Institution
+- `studentStatus` — boolean, default `true`
+- `role` — ref Role
+
+### Institution
+
+Fields:
+
+- `name` — string, unique, required
+- `email` — string
+- `domain` — string
+- `isLocked` — boolean, default `false`
+
+### Role
+
+Seeded roles: `AppAdmin`, `InstitutionAdmin`, `Finance`, `SAAD`, `student`.
+
+### Issue
+
+Tracks a discrepancy between what the student confirmed and the finance record.
+
+Fields:
+
+- `student` — ObjectId, ref Student
+- `contractNumber` — string
+- `correctedBankName` — string
+- `correctedAccountNumber` — string
+- `document` — string (base64)
+- `status` — `open` | `resolved` | `rejected`, default `open`
+
+### Feedback
+
+Fields:
+
+- `rating` — number (1–5), required
+- `comment` — string, optional
+
+### Election
+
+States: `DRAFT`, `PUBLISHED`, `CLOSED`, `COUNTING`, `RESULTS_PUBLISHED`
+
+Fields:
+
+- `title` — string
+- `description` — string
+- `startDate` — Date
+- `endDate` — Date
+- `status` — enum above
+- `institution` — ObjectId, ref Institution
+
+### Candidate
+
+Fields:
+
+- `name` — string
+- `surname` — string
+- `studentId` — string
+- `position` — ObjectId, ref Position
+- `election` — ObjectId, ref Election
+- `photo` — string (URL or base64)
+- `bio` — string
+- `isApproved` — boolean, default `false`
+- `isDisqualified` — boolean, default `false`
+
+### Position
+
+Fields:
+
+- `title` — string
+- `description` — string
+- `election` — ObjectId, ref Election
+- `maxVotesAllowed` — number, default `1`
+- `candidateCount` — number
+
+### Ballot
+
+Fields:
+
+- `election` — ObjectId, ref Election
+- `voter` — ObjectId, ref Student
+- `votes` — array of `{ position: ObjectId, candidate: ObjectId }`
+- `hash` — string (HMAC-SHA256)
+- `receiptCode` — string (last 8 chars of hash)
+- `submittedAt` — Date
+
+### ResultSnapshot
+
+Fields:
+
+- `election` — ObjectId, ref Election
+- `results` — array of position results with candidate vote counts
+- `hash` — string
+- `publishedAt` — Date
+- `snapshotVersion` — number
+
+### AuditLog
+
+Fields:
+
+- `action` — string (e.g. `http.POST`, `account.confirm`)
+- `actor` — ObjectId, ref User/Student
+- `actorEmail` — string
+- `actorRole` — string
+- `targetCollection` — string
+- `targetId` — string
+- `details` — Mixed
+- `requestId` — string
+
+---
 
 ## API Endpoints
 
@@ -384,6 +568,178 @@ Implementation notes:
 - `status` is normalized to lowercase when the reports are calculated.
 - `confirmationDate` and `paidAt` are used for timing and operational reports.
 
+### Profile
+
+`GET /profile`
+
+Role: Any authenticated user
+
+Returns the current user's profile.
+
+`PUT /profile`
+
+Role: Any authenticated user
+
+Updates the current user's profile (name, surname, email, password).
+
+### Users
+
+All routes require `AppAdmin` or `InstitutionAdmin`.
+
+`GET /users`
+
+Lists users. Supports filtering by role and institution.
+
+`GET /users/roles`
+
+Lists available roles.
+
+`GET /users/:id`
+
+Gets a single user.
+
+`PUT /users/:id`
+
+Updates a user (name, surname, email, role, institution, `isActive`).
+
+`DELETE /users/:id`
+
+Deletes a user.
+
+`GET /users/:id/status`
+
+Toggles a user's `isActive` status.
+
+### Institutions
+
+All routes require `AppAdmin`.
+
+`GET /institutions`
+
+Lists all institutions.
+
+`POST /institutions`
+
+Creates an institution.
+
+`PUT /institutions/:id`
+
+Updates an institution.
+
+`DELETE /institutions/:id`
+
+Deletes an institution.
+
+`POST /institutions/:id/lock`
+
+Locks an institution.
+
+`POST /institutions/:id/unlock`
+
+Unlocks an institution.
+
+`GET /institutions/:id/users`
+
+Lists users for an institution (any authenticated user).
+
+`POST /institutions/:id/users`
+
+Creates a user scoped to the institution. Role: `AppAdmin` or `InstitutionAdmin`.
+
+### Issues (Student)
+
+All routes require authentication.
+
+`GET /issues`
+
+Lists issues for the authenticated student.
+
+`POST /issues`
+
+Creates an issue.
+
+`DELETE /issues`
+
+Deletes all issues for the authenticated student.
+
+`GET /issues/:id`
+
+Gets a single issue.
+
+`PUT /issues/:id`
+
+Updates an issue.
+
+### Admin Issues
+
+All routes require `Finance`.
+
+`GET /admin/issues`
+
+Lists all issues across students.
+
+`GET /admin/issues/:id`
+
+Gets a single issue.
+
+`PUT /admin/issues/:id/approve`
+
+Approves an issue — applies corrected bank/account from the issue to the matching account, then deletes the issue.
+
+`PUT /admin/issues/:id/reject`
+
+Rejects an issue — sets its status to `rejected`.
+
+### AI / OCR
+
+`POST /ai/validate-account`
+
+Role: `Student`
+
+Uses Google Gemini to validate account details. Sends an image (base64 JSON payload) and receives back structured account info extracted by AI.
+
+`POST /ocr/server-ocr`
+
+Role: `Student`
+
+Uploads a document image file (multipart, field name `file`) for server-side OCR processing.
+
+### Upload
+
+`POST /upload`
+
+Role: Any authenticated user
+
+Uploads an image file (multipart, field name `file`) to Cloudinary. Returns the Cloudinary URL.
+
+### Vote
+
+All routes require authentication.
+
+`POST /vote/submit`
+
+Role: `Student`
+
+Rate limited: 5 req / 60s
+
+Submits a ballot. Also available at `POST /elections/:electionId/vote`.
+
+`GET /vote/status`
+
+Role: `Student`
+
+Rate limited: 30 req / 60s
+
+Returns whether the student has already voted in a given election.
+
+`GET /vote/receipt/:id`
+
+Role: `Student` or `SAAD`
+
+Rate limited: 30 req / 60s
+
+Returns vote receipt details by receipt ID.
+
 ## Audit Logging
 
 Audit logging is enabled in two layers:
@@ -411,10 +767,75 @@ It does not log full sensitive payloads.
 
 - `account.confirm`
 - `account.confirm.failed`
+- `account.import`
+- `account.resolve`
+- `account.finance-resolve`
+- `account.update`
 - `issue.submit`
 - `issue.submit.failed`
-- `issue.resolve.applied`
+- `issue.resolve`
 - `issue.resolve.failed`
+- `feedback.create`
+- `feedback.list`
+- `candidate.create`
+- `candidate.update`
+- `candidate.approve`
+- `candidate.disqualify`
+- `candidate.delete`
+- `candidate.import`
+- `election.create`
+- `election.update`
+- `election.schedule`
+- `election.publish`
+- `election.open`
+- `election.close`
+- `election.archive`
+- `election.delete`
+- `results.publish`
+- `results.compute`
+- `position.create`
+- `position.update`
+- `position.deadline`
+- `position.delete`
+- `vote.cast`
+- `admin.issue.resolve`
+- `admin.issue.reject`
+- `auth.login`
+- `auth.login.failed`
+- `auth.register`
+- `auth.register.failed`
+- `user.create`
+- `user.update`
+- `user.delete`
+- `user.status`
+- `institution.create`
+- `institution.update`
+- `institution.delete`
+
+### Audit log endpoints
+
+`GET /audit-logs`
+
+Role: `AppAdmin`
+
+Returns paginated audit logs sorted by newest first. All logs — HTTP middleware and domain actions — are stored in the `AuditLog` collection.
+
+Query params (all optional):
+
+| Param | Description |
+|-------|-------------|
+| `page` | Page number, default `1` |
+| `limit` | Items per page, default `50`, max `500` |
+| `search` | Global search across action, actorEmail, actorRole, targetCollection, targetId, details.path, and details.method |
+| `action` | Filter by action name (regex) |
+| `startDate` | Filter from this date (ISO) |
+| `endDate` | Filter to this date (inclusive) |
+
+`GET /audit-logs/export`
+
+Role: `AppAdmin`
+
+Downloads all audit logs as a `.txt` file in MongoDB Extended JSON format (`$oid`, `$date`, etc.).
 
 ### Audit log model
 
@@ -627,9 +1048,12 @@ No request body required.
 ## Important Notes
 
 - `Account` has unique indexes on `institution + contractNumber` and `institution + accountNumber`.
-- Student document uploads are stored as base64 in the database. For production, object storage is a better long-term choice.
+- Student document uploads (issue resolution) are stored as base64 in the database. Cloudinary is used for candidate photo uploads when configured.
 - `req.user` is attached by `requireAuth` and `requireRole` enforces role access.
-- Controllers now guard against undefined `req.body` before destructuring.
+- Controllers guard against undefined `req.body` before destructuring.
+- Audit logs are accessible to `AppAdmin` only via `GET /audit-logs` (paginated) and `GET /audit-logs/export` (full download).
+- Ballot hashing uses HMAC-SHA256 with `ELECTION_HMAC_SECRET` for integrity verification.
+- Rate limiting is applied globally via `express-rate-limit` and separately for auth routes to mitigate brute-force attacks.
 
 ## Troubleshooting
 
