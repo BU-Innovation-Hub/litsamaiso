@@ -10,6 +10,7 @@ import {
   financeResolveAccountIssue,
   loadPayedStudents,
   updateAccount,
+  exportAccountRecords,
 } from "../controllers/accountController.js";
 
 const router = Router();
@@ -53,6 +54,13 @@ router.post(
   requireRole("Finance"),
   upload.single("file"),
   loadPayedStudents,
+);
+
+router.get(
+  "/export",
+  requireAuth,
+  requireRole(["AppAdmin", "InstitutionAdmin", "Finance"]),
+  exportAccountRecords,
 );
 
 // List accounts - available to Finance, InstitutionAdmin and AppAdmin

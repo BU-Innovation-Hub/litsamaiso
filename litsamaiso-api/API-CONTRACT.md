@@ -233,6 +233,7 @@ studentId=STU123
 | POST | /students/upload | Yes | InstitutionAdmin | Import students from Excel |
 | POST | /accounts/upload | Yes | Finance | Import accounts from Excel |
 | POST | /accounts/load_payed_students | Yes | Finance | Import paid accounts from Excel |
+| GET | /accounts/export | Yes | AppAdmin, InstitutionAdmin, Finance | Export account records as CSV/XLSX |
 | POST | /accounts/confirm | Yes | Student | Confirm account |
 | POST | /accounts/resolve | Yes | Student | Submit issue resolution + document |
 | POST | /accounts/finance-resolve | Yes | Finance | Apply issue resolution to account |
@@ -393,6 +394,34 @@ Optional columns used if present:
 **Errors**
 - 400 `{ "message": "Missing file upload" }`
 - 500 `{ "message": "<xlsx or import error>" }`
+
+---
+
+#### GET /accounts/export
+**Auth**: Yes (AppAdmin, InstitutionAdmin, Finance)
+
+**Query Params**
+- `format` (string, optional) -> `csv` default, or `xlsx`
+- `search` (string, optional)
+- `status` (string, optional)
+- `batchNumber` (number, optional)
+- `startDate` (date string, optional) -> filters by `confirmationDate`
+- `endDate` (date string, optional) -> filters by `confirmationDate`
+- `institutionId` (string, optional, only respected for AppAdmin)
+- `limit` (number, optional, default 5000, max 50000)
+
+**Response**
+- File download with `Content-Disposition: attachment`
+- CSV uses `text/csv; charset=utf-8`
+- XLSX uses `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+**Export Columns**
+`First Name`, `Surname`, `Full Names`, `Contract Number`, `Course of Study`, `Bank Name`, `Account Number`, `Student ID`, `Status`, `Graduating`, `Batch Number`, `Confirmation Date`, `Paid Date`, `Signature`, `Created At`, `Updated At`
+
+**Notes**
+- `First Name`, `Surname`, and `Student ID` come from the confirming student when available.
+- `First Name` and `Surname` fall back to splitting `Full Names` for unconfirmed records.
+- `Signature` is exported as a blank column because it is not stored in the current account/student schema.
 
 ---
 
