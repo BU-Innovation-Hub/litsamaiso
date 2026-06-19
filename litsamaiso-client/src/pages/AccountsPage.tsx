@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, CheckCircle, Clock, CreditCard, FileText, Filter, Image as ImageIcon, Receipt, RefreshCcw, Search, ShieldCheck, Upload, XCircle, Download, Edit, Loader } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle, ChevronLeft, ChevronRight, Clock, CreditCard, Eye, FileText, Filter, Image as ImageIcon, Receipt, RefreshCcw, Search, ShieldCheck, Upload, X, XCircle, Download, Edit, Loader } from 'lucide-react';
 import exportData from '../exporters';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
@@ -47,6 +47,9 @@ const AccountsPage: React.FC = () => {
   const [issueList, setIssueList] = useState<any[] | null>(null);
   const [issuesLoading, setIssuesLoading] = useState(false);
   const [reviewingIssue, setReviewingIssue] = useState<{ id: string; action: 'approve' | 'reject' } | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<any | null>(null);
+  const [issuePage, setIssuePage] = useState(1);
+  const issuePageSize = 10;
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -160,6 +163,7 @@ const AccountsPage: React.FC = () => {
       try {
         const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
         setIssueList(list || []);
+        setIssuePage(1);
       } catch (err: unknown) {
         toast.error(getApiErrorMessage(err, 'Failed to load issues'));
         setIssueList([]);
@@ -395,6 +399,30 @@ const AccountsPage: React.FC = () => {
     return urls;
   };
 
+  const financeIssueRows = Array.isArray(issueList) ? issueList : [];
+  const totalIssuePages = Math.max(1, Math.ceil(financeIssueRows.length / issuePageSize));
+  const currentIssuePage = Math.min(issuePage, totalIssuePages);
+  const paginatedIssueRows = financeIssueRows.slice(
+    (currentIssuePage - 1) * issuePageSize,
+    currentIssuePage * issuePageSize,
+  );
+  const issueStart = financeIssueRows.length === 0 ? 0 : (currentIssuePage - 1) * issuePageSize + 1;
+  const issueEnd = Math.min(currentIssuePage * issuePageSize, financeIssueRows.length);
+  const selectedIssueStatus = String(selectedIssue?.status || 'submitted').toLowerCase();
+  const selectedIssueIsPending = selectedIssueStatus === 'submitted' || selectedIssueStatus === 'reported';
+  const currentReviewingIssue = reviewingIssue;
+  const selectedIssueAction = selectedIssue && currentReviewingIssue && currentReviewingIssue.id === selectedIssue._id
+    ? currentReviewingIssue.action
+    : null;
+  const selectedIssueCurrentBankName = selectedIssue?.recordedBankName || selectedIssue?.account?.bankName;
+  const selectedIssueCurrentAccountNumber = selectedIssue?.recordedAccountNumber || selectedIssue?.account?.accountNumber;
+  const selectedIssueProposedBankName = selectedIssue?.correctedBankName || selectedIssue?.bankName;
+  const selectedIssueProposedAccountNumber = selectedIssue?.correctedAccountNumber || selectedIssue?.accountNumber;
+  const selectedIssueBankChanged = hasChanged(selectedIssueCurrentBankName, selectedIssueProposedBankName);
+  const selectedIssueAccountChanged = hasChanged(selectedIssueCurrentAccountNumber, selectedIssueProposedAccountNumber);
+  const selectedIssueProofImages = selectedIssue ? getIssueProofImages(selectedIssue) : [];
+  const selectedIssueReasons = selectedIssue && Array.isArray(selectedIssue.reasons) ? selectedIssue.reasons : [];
+
   return (
     <div className="global-bg min-h-screen pt-5 pb-14">
       <div className="mx-auto max-w-6xl px-4 space-y-8">
@@ -496,6 +524,7 @@ const AccountsPage: React.FC = () => {
                         try {
                           const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
                           setIssueList(list || []);
+                          setIssuePage(1);
                         } catch (err) {
                           toast.error(getApiErrorMessage(err, 'Failed to load issues'));
                           setIssueList([]);
@@ -518,195 +547,107 @@ const AccountsPage: React.FC = () => {
                   ) : !issueList || issueList.length === 0 ? (
                     <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-6 text-gray-600">No issues found</div>
                   ) : (
-                    <div className="space-y-4">
-                      {issueList.map((it: any) => {
-                        const issueStatus = String(it.status || 'submitted').toLowerCase();
-                        const isPendingIssue = issueStatus === 'submitted' || issueStatus === 'reported';
-                        const currentReviewingIssue = reviewingIssue;
-                        const activeReviewAction = currentReviewingIssue && currentReviewingIssue.id === it._id
-                          ? currentReviewingIssue.action
-                          : null;
-                        const isReviewActionDisabled = Boolean(currentReviewingIssue);
-                        const currentBankName = it.recordedBankName || it.account?.bankName;
-                        const currentAccountNumber = it.recordedAccountNumber || it.account?.accountNumber;
-                        const proposedBankName = it.correctedBankName || it.bankName;
-                        const proposedAccountNumber = it.correctedAccountNumber || it.accountNumber;
-                        const bankChanged = hasChanged(currentBankName, proposedBankName);
-                        const accountChanged = hasChanged(currentAccountNumber, proposedAccountNumber);
-                        const proofImages = getIssueProofImages(it);
-                        const reasons = Array.isArray(it.reasons) ? it.reasons : [];
+                    <div className="overflow-hidden rounded-lg border border-slate-200">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-slate-200">
+                          <thead className="bg-slate-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Contract</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Student</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Problem</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Student correction</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Proof</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Status</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Submitted</th>
+                              <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-slate-500">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {paginatedIssueRows.map((it: any) => {
+                              const issueStatus = String(it.status || 'submitted').toLowerCase();
+                              const reasons = Array.isArray(it.reasons) ? it.reasons : [];
+                              const proposedBankName = it.correctedBankName || it.bankName;
+                              const proposedAccountNumber = it.correctedAccountNumber || it.accountNumber;
+                              const proofImages = getIssueProofImages(it);
+                              const problemSummary = reasons.length > 0
+                                ? reasons.map((reason: string) => formatIssueReason(reason)).join(', ')
+                                : 'Manual review';
 
-                        return (
-                          <article key={it._id} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-                            <div className="flex flex-col gap-3 border-b border-slate-200 bg-slate-50 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h3 className="font-semibold text-slate-950">{displayValue(it.contractNumber)}</h3>
-                                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getIssueStatusBadgeClass(issueStatus)}`}>
-                                    {issueStatus}
-                                  </span>
-                                </div>
-                                <p className="mt-1 text-sm text-slate-600">
-                                  Student {(it.student && it.student.studentId) || it.studentId || '-'} submitted this on {it.createdAt ? new Date(it.createdAt).toLocaleString() : '-'}.
-                                </p>
-                              </div>
-
-                              <div className="flex flex-wrap gap-2">
-                                {reasons.length > 0 ? reasons.map((reason: string) => (
-                                  <span key={reason} className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
-                                    <AlertTriangle className="h-3 w-3" />
-                                    {formatIssueReason(reason)}
-                                  </span>
-                                )) : (
-                                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">Manual review</span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="grid gap-0 lg:grid-cols-[1fr_auto_1fr]">
-                              <section className="px-5 py-5">
-                                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-red-700">
-                                  <XCircle className="h-4 w-4" />
-                                  Current record
-                                </div>
-                                <dl className="space-y-3">
-                                  <div>
-                                    <dt className="text-xs uppercase text-slate-500">Bank name in system</dt>
-                                    <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(currentBankName)}</dd>
-                                  </div>
-                                  <div>
-                                    <dt className="text-xs uppercase text-slate-500">Account number in system</dt>
-                                    <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(currentAccountNumber)}</dd>
-                                  </div>
-                                  {!it.account && (
-                                    <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                                      No matching account record was returned for this contract.
-                                    </p>
-                                  )}
-                                </dl>
-                              </section>
-
-                              <div className="hidden items-center justify-center border-x border-slate-200 px-4 lg:flex">
-                                <div className="rounded-full bg-slate-100 p-2 text-slate-500">
-                                  <ArrowRight className="h-5 w-5" />
-                                </div>
-                              </div>
-
-                              <section className="border-t border-slate-200 px-5 py-5 lg:border-t-0">
-                                <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-green-700">
-                                  <CheckCircle className="h-4 w-4" />
-                                  Student says correct
-                                </div>
-                                <dl className="space-y-3">
-                                  <div>
-                                    <dt className="flex items-center gap-2 text-xs uppercase text-slate-500">
-                                      Correct bank name
-                                      {bankChanged && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">changed</span>}
-                                    </dt>
-                                    <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(proposedBankName)}</dd>
-                                  </div>
-                                  <div>
-                                    <dt className="flex items-center gap-2 text-xs uppercase text-slate-500">
-                                      Correct account number
-                                      {accountChanged && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">changed</span>}
-                                    </dt>
-                                    <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(proposedAccountNumber)}</dd>
-                                  </div>
-                                  {it.notes && (
-                                    <div>
-                                      <dt className="text-xs uppercase text-slate-500">Student notes</dt>
-                                      <dd className="mt-1 text-sm text-slate-700">{it.notes}</dd>
-                                    </div>
-                                  )}
-                                </dl>
-                              </section>
-                            </div>
-
-                            <div className="border-t border-slate-200 px-5 py-4">
-                              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                                <div>
-                                  <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
-                                    <ImageIcon className="h-4 w-4" />
-                                    Proof submitted
-                                  </div>
-                                  {proofImages.length > 0 ? (
-                                    <div className="flex flex-wrap gap-2">
-                                      {proofImages.map((url: string, idx: number) => (
-                                        <button
-                                          key={`${url}-${idx}`}
-                                          type="button"
-                                          onClick={() => { setLightboxImages(proofImages); setLightboxIndex(idx); setLightboxOpen(true); }}
-                                          className="group overflow-hidden rounded-md border border-slate-200 bg-white p-1 transition hover:border-active"
-                                          aria-label={`Open proof ${idx + 1}`}
-                                        >
-                                          <img src={url} alt={`proof-${idx}`} className="h-16 w-20 rounded object-cover transition group-hover:opacity-90" />
-                                        </button>
-                                      ))}
-                                    </div>
-                                  ) : it.documentFileName ? (
-                                    <div className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600">
-                                      <FileText className="h-4 w-4" />
-                                      {it.documentFileName}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-slate-500">No proof uploaded.</p>
-                                  )}
-                                </div>
-
-                                {isPendingIssue ? (
-                                  <div className="flex flex-wrap justify-end gap-2">
+                              return (
+                                <tr
+                                  key={it._id}
+                                  onClick={() => setSelectedIssue(it)}
+                                  className="cursor-pointer transition hover:bg-slate-50"
+                                >
+                                  <td className="whitespace-nowrap px-4 py-4 text-sm font-semibold text-slate-950">{displayValue(it.contractNumber)}</td>
+                                  <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-600">{(it.student && it.student.studentId) || it.studentId || '-'}</td>
+                                  <td className="max-w-xs px-4 py-4 text-sm text-slate-700">
+                                    <div className="line-clamp-2">{problemSummary}</div>
+                                  </td>
+                                  <td className="px-4 py-4 text-sm text-slate-700">
+                                    <p className="font-medium text-slate-950">{displayValue(proposedBankName)}</p>
+                                    <p className="text-slate-500">{displayValue(proposedAccountNumber)}</p>
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-600">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                      <ImageIcon className="h-3.5 w-3.5" />
+                                      {proofImages.length || (it.documentFileName ? 1 : 0)}
+                                    </span>
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-4 text-sm">
+                                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getIssueStatusBadgeClass(issueStatus)}`}>
+                                      {issueStatus}
+                                    </span>
+                                  </td>
+                                  <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-600">{it.createdAt ? new Date(it.createdAt).toLocaleDateString() : '-'}</td>
+                                  <td className="whitespace-nowrap px-4 py-4 text-right text-sm">
                                     <button
-                                      disabled={isReviewActionDisabled}
-                                      onClick={async () => {
-                                        if (!confirm('Approve this issue and update account records?')) return;
-                                        setReviewingIssue({ id: it._id, action: 'approve' });
-                                        try {
-                                          await adminIssueService.approveIssue(it._id);
-                                          toast.success('Issue approved and account updated');
-                                          const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
-                                          setIssueList(list || []);
-                                          if (canViewReports) await loadAccountRows();
-                                        } catch (err: any) {
-                                          toast.error(getApiErrorMessage(err, 'Failed to approve issue'));
-                                        } finally {
-                                          setReviewingIssue(null);
-                                        }
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        setSelectedIssue(it);
                                       }}
-                                      className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                      className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
                                     >
-                                      {activeReviewAction === 'approve' ? <Loader className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                                      {activeReviewAction === 'approve' ? 'Approving...' : 'Approve correction'}
+                                      <Eye className="h-4 w-4" />
+                                      Review
                                     </button>
-                                    <button
-                                      disabled={isReviewActionDisabled}
-                                      onClick={async () => {
-                                        const reason = prompt('Enter reason for rejection (optional):');
-                                        setReviewingIssue({ id: it._id, action: 'reject' });
-                                        try {
-                                          await adminIssueService.rejectIssue(it._id, reason || undefined);
-                                          toast.success('Issue rejected');
-                                          const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
-                                          setIssueList(list || []);
-                                        } catch (err: any) {
-                                          toast.error(getApiErrorMessage(err, 'Failed to reject issue'));
-                                        } finally {
-                                          setReviewingIssue(null);
-                                        }
-                                      }}
-                                      className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                      {activeReviewAction === 'reject' ? <Loader className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-                                      {activeReviewAction === 'reject' ? 'Rejecting...' : 'Reject'}
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <span className="text-sm text-slate-500">Reviewed</span>
-                                )}
-                              </div>
-                            </div>
-                          </article>
-                        );
-                      })}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-sm text-slate-600">
+                          Showing {issueStart}-{issueEnd} of {financeIssueRows.length} issues
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={currentIssuePage <= 1}
+                            onClick={() => setIssuePage((page) => Math.max(1, page - 1))}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                            Previous
+                          </button>
+                          <span className="rounded-md bg-white px-3 py-2 text-sm font-medium text-slate-700">
+                            Page {currentIssuePage} of {totalIssuePages}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={currentIssuePage >= totalIssuePages}
+                            onClick={() => setIssuePage((page) => Math.min(totalIssuePages, page + 1))}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Next
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -716,6 +657,204 @@ const AccountsPage: React.FC = () => {
                 <p className="text-gray-600">Listing all student issues is not available on this API. Finance users can resolve issues by Student ID.</p>
               )}
             </div>
+          </div>
+        )}
+
+        {selectedIssue && (
+          <div className="fixed inset-0 z-40">
+            <button
+              type="button"
+              aria-label="Close issue review"
+              className="absolute inset-0 bg-slate-950/40"
+              onClick={() => setSelectedIssue(null)}
+            />
+            <aside className="absolute right-0 top-0 flex h-full w-full max-w-4xl flex-col bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-6 py-5">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-semibold text-slate-950">{displayValue(selectedIssue.contractNumber)}</h3>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getIssueStatusBadgeClass(selectedIssueStatus)}`}>
+                      {selectedIssueStatus}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Student {(selectedIssue.student && selectedIssue.student.studentId) || selectedIssue.studentId || '-'} submitted this on {selectedIssue.createdAt ? new Date(selectedIssue.createdAt).toLocaleString() : '-'}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIssue(null)}
+                  className="rounded-md p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-5">
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {selectedIssueReasons.length > 0 ? selectedIssueReasons.map((reason: string) => (
+                    <span key={reason} className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                      <AlertTriangle className="h-3 w-3" />
+                      {formatIssueReason(reason)}
+                    </span>
+                  )) : (
+                    <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">Manual review</span>
+                  )}
+                </div>
+
+                <article className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+                  <div className="grid gap-0 lg:grid-cols-[1fr_auto_1fr]">
+                    <section className="px-5 py-5">
+                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-red-700">
+                        <XCircle className="h-4 w-4" />
+                        Current record
+                      </div>
+                      <dl className="space-y-3">
+                        <div>
+                          <dt className="text-xs uppercase text-slate-500">Bank name in system</dt>
+                          <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(selectedIssueCurrentBankName)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs uppercase text-slate-500">Account number in system</dt>
+                          <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(selectedIssueCurrentAccountNumber)}</dd>
+                        </div>
+                        {!selectedIssue.account && (
+                          <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                            No matching account record was returned for this contract.
+                          </p>
+                        )}
+                      </dl>
+                    </section>
+
+                    <div className="hidden items-center justify-center border-x border-slate-200 px-4 lg:flex">
+                      <div className="rounded-full bg-slate-100 p-2 text-slate-500">
+                        <ArrowRight className="h-5 w-5" />
+                      </div>
+                    </div>
+
+                    <section className="border-t border-slate-200 px-5 py-5 lg:border-t-0">
+                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-green-700">
+                        <CheckCircle className="h-4 w-4" />
+                        Student says correct
+                      </div>
+                      <dl className="space-y-3">
+                        <div>
+                          <dt className="flex items-center gap-2 text-xs uppercase text-slate-500">
+                            Correct bank name
+                            {selectedIssueBankChanged && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">changed</span>}
+                          </dt>
+                          <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(selectedIssueProposedBankName)}</dd>
+                        </div>
+                        <div>
+                          <dt className="flex items-center gap-2 text-xs uppercase text-slate-500">
+                            Correct account number
+                            {selectedIssueAccountChanged && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">changed</span>}
+                          </dt>
+                          <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(selectedIssueProposedAccountNumber)}</dd>
+                        </div>
+                        {selectedIssue.notes && (
+                          <div>
+                            <dt className="text-xs uppercase text-slate-500">Student notes</dt>
+                            <dd className="mt-1 text-sm text-slate-700">{selectedIssue.notes}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </section>
+                  </div>
+
+                  <div className="border-t border-slate-200 px-5 py-5">
+                    <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-900">
+                      <ImageIcon className="h-4 w-4" />
+                      Proof submitted
+                    </div>
+                    {selectedIssueProofImages.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedIssueProofImages.map((url: string, idx: number) => (
+                          <button
+                            key={`${url}-${idx}`}
+                            type="button"
+                            onClick={() => { setLightboxImages(selectedIssueProofImages); setLightboxIndex(idx); setLightboxOpen(true); }}
+                            className="group overflow-hidden rounded-md border border-slate-200 bg-white p-1 transition hover:border-active"
+                            aria-label={`Open proof ${idx + 1}`}
+                          >
+                            <img src={url} alt={`proof-${idx}`} className="h-24 w-32 rounded object-cover transition group-hover:opacity-90" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : selectedIssue.documentFileName ? (
+                      <div className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                        <FileText className="h-4 w-4" />
+                        {selectedIssue.documentFileName}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500">No proof uploaded.</p>
+                    )}
+                  </div>
+                </article>
+              </div>
+
+              <div className="border-t border-slate-200 bg-white px-6 py-4">
+                {selectedIssueIsPending ? (
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button
+                      disabled={Boolean(reviewingIssue)}
+                      onClick={async () => {
+                        if (!confirm('Approve this issue and update account records?')) return;
+                        setReviewingIssue({ id: selectedIssue._id, action: 'approve' });
+                        try {
+                          await adminIssueService.approveIssue(selectedIssue._id);
+                          toast.success('Issue approved and account updated');
+                          const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
+                          setIssueList(list || []);
+                          setSelectedIssue(null);
+                          if (canViewReports) await loadAccountRows();
+                        } catch (err: any) {
+                          toast.error(getApiErrorMessage(err, 'Failed to approve issue'));
+                        } finally {
+                          setReviewingIssue(null);
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {selectedIssueAction === 'approve' ? <Loader className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                      {selectedIssueAction === 'approve' ? 'Approving...' : 'Approve correction'}
+                    </button>
+                    <button
+                      disabled={Boolean(reviewingIssue)}
+                      onClick={async () => {
+                        const reason = prompt('Enter reason for rejection (optional):');
+                        setReviewingIssue({ id: selectedIssue._id, action: 'reject' });
+                        try {
+                          await adminIssueService.rejectIssue(selectedIssue._id, reason || undefined);
+                          toast.success('Issue rejected');
+                          const list = await adminIssueService.listIssues({ search: accountSearch || undefined });
+                          setIssueList(list || []);
+                          setSelectedIssue(null);
+                        } catch (err: any) {
+                          toast.error(getApiErrorMessage(err, 'Failed to reject issue'));
+                        } finally {
+                          setReviewingIssue(null);
+                        }
+                      }}
+                      className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {selectedIssueAction === 'reject' ? <Loader className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                      {selectedIssueAction === 'reject' ? 'Rejecting...' : 'Reject'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIssue(null)}
+                      className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-800"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
+            </aside>
           </div>
         )}
 
