@@ -444,7 +444,7 @@ const DashboardPage: React.FC = () => {
                   })}
                 </div>
               ) : canViewElections && elections.length > 0 ? (
-                <div className={`divide-y divide-slate-100 ${canViewAdminIssues ? 'max-h-[28rem] overflow-y-auto pr-1' : ''}`}>
+                <div className={`divide-y divide-slate-100 ${canViewAdminIssues ? 'max-h-112 overflow-y-auto pr-1' : ''}`}>
                   {elections.slice(0, 5).map((election) => (
                     <div key={election._id} className="flex items-center justify-between gap-4 py-3">
                       <div>
