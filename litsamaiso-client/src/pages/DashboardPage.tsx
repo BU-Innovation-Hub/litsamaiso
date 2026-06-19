@@ -254,28 +254,28 @@ const DashboardPage: React.FC = () => {
           value: accountSummary?.total ?? 0,
           description: 'Accounts available in report scope',
           icon: Banknote,
-          tone: 'bg-indigo-50 text-active-clr',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Confirmed accounts',
           value: accountSummary?.confirmed ?? 0,
           description: `${accountSummary?.confirmationRate ?? 0}% confirmation rate`,
           icon: BadgeCheck,
-          tone: 'bg-emerald-50 text-emerald-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Paid accounts',
           value: accountSummary?.paid ?? 0,
           description: `${accountSummary?.paymentRate ?? 0}% payment rate`,
           icon: Banknote,
-          tone: 'bg-sky-50 text-sky-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Pending confirmations',
           value: accountSummary?.unconfirmed ?? 0,
           description: 'Accounts still awaiting confirmation',
           icon: AlertCircle,
-          tone: 'bg-amber-50 text-amber-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
       );
     }
@@ -287,7 +287,7 @@ const DashboardPage: React.FC = () => {
           value: pendingIssues,
           description: 'Student corrections awaiting finance review',
           icon: FileWarning,
-          tone: 'bg-rose-50 text-rose-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Rejected issues',
