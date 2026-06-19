@@ -24,6 +24,7 @@ import issueRoutes from "./routes/issueRoutes.js";
 import institutionRoutes from "./routes/institutionRoutes.js";
 import adminIssueRoutes from "./routes/adminIssueRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
+import auditLogRoutes from "./routes/auditLogRoutes.js";
 import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
@@ -113,6 +114,7 @@ app.use("/ocr", ocrRoutes);
 app.use("/upload", uploadRoutes);
 app.use("/issues", issueRoutes);
 app.use("/admin/issues", adminIssueRoutes);
+app.use("/audit-logs", auditLogRoutes);
 app.use("/institutions", institutionRoutes);
 
 app.get("/", (req: Request, res: Response) => {

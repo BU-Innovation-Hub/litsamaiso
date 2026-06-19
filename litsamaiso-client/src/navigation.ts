@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarDays,
   ClipboardCheck,
+  History,
   LayoutDashboard,
   MessageSquareWarning,
   Users,
@@ -75,6 +76,13 @@ export const navigationItems: NavigationItem[] = [
     href: '/institutions',
     roles: roleAccess.institutions,
     icon: Building2,
+  },
+  {
+    id: 'audit-logs',
+    label: 'Audit Logs',
+    href: '/audit-logs',
+    roles: ['AppAdmin'],
+    icon: History,
   },
 ];
 

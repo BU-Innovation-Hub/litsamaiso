@@ -200,6 +200,28 @@ export interface Issue {
   updatedAt?: string;
 }
 
+// Audit Log Types
+export interface AuditLog {
+  _id: string;
+  action: string;
+  actorId?: string;
+  actorEmail?: string;
+  actorRole?: string;
+  targetCollection?: string;
+  targetId?: string;
+  details?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AuditLogsResponse {
+  auditLogs: AuditLog[];
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
 // Pagination Types
 export interface PaginatedResponse<T> {
   data: T[];
