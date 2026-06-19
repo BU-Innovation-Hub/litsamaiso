@@ -9,7 +9,6 @@ import {
   Clock3,
   FileWarning,
   ListChecks,
-  RefreshCw,
   ShieldCheck,
   Users,
   type LucideIcon,
@@ -373,10 +372,6 @@ const DashboardPage: React.FC = () => {
                 ? `${institutionName} workspace`
                 : 'Your Litsamaiso workspace'} with role-aware activity, queues, and account status.
             </p>
-          </div>
-          <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-600">
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            Live API data
           </div>
         </section>
 
