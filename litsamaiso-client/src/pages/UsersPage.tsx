@@ -189,7 +189,7 @@ const UsersPage: React.FC = () => {
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-4">
           <div className="rounded-lg bg-white p-6 shadow">
             <div className="flex items-center">
-              <Users className="h-8 w-8 text-purple-600" />
+              <Users className="h-8 w-8 text-active-clr" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Users</p>
                 <p className="text-2xl font-bold text-gray-900">{users.length}</p>
@@ -199,7 +199,7 @@ const UsersPage: React.FC = () => {
           {roleCounts.slice(0, 3).map(([roleName, count]) => (
             <div key={roleName} className="rounded-lg bg-white p-6 shadow">
               <div className="flex items-center">
-                <UserCog className="h-8 w-8 text-blue-600" />
+                <UserCog className="h-8 w-8 text-active-clr" />
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">{roleName}</p>
                   <p className="text-2xl font-bold text-gray-900">{count}</p>

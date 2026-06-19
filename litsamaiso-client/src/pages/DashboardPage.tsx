@@ -305,7 +305,7 @@ const DashboardPage: React.FC = () => {
         value: users.length,
         description: 'Users available to your role',
         icon: Users,
-        tone: 'bg-violet-50 text-violet-700',
+        tone: 'bg-gray-100 text-active-clr',
       });
     }
 
@@ -316,14 +316,14 @@ const DashboardPage: React.FC = () => {
           value: institutions.length,
           description: 'Institutions registered in Litsamaiso',
           icon: Building2,
-          tone: 'bg-cyan-50 text-cyan-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
         {
           label: 'Active institutions',
           value: activeInstitutions,
           description: 'Institutions without an active lock',
           icon: ShieldCheck,
-          tone: 'bg-emerald-50 text-emerald-700',
+          tone: 'bg-gray-100 text-active-clr',
         },
       );
     }
