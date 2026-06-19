@@ -517,6 +517,8 @@ export const accountConfirmation = async (
       studentId: input.studentId,
       bankName,
       accountNumber,
+      recordedBankName: accountByContract.bankName,
+      recordedAccountNumber: accountByContract.accountNumber,
       reasons,
       status: 'submitted',
     };
