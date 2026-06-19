@@ -223,7 +223,7 @@ const LandingPage = () => {
           height={72}
           squares={[28, 16]}
           className="opacity-[0.06]"
-          squaresClassName="stroke-gray-300"
+          squaresClassName="stroke-gray-400"
         />
 
         <nav className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 md:px-8">
