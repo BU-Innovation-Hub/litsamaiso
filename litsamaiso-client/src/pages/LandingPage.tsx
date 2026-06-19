@@ -2,7 +2,6 @@ import {
   ArrowRight,
   BadgeCheck,
   BarChart3,
-  CheckCircle2,
   ChevronRight,
   ClipboardCheck,
   FileCheck2,
@@ -17,11 +16,9 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
-import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
-import { Marquee } from "@/components/ui/marquee";
 import { Meteors } from "@/components/ui/meteors";
 import { OrbitingCircles } from "@/components/ui/orbiting-circles";
 import { Ripple } from "@/components/ui/ripple";
@@ -33,22 +30,6 @@ import { cn } from "@/lib/utils";
 
 const heroVideoUrl =
   "https://res.cloudinary.com/joelics-arts/video/upload/v1781684213/litsamaiso/landing-page-video_agw7fr.mp4";
-
-const trustMetrics = [
-  { value: "24/7", label: "student status visibility" },
-  { value: "3x", label: "faster confirmation reviews" },
-  { value: "100%", label: "auditable funding workflows" },
-  { value: "1", label: "shared source of truth" },
-];
-
-const trustSignals = [
-  "Student services",
-  "Finance offices",
-  "SRC operations",
-  "Bursary teams",
-  "Campus administrators",
-  "Support desks",
-];
 
 const capabilityCards = [
   {
@@ -197,8 +178,8 @@ const SectionHeading = ({
     )}
   >
     <SectionLabel>{eyebrow}</SectionLabel>
-    <h2 className="text-3xl font-semibold text-white md:text-5xl">{title}</h2>
-    <p className="text-base leading-7 text-white/68 md:text-lg">
+    <h2 className="text-3xl font-semibold text-primary-clr md:text-5xl">{title}</h2>
+    <p className="text-base leading-7 text-gray-600 md:text-lg">
       {description}
     </p>
   </div>
@@ -213,7 +194,7 @@ const NavLink = ({
 }) => (
   <a
     href={href}
-    className="rounded-full px-3 py-2 text-sm font-medium text-white/72 transition hover:bg-white/10 hover:text-white"
+    className="rounded-full px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-primary-clr"
   >
     {children}
   </a>
@@ -221,11 +202,11 @@ const NavLink = ({
 
 const LandingPage = () => {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-primary-clr text-white">
-      <section
-        id="hero"
-        className="relative min-h-screen overflow-hidden border-b border-white/10"
-      >
+    <div className="relative min-h-screen w-full overflow-hidden bg-gray-50">
+        <section
+          id="hero"
+          className="relative min-h-screen overflow-hidden border-b border-gray-200"
+        >
         <video
           className="absolute inset-0 h-full w-full object-cover"
           src={heroVideoUrl}
@@ -235,25 +216,25 @@ const LandingPage = () => {
           playsInline
           aria-hidden="true"
         />
-        <div className="absolute inset-0 bg-primary-clr/72" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(83,91,192,0.24),transparent_34%),linear-gradient(180deg,rgba(2,6,24,0.24)_0%,#020618_96%)]" />
+        <div className="absolute inset-0 bg-white/60" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(83,91,192,0.06),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.5)_0%,white_96%)]" />
         <InteractiveGridPattern
           width={72}
           height={72}
           squares={[28, 16]}
-          className="opacity-[0.055]"
-          squaresClassName="stroke-white/35"
+          className="opacity-[0.06]"
+          squaresClassName="stroke-gray-300"
         />
 
         <nav className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 md:px-8">
           <Link to="/" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/14 bg-white/10 backdrop-blur-md">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
               <img src="/logo-1.png" alt="" className="h-6 w-6" />
             </span>
-            <span className="text-lg font-semibold">Litsamaiso</span>
+            <span className="text-lg font-semibold text-primary-clr">Litsamaiso</span>
           </Link>
 
-          <div className="hidden items-center rounded-full border border-white/12 bg-white/8 p-1 shadow-2xl shadow-black/20 backdrop-blur-xl md:flex">
+          <div className="hidden items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm md:flex">
             <NavLink href="#capabilities">Capabilities</NavLink>
             <NavLink href="#workflow">Workflow</NavLink>
             <NavLink href="#intelligence">Intelligence</NavLink>
@@ -261,14 +242,9 @@ const LandingPage = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <AnimatedThemeToggler
-              aria-label="Toggle theme"
-              variant="circle"
-              className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/12 bg-white/8 text-white/76 backdrop-blur-xl transition hover:bg-white/14 hover:text-white sm:flex [&_svg]:h-4 [&_svg]:w-4"
-            />
             <Link
               to="/login"
-              className="inline-flex items-center gap-2 rounded-full border border-white/14 bg-white px-5 py-2.5 text-sm font-semibold text-primary-clr shadow-lg shadow-black/20 transition hover:-translate-y-0.5 hover:bg-white/90"
+              className="inline-flex items-center gap-2 rounded-full bg-primary-clr px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90"
             >
               Sign in
               <ArrowRight className="h-4 w-4" />
@@ -284,17 +260,17 @@ const LandingPage = () => {
             variants={fadeUp}
             transition={{ duration: 0.7, ease: "easeOut" }}
           >
-            <div className="mx-auto mb-7 inline-flex sm:hidden items-center gap-2 rounded-full border border-white/14 bg-white/10 px-4 py-2 text-sm text-white/82 shadow-2xl shadow-black/20 backdrop-blur-xl">
+            <div className="mx-auto mb-7 inline-flex sm:hidden items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm">
               <span className="h-2 w-2 rounded-full bg-active-clr shadow-[0_0_22px_rgba(83,91,192,0.9)]" />
               Student services, funding confirmations, and governance in one
               place
             </div>
 
-            <h1 className="mx-auto max-w-4xl text-5xl font-semibold leading-[1.02] text-white md:text-7xl">
+            <h1 className="mx-auto max-w-4xl text-5xl font-semibold leading-[1.02] text-primary-clr md:text-7xl">
               Make academic support feel connected, and accountable.
             </h1>
 
-            <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-white/74 md:text-xl">
+            <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-gray-600 md:text-xl">
               Litsamaiso helps institutions manage student funding
               confirmations, bank details, issues, elections, and operational
               visibility through one trusted platform.
@@ -303,78 +279,24 @@ const LandingPage = () => {
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 to="/login"
-                className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white px-7 py-3 text-sm font-semibold text-primary-clr shadow-2xl shadow-black/25 transition hover:-translate-y-0.5 hover:bg-white/90 sm:w-auto"
+                className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary-clr px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90 sm:w-auto"
               >
                 Get started
                 <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" />
               </Link>
               <a
                 href="#capabilities"
-                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-white/14 bg-white/8 px-7 py-3 text-sm font-semibold text-white backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/12 sm:w-auto"
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-7 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 sm:w-auto"
               >
                 Explore platform
                 <ArrowRight className="h-4 w-4" />
               </a>
             </div>
           </motion.div>
-
-          <motion.div
-            className="mx-auto mt-14 grid w-full max-w-4xl gap-3 sm:grid-cols-2 lg:grid-cols-4"
-            initial="hidden"
-            animate="visible"
-            variants={fadeUp}
-            transition={{ duration: 0.7, delay: 0.18, ease: "easeOut" }}
-          >
-            {trustMetrics.map((metric) => (
-              <div
-                key={metric.label}
-                className="rounded-2xl border border-white/12 bg-white/8 p-4 text-left shadow-2xl shadow-black/15 backdrop-blur-xl"
-              >
-                <p className="text-2xl font-semibold text-white">
-                  {metric.value}
-                </p>
-                <p className="mt-1 text-sm leading-5 text-white/64">
-                  {metric.label}
-                </p>
-              </div>
-            ))}
-          </motion.div>
         </div>
       </section>
 
       <main>
-        <section className="relative overflow-hidden py-10">
-          <DotPattern
-            width={28}
-            height={28}
-            cr={0.6}
-            className="opacity-[0.08]"
-          />
-          <div className="relative mx-auto max-w-7xl px-5 md:px-8">
-            <div className="mb-5 flex items-center justify-between gap-6">
-              <p className="text-sm font-medium text-white/54">
-                Built around the offices that keep students moving
-              </p>
-              <div className="hidden h-px flex-1 bg-white/10 md:block" />
-            </div>
-            <Marquee
-              pauseOnHover
-              repeat={3}
-              className="[--duration:34s] [--gap:1rem]"
-            >
-              {trustSignals.map((signal) => (
-                <div
-                  key={signal}
-                  className="flex min-w-56 items-center gap-3 rounded-full border border-white/10 bg-white/6 px-5 py-3 text-sm font-medium text-white/72"
-                >
-                  <CheckCircle2 className="h-4 w-4 text-active-clr" />
-                  {signal}
-                </div>
-              ))}
-            </Marquee>
-          </div>
-        </section>
-
         <section
           id="capabilities"
           className="relative overflow-hidden py-24 md:py-32"
@@ -383,8 +305,8 @@ const LandingPage = () => {
             width={96}
             height={96}
             squares={[18, 12]}
-            className="opacity-[0.035]"
-            squaresClassName="stroke-white/30"
+            className="opacity-[0.06]"
+            squaresClassName="stroke-gray-300"
           />
           <div className="relative mx-auto max-w-7xl px-5 md:px-8">
             <SectionHeading
@@ -401,7 +323,7 @@ const LandingPage = () => {
                   <motion.article
                     key={card.title}
                     className={cn(
-                      "group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5.5 p-6 shadow-2xl shadow-black/18 transition duration-300 hover:-translate-y-1 hover:border-white/18 hover:bg-white/7.5",
+                      "group relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-gray-300 hover:shadow-md",
                       card.className,
                     )}
                     initial="hidden"
@@ -413,13 +335,13 @@ const LandingPage = () => {
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(83,91,192,0.22),transparent_34%)] opacity-0 transition group-hover:opacity-100" />
                     <div className="relative flex h-full flex-col justify-between gap-8">
                       <div>
-                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 text-primary-clr">
                           <Icon className="h-5 w-5" />
                         </span>
-                        <h3 className="mt-5 text-xl font-semibold text-white">
+                        <h3 className="mt-5 text-xl font-semibold text-primary-clr">
                           {card.title}
                         </h3>
-                        <p className="mt-3 max-w-xl text-sm leading-6 text-white/62">
+                        <p className="mt-3 max-w-xl text-sm leading-6 text-gray-600">
                           {card.description}
                         </p>
                       </div>
@@ -451,7 +373,7 @@ const LandingPage = () => {
                   return (
                     <motion.div
                       key={item.title}
-                      className="relative rounded-3xl border border-white/10 bg-white/5.5 p-6 shadow-xl shadow-black/10"
+                      className="relative rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
                       initial="hidden"
                       whileInView="visible"
                       viewport={{ once: true, margin: "-80px" }}
@@ -459,17 +381,17 @@ const LandingPage = () => {
                       transition={{ duration: 0.55, ease: "easeOut" }}
                     >
                       <div className="mb-8 flex items-center justify-between">
-                        <span className="text-sm font-semibold text-white/42">
+                        <span className="text-sm font-semibold text-gray-400">
                           {item.step}
                         </span>
-                        <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/12 bg-primary-clr text-active-clr">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-active-clr">
                           <Icon className="h-5 w-5" />
                         </span>
                       </div>
-                      <h3 className="text-xl font-semibold text-white">
+                      <h3 className="text-xl font-semibold text-primary-clr">
                         {item.title}
                       </h3>
-                      <p className="mt-3 text-sm leading-6 text-white/62">
+                      <p className="mt-3 text-sm leading-6 text-gray-600">
                         {item.description}
                       </p>
                     </motion.div>
@@ -482,7 +404,7 @@ const LandingPage = () => {
 
         <section
           id="intelligence"
-          className="relative overflow-hidden border-y border-white/10 py-24 md:py-32"
+          className="relative overflow-hidden border-y border-gray-200 py-24 md:py-32"
         >
           <FlickeringGrid
             squareSize={3}
@@ -492,7 +414,7 @@ const LandingPage = () => {
             maxOpacity={0.12}
             className="absolute inset-0 opacity-45"
           />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(83,91,192,0.22),transparent_30%),linear-gradient(180deg,#020618_0%,rgba(2,6,24,0.82)_50%,#020618_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(83,91,192,0.08),transparent_30%),linear-gradient(180deg,white_0%,rgba(255,255,255,0)_50%,white_100%)]" />
           <div className="relative mx-auto max-w-7xl px-5 md:px-8">
             <SectionHeading
               eyebrow="Platform intelligence"
@@ -507,7 +429,7 @@ const LandingPage = () => {
                 return (
                   <motion.article
                     key={card.title}
-                    className="relative min-h-97.5 overflow-hidden rounded-3xl border border-white/10 bg-white/5.5 p-6 shadow-2xl shadow-black/20"
+                    className="relative min-h-97.5 overflow-hidden rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
                     initial="hidden"
                     whileInView="visible"
                     viewport={{ once: true, margin: "-80px" }}
@@ -529,20 +451,20 @@ const LandingPage = () => {
                         maxDelay={8}
                         minDuration={8}
                         maxDuration={14}
-                        className="bg-white/50"
+                        className="bg-active-clr/40"
                       />
                     )}
                     {card.visual === "orbit" && <EcosystemOrbit />}
 
                     <div className="relative z-10 flex h-full flex-col justify-between gap-10">
                       <div>
-                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-active-clr">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 text-active-clr">
                           <Icon className="h-5 w-5" />
                         </span>
-                        <h3 className="mt-5 text-2xl font-semibold">
+                        <h3 className="mt-5 text-2xl font-semibold text-primary-clr">
                           {card.title}
                         </h3>
-                        <p className="mt-3 text-sm leading-6 text-white/64">
+                        <p className="mt-3 text-sm leading-6 text-gray-600">
                           {card.description}
                         </p>
                       </div>
@@ -555,10 +477,10 @@ const LandingPage = () => {
           </div>
         </section>
 
-        <ScrollVelocityContainer className="border-b border-white/10 py-8">
+        <ScrollVelocityContainer className="border-b border-gray-200 py-8">
           <ScrollVelocityRow
             baseVelocity={1.6}
-            className="text-4xl font-semibold text-white/5.5 md:text-6xl"
+            className="text-4xl font-semibold text-gray-200 md:text-6xl"
           >
             <span className="mx-6">
               confirmations / accounts / issues / elections / reporting /
@@ -577,17 +499,17 @@ const LandingPage = () => {
             <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
               <div>
                 <SectionLabel>The team</SectionLabel>
-                <h2 className="mt-4 max-w-2xl text-4xl font-semibold text-white md:text-5xl">
+                <h2 className="mt-4 max-w-2xl text-4xl font-semibold text-primary-clr md:text-5xl">
                   Meet the minds keeping student operations human.
                 </h2>
-                <p className="mt-4 max-w-2xl text-base leading-7 text-white/64">
+                <p className="mt-4 max-w-2xl text-base leading-7 text-gray-600">
                   A focused group of product, engineering, and operations
                   specialists building a platform institutions can trust.
                 </p>
               </div>
               <Link
                 to="/login"
-                className="inline-flex w-fit items-center gap-2 rounded-full border border-white/12 bg-white/8 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/12"
+                className="inline-flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:bg-gray-50"
               >
                 Work with us
                 <ArrowRight className="h-4 w-4" />
@@ -640,26 +562,26 @@ const LandingPage = () => {
             className="opacity-[0.055]"
           />
           <div className="relative mx-auto max-w-5xl px-5 text-center md:px-8">
-            <div className="rounded-4xl border border-white/10 bg-white/5.5 px-6 py-14 shadow-2xl shadow-black/20 md:px-12">
+            <div className="rounded-4xl border border-gray-200 bg-white px-6 py-14 shadow-md md:px-12">
               <SectionLabel>Ready when your institution is</SectionLabel>
-              <h2 className="mx-auto mt-4 max-w-3xl text-4xl font-semibold text-white md:text-6xl">
+              <h2 className="mx-auto mt-4 max-w-3xl text-4xl font-semibold text-primary-clr md:text-6xl">
                 Bring every student support workflow into one trusted system.
               </h2>
-              <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-white/66 md:text-lg">
+              <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-gray-600 md:text-lg">
                 Start with confirmations, expand into issues, elections, and
                 institution-wide reporting as your operational needs mature.
               </p>
               <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
                 <Link
                   to="/login"
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-7 py-3 text-sm font-semibold text-primary-clr transition hover:-translate-y-0.5 hover:bg-white/90"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary-clr px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90"
                 >
                   Launch workspace
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
                   href="#workflow"
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/12 bg-primary-clr px-7 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/8"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-7 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50"
                 >
                   View workflow
                 </a>
@@ -669,16 +591,16 @@ const LandingPage = () => {
         </section>
       </main>
 
-      <footer className="border-t border-white/10 bg-black/18 py-10">
+      <footer className="border-t border-gray-200 bg-gray-100 py-10">
         <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 md:flex-row md:items-center md:justify-between md:px-8">
           <div>
             <Link to="/" className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/14 bg-white/10">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-gray-200">
                 <img src="/logo-1.png" alt="" className="h-6 w-6" />
               </span>
-              <span className="text-lg font-semibold">Litsamaiso</span>
+              <span className="text-lg font-semibold text-primary-clr">Litsamaiso</span>
             </Link>
-            <p className="mt-3 max-w-md text-sm leading-6 text-white/54">
+            <p className="mt-3 max-w-md text-sm leading-6 text-gray-500">
               Academic support, confirmations, and student operations made
               clearer for every team involved.
             </p>
@@ -688,7 +610,7 @@ const LandingPage = () => {
               <a
                 key={item}
                 href="#hero"
-                className="rounded-full border border-white/10 px-4 py-2 text-sm text-white/58 transition hover:bg-white/8 hover:text-white"
+                className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-500 transition hover:bg-gray-200 hover:text-gray-700"
               >
                 {item}
               </a>
@@ -703,19 +625,19 @@ const LandingPage = () => {
 const CapabilityVisual = ({ type }: { type: string }) => {
   if (type === "dashboard") {
     return (
-      <div className="grid gap-3 rounded-2xl border border-white/10 bg-primary-clr/70 p-4">
+      <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-100 p-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-white/46">
+          <span className="text-xs font-medium text-gray-500">
             Review queue
           </span>
-          <span className="rounded-full bg-active-clr/20 px-2 py-1 text-xs text-white/72">
+          <span className="rounded-full bg-active-clr/20 px-2 py-1 text-xs text-gray-600">
             Live
           </span>
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {["Confirmed", "Pending", "Issues"].map((label, index) => (
-            <div key={label} className="rounded-xl bg-white/8 p-3">
-              <div className="h-2 w-12 rounded-full bg-white/18" />
+            <div key={label} className="rounded-xl bg-white p-3">
+              <div className="h-2 w-12 rounded-full bg-gray-200" />
               <div
                 className={cn(
                   "mt-4 h-10 rounded-lg",
@@ -724,7 +646,7 @@ const CapabilityVisual = ({ type }: { type: string }) => {
                   index === 2 && "bg-orange-200/55",
                 )}
               />
-              <p className="mt-3 text-xs text-white/54">{label}</p>
+              <p className="mt-3 text-xs text-gray-500">{label}</p>
             </div>
           ))}
         </div>
@@ -739,12 +661,12 @@ const CapabilityVisual = ({ type }: { type: string }) => {
           (item) => (
             <div
               key={item}
-              className="flex items-center gap-3 rounded-2xl border border-white/10 bg-primary-clr/60 p-3"
+              className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-100 p-3"
             >
-              <div className="h-9 w-9 rounded-full bg-white/10" />
+              <div className="h-9 w-9 rounded-full bg-gray-200" />
               <div>
-                <div className="h-2 w-36 rounded-full bg-white/22" />
-                <p className="mt-2 text-xs text-white/52">{item}</p>
+                <div className="h-2 w-36 rounded-full bg-gray-200" />
+                <p className="mt-2 text-xs text-gray-600">{item}</p>
               </div>
             </div>
           ),
@@ -754,11 +676,11 @@ const CapabilityVisual = ({ type }: { type: string }) => {
   }
 
   return (
-    <div className="flex h-28 items-end gap-2 rounded-2xl border border-white/10 bg-primary-clr/60 p-4">
+    <div className="flex h-28 items-end gap-2 rounded-2xl border border-gray-200 bg-gray-100 p-4">
       {[42, 66, 50, 84, 58, 72].map((height, index) => (
         <div
           key={`${height}-${index}`}
-          className="flex-1 rounded-t-xl bg-linear-to-t from-active-clr/20 to-white/45"
+          className="flex-1 rounded-t-xl bg-linear-to-t from-active-clr/20 to-active-clr/10"
           style={{ height: `${height}%` }}
         />
       ))}
@@ -769,9 +691,9 @@ const CapabilityVisual = ({ type }: { type: string }) => {
 const EcosystemOrbit = () => (
   <div className="absolute bottom-8 right-8 h-40 w-40 opacity-75">
     <OrbitingCircles radius={58} duration={24} iconSize={28}>
-      <Landmark className="h-4 w-4 text-white/72" />
-      <UsersRound className="h-4 w-4 text-white/72" />
-      <ShieldCheck className="h-4 w-4 text-white/72" />
+      <Landmark className="h-4 w-4 text-active-clr" />
+      <UsersRound className="h-4 w-4 text-active-clr" />
+      <ShieldCheck className="h-4 w-4 text-active-clr" />
     </OrbitingCircles>
   </div>
 );
@@ -779,9 +701,9 @@ const EcosystemOrbit = () => (
 const IntelligenceVisual = ({ type }: { type: string }) => {
   if (type === "orbit") {
     return (
-      <div className="grid grid-cols-3 gap-2 text-center text-xs text-white/54">
+      <div className="grid grid-cols-3 gap-2 text-center text-xs text-gray-500">
         {["Finance", "Support", "Governance"].map((item) => (
-          <span key={item} className="rounded-full bg-white/8 px-3 py-2">
+          <span key={item} className="rounded-full bg-gray-100 px-3 py-2">
             {item}
           </span>
         ))}
@@ -793,13 +715,13 @@ const IntelligenceVisual = ({ type }: { type: string }) => {
     <div className="space-y-3">
       {["Submissions", "Review time", "Resolution rate"].map((item, index) => (
         <div key={item}>
-          <div className="mb-2 flex justify-between text-xs text-white/50">
+          <div className="mb-2 flex justify-between text-xs text-gray-500">
             <span>{item}</span>
             <span>{[82, 64, 91][index]}%</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-white/10">
+          <div className="h-2 overflow-hidden rounded-full bg-gray-200">
             <div
-              className="h-full rounded-full bg-linear-to-r from-active-clr to-white/70"
+              className="h-full rounded-full bg-linear-to-r from-active-clr to-active-clr/40"
               style={{ width: `${[82, 64, 91][index]}%` }}
             />
           </div>
@@ -818,7 +740,7 @@ const TeamPhoto = ({
 }) => (
   <motion.figure
     className={cn(
-      "relative min-h-72 overflow-hidden rounded-3xl border border-white/10 bg-white/5.5",
+      "relative min-h-72 overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm",
       className,
     )}
     initial="hidden"
@@ -832,7 +754,7 @@ const TeamPhoto = ({
       alt={member.name}
       className="absolute inset-0 h-full w-full object-cover opacity-88 grayscale-10"
     />
-    <div className="absolute inset-0 bg-linear-to-t from-primary-clr via-primary-clr/24 to-transparent" />
+    <div className="absolute inset-0 bg-linear-to-t from-gray-900/70 via-gray-900/20 to-transparent" />
     <figcaption className="absolute inset-x-0 bottom-0 p-5">
       <p className="text-sm font-semibold text-white">{member.name}</p>
       <p className="mt-1 text-xs uppercase text-white/58">{member.role}</p>
@@ -849,7 +771,7 @@ const TeamBio = ({
 }) => (
   <motion.article
     className={cn(
-      "min-h-44 rounded-3xl border border-white/10 bg-white/5.5 p-5 shadow-xl shadow-black/10",
+      "min-h-44 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm",
       className,
     )}
     initial="hidden"
@@ -861,8 +783,8 @@ const TeamBio = ({
     <p className="text-xs font-semibold uppercase text-active-clr">
       {member.role}
     </p>
-    <h3 className="mt-8 text-base font-semibold text-white">{member.name}</h3>
-    <p className="mt-3 text-sm leading-6 text-white/62">{member.description}</p>
+    <h3 className="mt-8 text-base font-semibold text-primary-clr">{member.name}</h3>
+    <p className="mt-3 text-sm leading-6 text-gray-600">{member.description}</p>
   </motion.article>
 );
 
