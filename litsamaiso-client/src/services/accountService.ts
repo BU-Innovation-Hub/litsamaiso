@@ -154,4 +154,21 @@ export const accountService = {
     const response = await apiClient.post('/accounts/finance-resolve', { studentId });
     return response.data;
   },
+
+  exportAccounts: async (params: {
+    format: 'csv' | 'xlsx';
+    search?: string;
+    status?: string;
+    batchNumber?: string;
+    startDate?: string;
+    endDate?: string;
+    institutionId?: string;
+    limit?: number;
+  }) => {
+    const response = await apiClient.get('/accounts/export', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data as Blob;
+  },
 };
