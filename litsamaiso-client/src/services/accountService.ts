@@ -114,6 +114,16 @@ export const accountService = {
     return response.data.data;
   },
 
+  validateContract: async () => {
+    const response = await apiClient.get<{
+      valid: boolean;
+      reason?: string;
+      message?: string;
+      contractNumber?: string;
+    }>('/accounts/validate-contract');
+    return response.data;
+  },
+
   getReports: async (params?: { institutionId?: string }) => {
     const response = await apiClient.get<AccountReports>('/reports/accounts', { params });
     return response.data;

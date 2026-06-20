@@ -60,6 +60,9 @@ const AccountConfirmationPage: React.FC = () => {
   const navigate = useNavigate();
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [statusError, setStatusError] = useState('');
+  const [contractValid, setContractValid] = useState<boolean | null>(null);
+  const [contractError, setContractError] = useState('');
+  const [contractReason, setContractReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoggingIssue, setIsLoggingIssue] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -133,8 +136,18 @@ const AccountConfirmationPage: React.FC = () => {
   };
 
   useEffect(() => {
-    const checkConfirmationStatus = async () => {
+    const initialize = async () => {
       try {
+        const contractResult = await accountService.validateContract();
+        if (!contractResult.valid) {
+          setContractValid(false);
+          setContractError(contractResult.message || 'Contract number not found in accounts list');
+          setContractReason(contractResult.reason || '');
+          setIsCheckingStatus(false);
+          return;
+        }
+        setContractValid(true);
+
         const response = await accountService.getConfirmationStatus();
         setIsConfirmed(response.confirmed);
       } catch (error: unknown) {
@@ -144,7 +157,7 @@ const AccountConfirmationPage: React.FC = () => {
       }
     };
 
-    void checkConfirmationStatus();
+    void initialize();
   }, []);
 
   useEffect(() => {
@@ -296,6 +309,42 @@ const AccountConfirmationPage: React.FC = () => {
     return (
       <div className="global-bg flex min-h-screen items-center justify-center">
         <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-active" />
+      </div>
+    );
+  }
+
+  if (contractValid === false) {
+    const isWarning = contractReason === "not_in_accounts";
+    return (
+      <div className="global-bg min-h-screen pt-32">
+        <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
+          <div className={`mb-6 rounded-full p-4 ${isWarning ? "bg-amber-100" : "bg-red-100"}`}>
+            {isWarning ? (
+              <svg className="h-12 w-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            )}
+          </div>
+          <h1 className={`text-3xl font-bold ${isWarning ? "text-amber-600" : "text-red-600"}`}>
+            {isWarning ? "Your Account Not Ready For Confirmation" : "Contract Number Not Found"}
+          </h1>
+          <p className="mt-3 max-w-xl text-muted-foreground">
+            {contractError}
+          </p>
+          {isWarning ? (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Your Finance Department has not yet uploaded your account records for confrimation. Please check back later.
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Please contact your institution admin or finance department to ensure your contract number is registered in the system.
+            </p>
+          )}
+        </div>
       </div>
     );
   }

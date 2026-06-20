@@ -51,6 +51,7 @@ export const authService = {
     if (data.institutionName) payload.institutionName = data.institutionName;
     if (data.institutionEmail) payload.institutionEmail = data.institutionEmail;
     if (data.studentId) payload.studentId = data.studentId;
+    if (data.contractNumber) payload.contractNumber = data.contractNumber;
     if (data.faceImageBase64) payload.faceImageBase64 = data.faceImageBase64;
     if (Array.isArray(data.faceDescriptor)) payload.faceDescriptor = data.faceDescriptor;
 

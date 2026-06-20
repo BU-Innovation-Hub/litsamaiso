@@ -293,6 +293,43 @@ export const confirmAccount = async (req: Request, res: Response) => {
   }
 };
 
+export const validateContractNumber = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const instId = user.institution;
+
+    const userRecord = await User.findById(user._id).select("contractNumber").lean();
+
+    if (!userRecord || !userRecord.contractNumber) {
+      res.json({
+        valid: false,
+        reason: "no_contract",
+        message: "Make sure you are registered with National Manpower Development Secretariat(NMDS) to use this feature",
+      });
+      return;
+    }
+
+    const account = await Account.findOne({
+      institution: instId,
+      contractNumber: userRecord.contractNumber,
+    }).lean();
+
+    if (!account) {
+      res.json({
+        valid: false,
+        reason: "not_in_accounts",
+        message: "Your Account is not YET ready for confirmation",
+      });
+      return;
+    }
+
+    res.json({ valid: true, contractNumber: userRecord.contractNumber });
+  } catch (err: any) {
+    console.error("validateContractNumber error:", err);
+    res.status(500).json({ valid: false, message: err.message || String(err) });
+  }
+};
+
 export const getConfirmationStatus = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;

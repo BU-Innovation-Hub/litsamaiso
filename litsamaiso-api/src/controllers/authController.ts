@@ -7,6 +7,7 @@ import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 import { Institution } from "../models/Institution.js";
 import { Student } from "../models/Student.js";
+import { Account } from "../models/Account.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { createHash, randomBytes } from "crypto";
 
@@ -45,6 +46,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionName,
     institutionEmail,
     studentId,
+    contractNumber,
     studentCardUrl,
     faceImageBase64,
     faceDescriptor,
@@ -57,6 +59,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionName?: string;
     institutionEmail?: string;
     studentId?: string;
+    contractNumber?: string;
     studentCardUrl?: string;
     faceImageBase64?: string;
     faceDescriptor?: number[];
@@ -165,6 +168,27 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         });
         return;
       }
+
+      // validate contractNumber exists in the Account collection for this institution
+      if (contractNumber) {
+        const accountExists = await Account.findOne({
+          institution: studentRecord.institution,
+          contractNumber: String(contractNumber).trim(),
+        });
+        if (!accountExists) {
+          res.status(400).json({
+            message:
+              "Contract number not found in the accounts list. Please check and try again.",
+          });
+          return;
+        }
+
+        // save contractNumber to the student record
+        await Student.findOneAndUpdate(
+          { studentId },
+          { contractNumber: String(contractNumber).trim() },
+        );
+      }
     } else {
       // no studentId -> institution must have been provided and validated earlier
       const studentByEmail = await Student.findOne({
@@ -188,6 +212,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     role: typeof roleDoc._id;
     institution: typeof institution._id;
     studentId?: string;
+    contractNumber?: string;
     studentCardUrl?: string;
     faceDescriptor?: number[];
     faceImageUrl?: string;
@@ -200,6 +225,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   if (studentId) {
     userData.studentId = studentId;
+  }
+
+  if (contractNumber) {
+    userData.contractNumber = String(contractNumber).trim();
   }
 
   if (studentCardUrl) {
@@ -224,6 +253,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       role: roleDoc.name,
       institution: institution._id,
       studentId: user.studentId,
+      contractNumber: user.contractNumber,
       studentCardUrl: user.studentCardUrl,
       faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,

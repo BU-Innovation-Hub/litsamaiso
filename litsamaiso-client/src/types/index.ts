@@ -54,6 +54,7 @@ export interface RegisterRequest {
   institutionName?: string;
   institutionEmail?: string;
   studentId?: string;
+  contractNumber?: string;
   faceImageBase64?: string;
   faceDescriptor?: number[];
   faceImageUrl?: string;
