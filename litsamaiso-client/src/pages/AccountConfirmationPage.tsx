@@ -341,7 +341,7 @@ const AccountConfirmationPage: React.FC = () => {
             </p>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
-              Please contact your institution admin or finance department to ensure your contract number is registered in the system.
+              Please contact your institution admin or finance department to ensure your contract number is registered in the system if you do have a contract with NMDS.
             </p>
           )}
         </div>
