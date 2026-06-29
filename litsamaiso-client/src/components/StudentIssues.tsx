@@ -9,7 +9,7 @@ import apiClient from '../lib/api';
 
 interface IIssue {
   _id?: string;
-  contractNumber: string;
+  borrowerNumber: string;
   studentId: string;
   bankName: string;
   accountNumber: string;
@@ -21,7 +21,7 @@ interface IIssue {
 interface Account {
   _id: string;
   fullnames: string;
-  contractNumber: string;
+  borrowerNumber: string;
   courseOfStudy: string;
   bankName: string;
   accountNumber: string;
@@ -39,7 +39,7 @@ export default function StudentIssues() {
   const [editingIssue, setEditingIssue] = useState<IIssue | null>(null);
   const [editForm, setEditForm] = useState({
     fullnames: '',
-    contractNumber: '',
+    borrowerNumber: '',
     courseOfStudy: '',
     bankName: '',
     accountNumber: '',
@@ -115,7 +115,7 @@ export default function StudentIssues() {
     // account parameter used to populate the edit form; we don't store it in state
     setEditForm({
       fullnames: account?.fullnames || '',
-      contractNumber: issue.contractNumber || '',
+      borrowerNumber: issue.borrowerNumber || '',
       courseOfStudy: account?.courseOfStudy || '',
       bankName: issue.bankName || '',
       accountNumber: issue.accountNumber || '',
@@ -208,7 +208,7 @@ export default function StudentIssues() {
                   <Button
                     className="px-4 py-3 bg-primary-clr hover:bg-black"
                     onClick={() => {
-                      const matchingAccount = accounts.find((acc) => acc.contractNumber === issue.contractNumber);
+                      const matchingAccount = accounts.find((acc) => acc.borrowerNumber === issue.borrowerNumber);
                       openEditModal(issue as IIssue, matchingAccount);
                     }}
                   >

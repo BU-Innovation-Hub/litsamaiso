@@ -30,7 +30,7 @@ interface AdminIssue {
   _id: string;
   status?: string;
   studentId?: string;
-  contractNumber?: string;
+  borrowerNumber?: string;
   bankName?: string;
   createdAt?: string;
   student?: {
@@ -48,7 +48,7 @@ interface StudentIssue {
   _id: string;
   status?: string;
   studentId?: string;
-  contractNumber?: string;
+  borrowerNumber?: string;
   bankName?: string;
   createdAt?: string;
 }
@@ -486,7 +486,7 @@ const DashboardPage: React.FC = () => {
                       <>
                       <div className="flex items-center justify-between gap-3">
                         <p className="font-semibold text-primary-clr">
-                          {issue.contractNumber || issue.studentId || 'Issue record'}
+                          {issue.borrowerNumber || issue.studentId || 'Issue record'}
                         </p>
                         <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                           {formatStatus(issue.status)}
@@ -517,7 +517,7 @@ const DashboardPage: React.FC = () => {
                     <div key={account._id} className="flex items-center justify-between gap-4 py-3">
                       <div>
                         <p className="font-semibold text-primary-clr">{account.fullnames}</p>
-                        <p className="text-sm text-slate-500">{account.contractNumber}</p>
+                        <p className="text-sm text-slate-500">{account.borrowerNumber}</p>
                       </div>
                       <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                         {formatStatus(account.status)}

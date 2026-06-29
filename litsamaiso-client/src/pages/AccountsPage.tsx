@@ -65,7 +65,7 @@ const AccountsPage: React.FC = () => {
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [editForm, setEditForm] = useState<Partial<Account>>({
     fullnames: '',
-    contractNumber: '',
+    borrowerNumber: '',
     courseOfStudy: '',
     bankName: '',
     accountNumber: '',
@@ -278,7 +278,7 @@ const AccountsPage: React.FC = () => {
     setEditingAccount(account);
     setEditForm({
       fullnames: account.fullnames,
-      contractNumber: account.contractNumber,
+      borrowerNumber: account.borrowerNumber,
       courseOfStudy: account.courseOfStudy,
       bankName: account.bankName,
       accountNumber: account.accountNumber,
@@ -490,7 +490,7 @@ const AccountsPage: React.FC = () => {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Contract</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Borrower Number</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Bank</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Account</th>
                             <th className="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
@@ -500,7 +500,7 @@ const AccountsPage: React.FC = () => {
                         <tbody className="bg-white divide-y divide-gray-200">
                           {issueList.map((it) => (
                             <tr key={(it as any)._id}>
-                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{(it as any).contractNumber}</td>
+                              <td className="px-6 py-4 text-sm font-medium text-gray-900">{(it as any).borrowerNumber}</td>
                               <td className="px-6 py-4 text-sm text-gray-500">{(it as any).bankName}</td>
                               <td className="px-6 py-4 text-sm text-gray-500">{(it as any).accountNumber}</td>
                               <td className="px-6 py-4 text-sm text-gray-500">{(it as any).status}</td>
@@ -552,7 +552,7 @@ const AccountsPage: React.FC = () => {
                         <table className="min-w-full divide-y divide-slate-200">
                           <thead className="bg-slate-50">
                             <tr>
-                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Contract</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Borrower Number</th>
                               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Student</th>
                               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Problem</th>
                               <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500">Student correction</th>
@@ -579,7 +579,7 @@ const AccountsPage: React.FC = () => {
                                   onClick={() => setSelectedIssue(it)}
                                   className="cursor-pointer transition hover:bg-slate-50"
                                 >
-                                  <td className="whitespace-nowrap px-4 py-4 text-sm font-semibold text-slate-950">{displayValue(it.contractNumber)}</td>
+                                  <td className="whitespace-nowrap px-4 py-4 text-sm font-semibold text-slate-950">{displayValue(it.borrowerNumber)}</td>
                                   <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-600">{(it.student && it.student.studentId) || it.studentId || '-'}</td>
                                   <td className="max-w-xs px-4 py-4 text-sm text-slate-700">
                                     <div className="line-clamp-2">{problemSummary}</div>
@@ -672,7 +672,7 @@ const AccountsPage: React.FC = () => {
               <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-6 py-5">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-semibold text-slate-950">{displayValue(selectedIssue.contractNumber)}</h3>
+                    <h3 className="text-lg font-semibold text-slate-950">{displayValue(selectedIssue.borrowerNumber)}</h3>
                     <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getIssueStatusBadgeClass(selectedIssueStatus)}`}>
                       {selectedIssueStatus}
                     </span>
@@ -869,7 +869,7 @@ const AccountsPage: React.FC = () => {
                   <input value={String(editForm.fullnames || '')} onChange={(e) => setEditForm((p) => ({ ...p, fullnames: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <input value={String(editForm.contractNumber || '')} onChange={(e) => setEditForm((p) => ({ ...p, contractNumber: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
+                  <input value={String(editForm.borrowerNumber || '')} onChange={(e) => setEditForm((p) => ({ ...p, borrowerNumber: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
                   <input value={String(editForm.courseOfStudy || '')} onChange={(e) => setEditForm((p) => ({ ...p, courseOfStudy: e.target.value }))} className="w-full rounded-md border border-gray-300 px-3 py-2" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -915,7 +915,7 @@ const AccountsPage: React.FC = () => {
                 Confirm your NMDS account
               </h2>
               <p className="text-muted-foreground mb-5">
-                Submit your contract and banking details for verification against your institution's records.
+                Submit your borrower's number and banking details for verification against your institution's records.
               </p>
               <Link
                 to="/accounts/confirm"
@@ -1069,7 +1069,7 @@ const AccountsPage: React.FC = () => {
                 <input
                   value={accountSearch}
                   onChange={(event) => setAccountSearch(event.target.value)}
-                  placeholder="Search by name, contract, bank, course, or account number"
+                  placeholder="Search by name, borrower number, bank, course, or account number"
                   className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -1160,7 +1160,7 @@ const AccountsPage: React.FC = () => {
                       <input type="checkbox" checked={isSelectAll} onChange={handleSelectAll} />
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Student</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Contract</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Borrower Number</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Bank Details</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Batch</th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
@@ -1188,7 +1188,7 @@ const AccountsPage: React.FC = () => {
                           <p className="text-sm text-gray-500">{account.courseOfStudy}</p>
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">
-                          {account.contractNumber}
+                          {account.borrowerNumber}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4">
                           <p className="text-sm text-gray-900">{account.bankName || '-'}</p>
@@ -1231,7 +1231,7 @@ const AccountsPage: React.FC = () => {
                             <button onClick={() => openEditModal(account)} className="rounded-md p-2 hover:bg-gray-100">
                               <Edit className="h-4 w-4 text-gray-700" />
                             </button>
-                            <button onClick={() => { const b = new Blob([JSON.stringify(account, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `account_${account.contractNumber || account._id}.json`; document.body.appendChild(a); a.click(); a.remove(); }} className="rounded-md p-2 hover:bg-gray-100">
+                            <button onClick={() => { const b = new Blob([JSON.stringify(account, null, 2)], { type: 'application/json' }); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = `account_${account.borrowerNumber || account._id}.json`; document.body.appendChild(a); a.click(); a.remove(); }} className="rounded-md p-2 hover:bg-gray-100">
                               <Download className="h-4 w-4 text-gray-700" />
                             </button>
                           </div>

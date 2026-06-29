@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import Issue from "../models/Issue.js";
-import { Account } from "../models/Account.js";
+import { FinancialClearance } from "../models/FinancialClearance.js";
 import { extractAccountCandidates } from "../services/geminiService.js";
 import { notifyFinanceUsersAboutIssue } from "../services/accountService.js";
 
@@ -30,21 +30,21 @@ export const createIssue = async (req: Request, res: Response) => {
       return;
     }
 
-    const { contractNumber, bankName, accountNumber, proofUrls, notes } = req.body;
+    const { borrowerNumber, bankName, accountNumber, proofUrls, notes } = req.body;
 
-    if (!contractNumber || !bankName || !accountNumber) {
+    if (!borrowerNumber || !bankName || !accountNumber) {
       res.status(400).json({ error: "All fields are required" });
       return;
     }
 
     const smartBankName = bankName; // keep as-is; client normalizes where possible
-    const recordedAccount = await Account.findOne({
-      contractNumber,
+    const recordedAccount = await FinancialClearance.findOne({
+      borrowerNumber,
       institution: user.institution,
     }).select("bankName accountNumber").lean();
 
     const updatePayload: any = {
-      contractNumber,
+      borrowerNumber,
       studentId: user.studentId,
       bankName: smartBankName,
       accountNumber,
@@ -57,7 +57,7 @@ export const createIssue = async (req: Request, res: Response) => {
     if (Array.isArray(proofUrls) && proofUrls.length) updatePayload.proofUrls = proofUrls;
     if (typeof notes === "string") updatePayload.notes = notes;
 
-    const issue = await Issue.findOneAndUpdate({ contractNumber, studentId: user.studentId }, updatePayload, { upsert: true, new: true, setDefaultsOnInsert: true });
+    const issue = await Issue.findOneAndUpdate({ borrowerNumber, studentId: user.studentId }, updatePayload, { upsert: true, new: true, setDefaultsOnInsert: true });
 
     // Notify finance (best-effort)
     try {
@@ -65,7 +65,7 @@ export const createIssue = async (req: Request, res: Response) => {
         institutionId: (req as any).user.institution,
         studentId: user.studentId,
         studentEmail: user.email,
-        contractNumber,
+        borrowerNumber,
         bankName: smartBankName,
         accountNumber,
         reasons: ["studentSubmitted"],
@@ -158,9 +158,9 @@ export const updateIssueById = async (req: Request, res: Response) => {
     }
 
     if (!issue.recordedBankName || !issue.recordedAccountNumber) {
-      const recordedAccount = issue.contractNumber
-        ? await Account.findOne({
-            contractNumber: issue.contractNumber,
+      const recordedAccount = issue.borrowerNumber
+        ? await FinancialClearance.findOne({
+            borrowerNumber: issue.borrowerNumber,
             institution: user.institution,
           }).select("bankName accountNumber").lean()
         : null;
@@ -184,7 +184,7 @@ export const updateIssueById = async (req: Request, res: Response) => {
         institutionId: (req as any).user.institution,
         studentId: updated.studentId,
         studentEmail: (req as any).user.email,
-        contractNumber: updated.contractNumber || "",
+        borrowerNumber: updated.borrowerNumber || "",
         bankName: updated.correctedBankName || updated.bankName || "",
         accountNumber: updated.correctedAccountNumber || updated.accountNumber || "",
         reasons: ["studentUpdated"],

@@ -1,6 +1,6 @@
 import XLSX from "xlsx";
 import { Buffer } from "buffer";
-import { Account } from "../models/Account.js";
+import { FinancialClearance } from "../models/FinancialClearance.js";
 import { Issue } from "../models/Issue.js";
 import { Institution } from "../models/Institution.js";
 import { Role } from "../models/Role.js";
@@ -27,7 +27,7 @@ interface LoadPaidResult {
 }
 
 const REQUIRED_COLUMNS = [
-  "contractnumber",
+  "borrowernumber",
   "accountnumber",
   "bankname",
   "courseofstudy",
@@ -40,7 +40,7 @@ const ACCOUNT_EXPORT_HEADERS = [
   "First Name",
   "Surname",
   "Full Names",
-  "Contract Number",
+  "Borrower Number",
   "Course of Study",
   "Bank Name",
   "Account Number",
@@ -102,7 +102,7 @@ const buildAccountFilter = (user: any, params: AccountQueryParams): Record<strin
   const search = safeString(params.search);
   if (search) {
     q.$or = [
-      { contractNumber: { $regex: search, $options: "i" } },
+      { borrowerNumber: { $regex: search, $options: "i" } },
       { accountNumber: { $regex: search, $options: "i" } },
       { fullnames: { $regex: search, $options: "i" } },
     ];
@@ -167,7 +167,7 @@ const buildExportRows = (accounts: any[]) =>
       "First Name": safeString(confirmedBy.name) || fallbackName.firstName,
       Surname: safeString(confirmedBy.surname) || fallbackName.surname,
       "Full Names": safeString(account.fullnames),
-      "Contract Number": safeString(account.contractNumber),
+      "Borrower Number": safeString(account.borrowerNumber),
       "Course of Study": safeString(account.courseOfStudy),
       "Bank Name": safeString(account.bankName),
       "Account Number": safeString(account.accountNumber),
@@ -190,7 +190,7 @@ export const exportAccounts = async (params: {
 }): Promise<AccountExportResult> => {
   const filter = buildAccountFilter(params.user, params.query);
   const limit = parseAccountLimit(params.query.limit, 5000, 50000);
-  const accounts = await Account.find(filter)
+  const accounts = await FinancialClearance.find(filter)
     .sort({ createdAt: -1 })
     .limit(limit)
     .populate("confirmedBy", "name surname studentId")
@@ -225,7 +225,7 @@ export const loadAccountsFromExcel = async (
   fileBuffer: Buffer,
   institutionId: Types.ObjectId,
 ): Promise<LoadResult> => {
-  const latestAccount = await Account.findOne({ institution: institutionId })
+  const latestAccount = await FinancialClearance.findOne({ institution: institutionId })
     .sort({ batchNumber: -1, createdAt: -1 })
     .lean();
   const nextBatchNumber = Number(latestAccount?.batchNumber || 0) + 1;
@@ -289,7 +289,7 @@ export const loadAccountsFromExcel = async (
         continue;
       }
 
-      const contractNumber = String(row["contractnumber"]).trim();
+      const borrowerNumber = String(row["borrowernumber"]).trim();
       const accountNumber = String(row["accountnumber"]).trim();
       const bankName = String(row["bankname"]).trim();
       const courseOfStudy = String(row["courseofstudy"]).trim();
@@ -306,21 +306,21 @@ export const loadAccountsFromExcel = async (
       const paidDate = paidDateRaw ? new Date(paidDateRaw) : undefined;
 
       // skip duplicates within institution
-      const exists = await Account.findOne({
+      const exists = await FinancialClearance.findOne({
         institution: institutionId,
-        $or: [{ contractNumber }, { accountNumber }],
+        $or: [{ borrowerNumber }, { accountNumber }],
       }).lean();
       if (exists) {
         skipped += 1;
         skippedDetails.push({
           row: idx + 2,
-          reasons: ["Duplicate contractNumber or accountNumber"],
+          reasons: ["Duplicate borrowerNumber or accountNumber"],
         });
         continue;
       }
 
       const payload: any = {
-        contractNumber,
+        borrowerNumber,
         accountNumber,
         bankName,
         batchNumber: nextBatchNumber,
@@ -334,7 +334,7 @@ export const loadAccountsFromExcel = async (
             : undefined,
         institution: institutionId,
       };
-      await Account.create(payload);
+      await FinancialClearance.create(payload);
       inserted += 1;
     } catch (err: any) {
       errors.push(`Row ${idx + 2}: ${err.message || String(err)}`);
@@ -403,7 +403,7 @@ export const loadPayedStudentsFromExcel = async (
         continue;
       }
 
-      const contractNumber = String(row["contractnumber"]).trim();
+      const borrowerNumber = String(row["borrowernumber"]).trim();
       const accountNumber = String(row["accountnumber"]).trim();
       const bankName = String(row["bankname"]).trim();
       const courseOfStudy = String(row["courseofstudy"]).trim();
@@ -419,16 +419,16 @@ export const loadPayedStudentsFromExcel = async (
         continue;
       }
 
-      const account = await Account.findOne({
+      const account = await FinancialClearance.findOne({
         institution: institutionId,
-        contractNumber,
+        borrowerNumber,
       });
 
       if (!account) {
         skipped += 1;
         skippedDetails.push({
           row: idx + 2,
-          reasons: ["Account not found for contractNumber"],
+          reasons: ["Account not found for borrowerNumber"],
         });
         continue;
       }
@@ -476,7 +476,7 @@ export const loadPayedStudentsFromExcel = async (
 };
 
 interface AccountConfirmationInput {
-  contractNumber: string;
+  borrowerNumber: string;
   bankName: string;
   accountNumber: string;
   institutionId: Types.ObjectId;
@@ -504,7 +504,7 @@ export const notifyFinanceUsersAboutIssue = async (input: {
   institutionId: Types.ObjectId;
   studentId: string;
   studentEmail: string;
-  contractNumber: string;
+  borrowerNumber: string;
   bankName: string;
   accountNumber: string;
   reasons: string[];
@@ -550,7 +550,7 @@ export const notifyFinanceUsersAboutIssue = async (input: {
       "",
       `Student ID: ${input.studentId}`,
       `Student Email: ${input.studentEmail}`,
-      `Contract Number: ${input.contractNumber}`,
+      `Borrower Number: ${input.borrowerNumber}`,
       `Bank Name: ${input.bankName}`,
       `Account Number: ${input.accountNumber}`,
       `Reasons: ${reasonText}`,
@@ -560,7 +560,7 @@ export const notifyFinanceUsersAboutIssue = async (input: {
       render(
         React.createElement(IssueNotificationEmail, {
           issue: {
-            contractNumber: input.contractNumber,
+            borrowerNumber: input.borrowerNumber,
             studentId: input.studentId,
             bankName: input.bankName,
             accountNumber: input.accountNumber,
@@ -592,23 +592,23 @@ export const notifyFinanceUsersAboutIssue = async (input: {
 export const accountConfirmation = async (
   input: AccountConfirmationInput,
 ): Promise<AccountConfirmationResult> => {
-  const contractNumber = String(input.contractNumber || "").trim();
+  const borrowerNumber = String(input.borrowerNumber || "").trim();
   const bankName = String(input.bankName || "").trim();
   const accountNumber = String(input.accountNumber || "").trim();
 
   console.log(
-    `[accountConfirmation] Input: contractNumber=${contractNumber}, bankName=${bankName}, accountNumber=${accountNumber}`,
+    `[accountConfirmation] Input: borrowerNumber=${borrowerNumber}, bankName=${bankName}, accountNumber=${accountNumber}`,
   );
 
   // Step 1: Validate required fields
-  if (!contractNumber) {
-    throw new Error("Enter your correct NMDS contract number");
+  if (!borrowerNumber) {
+    throw new Error("Enter your correct NMDS borrower's number");
   }
   if (!bankName || !accountNumber) {
     throw new Error("bankName and accountNumber are required");
   }
 
-  // Step 2: Validate contractNumber exists in database
+  // Step 2: Validate borrowerNumber exists in database
   if (!input.studentId) {
     throw new Error(
       "Student identifier (studentId) is required for confirmation",
@@ -623,49 +623,49 @@ export const accountConfirmation = async (
     throw new Error("Student record not found for the logged in user");
   }
 
-  // Find the account by contractNumber
-  const accountByContract = await Account.findOne({
+  // Find the account by borrowerNumber
+  const accountByBorrowerNo = await FinancialClearance.findOne({
     institution: input.institutionId,
-    contractNumber,
+    borrowerNumber,
   });
 
-  if (!accountByContract) {
+  if (!accountByBorrowerNo) {
     console.log(
-      `[accountConfirmation] Account not found for contractNumber: ${contractNumber}`,
+      `[accountConfirmation] Account not found for borrowerNumber: ${borrowerNumber}`,
     );
-    throw new Error("Enter your correct NMDS contract number");
+    throw new Error("Enter your correct NMDS borrower's number");
   }
 
   // Step 3: Check if bank and account match
   const accountMatches =
-    String(accountByContract.accountNumber || "").replace(/[^0-9]/g, "") ===
+    String(accountByBorrowerNo.accountNumber || "").replace(/[^0-9]/g, "") ===
     String(accountNumber || "").replace(/[^0-9]/g, "");
   const bankMatches =
-    String(accountByContract.bankName || "").toLowerCase() ===
+    String(accountByBorrowerNo.bankName || "").toLowerCase() ===
     String(bankName || "").toLowerCase();
 
-  // Ensure the logged-in student's record maps to the provided contract number
-  const studentContract = String(student.contractNumber || "").trim();
+  // Ensure the logged-in student's record maps to the provided borrower's number
+  const studentContract = String(student.borrowerNumber || "").trim();
   const confirmedByMatches = !!(
-    accountByContract &&
-    (accountByContract as any).confirmedBy &&
-    String((accountByContract as any).confirmedBy) === String(student._id)
+    accountByBorrowerNo &&
+    (accountByBorrowerNo as any).confirmedBy &&
+    String((accountByBorrowerNo as any).confirmedBy) === String(student._id)
   );
 
   // Consider a student a match if:
-  // - their stored contractNumber equals the provided contractNumber, OR
+  // - their stored borrowerNumber equals the provided borrowerNumber, OR
   // - they previously confirmed this account (confirmedBy), OR
-  // - they have no stored contractNumber but are the logged-in student and the account's contractNumber matches the input
+  // - they have no stored borrowerNumber but are the logged-in student and the account's borrowerNumber matches the input
   const studentMatches =
-    (studentContract !== "" && studentContract === contractNumber) ||
+    (studentContract !== "" && studentContract === borrowerNumber) ||
     confirmedByMatches ||
     (!studentContract &&
       String(input.studentId || "").trim() === String(student.studentId || "").trim() &&
-      String(accountByContract.contractNumber || "").trim() === contractNumber);
+      String(accountByBorrowerNo.borrowerNumber || "").trim() === borrowerNumber);
 
   if (!accountMatches || !bankMatches || !studentMatches) {
     console.log(
-      `[accountConfirmation] Mismatch detected. Account match: ${accountMatches}, Bank match: ${bankMatches}, Student match: ${studentMatches}. Debug: student._id=${String(student._id)}, student.studentId=${String(student.studentId)}, student.contractNumber=${studentContract}, account.contractNumber=${String(accountByContract.contractNumber)}, account.confirmedBy=${String((accountByContract as any).confirmedBy) || "null"}, input.studentId=${String(input.studentId)}`,
+      `[accountConfirmation] Mismatch detected. Account match: ${accountMatches}, Bank match: ${bankMatches}, Student match: ${studentMatches}. Debug: student._id=${String(student._id)}, student.studentId=${String(student.studentId)}, student.borrowerNumber=${studentContract}, account.borrowerNumber=${String(accountByBorrowerNo.borrowerNumber)}, account.confirmedBy=${String((accountByBorrowerNo as any).confirmedBy) || "null"}, input.studentId=${String(input.studentId)}`,
     );
 
     const reasons: string[] = [];
@@ -685,17 +685,17 @@ export const accountConfirmation = async (
       // Give student a chance to upload proof first
       (student as any).confirmationAttempts = ((student as any).confirmationAttempts || 0) + 1;
       await (student as any).save();
-      return { accountId: accountByContract._id, confirmationDate: new Date(), status: 'mismatch', alreadyConfirmed: false, needsProof: true, message: 'Account details do not match. Please upload a clearer bank confirmation and try again.' } as any;
+      return { accountId: accountByBorrowerNo._id, confirmationDate: new Date(), status: 'mismatch', alreadyConfirmed: false, needsProof: true, message: 'Account details do not match. Please upload a clearer bank confirmation and try again.' } as any;
     }
 
     // Build issue payload
     const issuePayload: any = {
-      contractNumber,
+      borrowerNumber,
       studentId: input.studentId,
       bankName,
       accountNumber,
-      recordedBankName: accountByContract.bankName,
-      recordedAccountNumber: accountByContract.accountNumber,
+      recordedBankName: accountByBorrowerNo.bankName,
+      recordedAccountNumber: accountByBorrowerNo.accountNumber,
       reasons,
       status: 'submitted',
     };
@@ -707,9 +707,9 @@ export const accountConfirmation = async (
       issuePayload.documentFileName = input.documentFileName;
     }
 
-    // Ensure contractNumber present
-    if (!issuePayload.contractNumber) {
-      throw new Error("[Critical] Cannot create/update Issue without contractNumber");
+    // Ensure borrowerNumber present
+    if (!issuePayload.borrowerNumber) {
+      throw new Error("[Critical] Cannot create/update Issue without borrowerNumber");
     }
 
     let issue: any = null;
@@ -719,7 +719,7 @@ export const accountConfirmation = async (
         institutionId: input.institutionId,
         studentId: input.studentId,
         studentEmail: input.studentEmail || student.email,
-        contractNumber,
+        borrowerNumber,
         bankName,
         accountNumber,
         reasons,
@@ -731,7 +731,7 @@ export const accountConfirmation = async (
         institutionId: input.institutionId,
         studentId: input.studentId,
         studentEmail: input.studentEmail || student.email,
-        contractNumber,
+        borrowerNumber,
         bankName,
         accountNumber,
         reasons,
@@ -747,13 +747,13 @@ export const accountConfirmation = async (
   }
 
   // Step 4: Account details match - confirm
-  const confirmedBy = (accountByContract as any).confirmedBy;
+  const confirmedBy = (accountByBorrowerNo as any).confirmedBy;
   if (confirmedBy && String(confirmedBy) !== String(student._id)) {
     throw new Error("This account was already confirmed by another student");
   }
 
   const alreadyConfirmed =
-    String(accountByContract.status || "").toLowerCase() === "confirmed" &&
+    String(accountByBorrowerNo.status || "").toLowerCase() === "confirmed" &&
     confirmedBy &&
     String(confirmedBy) === String(student._id);
 
@@ -761,31 +761,31 @@ export const accountConfirmation = async (
   let shouldSave = false;
 
   if (!alreadyConfirmed) {
-    accountByContract.status = "confirmed";
-    (accountByContract as any).confirmedBy = student._id;
-    (accountByContract as any).confirmationDate = confirmationDate;
+    accountByBorrowerNo.status = "confirmed";
+    (accountByBorrowerNo as any).confirmedBy = student._id;
+    (accountByBorrowerNo as any).confirmationDate = confirmationDate;
     shouldSave = true;
   }
 
   if (typeof input.graduating === "boolean") {
-    accountByContract.graduating = input.graduating;
+    accountByBorrowerNo.graduating = input.graduating;
     shouldSave = true;
   }
 
   if (shouldSave) {
-    await accountByContract.save();
+    await accountByBorrowerNo.save();
   }
 
   const result: AccountConfirmationResult = {
-    accountId: accountByContract._id,
+    accountId: accountByBorrowerNo._id,
     confirmationDate:
-      (accountByContract as any).confirmationDate || confirmationDate,
-    status: accountByContract.status || "confirmed",
+      (accountByBorrowerNo as any).confirmationDate || confirmationDate,
+    status: accountByBorrowerNo.status || "confirmed",
     alreadyConfirmed,
   };
 
-  if (typeof accountByContract.graduating === "boolean") {
-    result.graduating = accountByContract.graduating;
+  if (typeof accountByBorrowerNo.graduating === "boolean") {
+    result.graduating = accountByBorrowerNo.graduating;
   }
 
   return result;

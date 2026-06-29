@@ -166,7 +166,7 @@ Fields:
 
 - `institution` (ObjectId, ref Institution) — required
 - `fullnames` — string
-- `contractNumber` — string, required
+- `borrowerNumber` — string, required
 - `courseOfStudy` — string
 - `bankName` — string
 - `accountNumber` — string
@@ -181,7 +181,7 @@ Fields:
 
 Indexes:
 
-- `(institution, contractNumber)` unique
+- `(institution, borrowerNumber)` unique
 - `(institution, accountNumber)` unique
 
 ### User
@@ -235,7 +235,7 @@ Tracks a discrepancy between what the student confirmed and the finance record.
 Fields:
 
 - `student` — ObjectId, ref Student
-- `contractNumber` — string
+- `borrowerNumber` — string
 - `correctedBankName` — string
 - `correctedAccountNumber` — string
 - `document` — string (base64)
@@ -406,7 +406,7 @@ Upload an account spreadsheet using `multipart/form-data` with a `file` field.
 Required columns in the first sheet:
 
 - `Fullnames`
-- `Contract Number`
+- `Borrower Number`
 - `Course of Study`
 - `Bank Name`
 - `Account Number`
@@ -422,7 +422,7 @@ Optional columns:
 Rules:
 
 - Only rows with all required fields are imported.
-- Duplicate `contractNumber` or `accountNumber` values within the same institution are skipped.
+- Duplicate `borrowerNumber` or `accountNumber` values within the same institution are skipped.
 - Each spreadsheet upload gets one batch number, and all records in that upload share it.
 
 Example response:
@@ -436,7 +436,7 @@ Example response:
     "errors": [],
     "skippedDetails": [
       { "row": 4, "reasons": ["Missing required fields: accountnumber"] },
-      { "row": 7, "reasons": ["Duplicate contractNumber or accountNumber"] }
+      { "row": 7, "reasons": ["Duplicate borrowerNumber or accountNumber"] }
     ]
   }
 }
@@ -450,7 +450,7 @@ Students confirm their account details with JSON:
 
 ```json
 {
-  "contractNumber": "202511000516",
+  "borrowerNumber": "202511000516",
   "bankName": "FNB",
   "accountNumber": "63007006025",
   "graduating": true
@@ -459,7 +459,7 @@ Students confirm their account details with JSON:
 
 Behavior:
 
-- The account is matched by `contractNumber`.
+- The account is matched by `borrowerNumber`.
 - If bank name and account number match, the account is marked as confirmed.
 - If there is a mismatch, an `Issue` is created or updated for the student.
 
@@ -477,7 +477,7 @@ Students submit corrected details with `multipart/form-data`:
 Behavior:
 
 - Stores the corrected values and the uploaded document on the student's `Issue` record.
-- `contractNumber` is optional for this submission.
+- `borrowerNumber` is optional for this submission.
 - Finance later uses the issue to apply the correction.
 
 `POST /accounts/finance-resolve`
@@ -496,10 +496,10 @@ Behavior:
 
 - Loads the student's `Issue` record.
 - Reads `correctedBankName` and `correctedAccountNumber`.
-- Uses the issue's `contractNumber` to find the matching account.
+- Uses the issue's `borrowerNumber` to find the matching account.
 - Updates the account, then deletes the issue after a successful save.
 
-If the issue does not contain `contractNumber`, the endpoint returns `400`.
+If the issue does not contain `borrowerNumber`, the endpoint returns `400`.
 
 `POST /accounts/load_payed_students`
 
@@ -510,7 +510,7 @@ Upload a spreadsheet using `multipart/form-data` with a `file` field.
 Required columns in the first sheet:
 
 - `Fullnames`
-- `Contract Number`
+- `Borrower Number`
 - `Course of Study`
 - `Bank Name`
 - `Account Number`
@@ -1047,7 +1047,7 @@ No request body required.
 
 ## Important Notes
 
-- `Account` has unique indexes on `institution + contractNumber` and `institution + accountNumber`.
+- `Account` has unique indexes on `institution + borrowerNumber` and `institution + accountNumber`.
 - Student document uploads (issue resolution) are stored as base64 in the database. Cloudinary is used for candidate photo uploads when configured.
 - `req.user` is attached by `requireAuth` and `requireRole` enforces role access.
 - Controllers guard against undefined `req.body` before destructuring.

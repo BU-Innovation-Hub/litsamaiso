@@ -5,7 +5,7 @@ export const issueService = {
     const response = await apiClient.get<{ issues: any[] }>('/issues');
     return response.data.issues;
   },
-  createIssue: async (payload: { contractNumber: string; bankName: string; accountNumber: string; proofUrls?: string[]; notes?: string }) => {
+  createIssue: async (payload: { borrowerNumber: string; bankName: string; accountNumber: string; proofUrls?: string[]; notes?: string }) => {
     const response = await apiClient.post('/issues', payload);
     return response.data;
   },

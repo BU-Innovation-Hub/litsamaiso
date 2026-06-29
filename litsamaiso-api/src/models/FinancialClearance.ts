@@ -1,7 +1,7 @@
 import { model, Schema, type Types } from "mongoose";
 
-export interface AccountDocument {
-  contractNumber: string;
+export interface FinancialClearanceDocument {
+  borrowerNumber: string;
   accountNumber: string;
   bankName: string;
   batchNumber: number;
@@ -16,9 +16,9 @@ export interface AccountDocument {
   confirmationDate?: Date;
 }
 
-const accountSchema = new Schema<AccountDocument>(
+const financialClearanceSchema = new Schema<FinancialClearanceDocument>(
   {
-    contractNumber: { type: String, required: true, trim: true },
+    borrowerNumber: { type: String, required: true, trim: true },
     accountNumber: { type: String, required: true, trim: true },
     bankName: { type: String, required: true, trim: true },
     batchNumber: { type: Number, required: true },
@@ -46,8 +46,8 @@ const accountSchema = new Schema<AccountDocument>(
   },
 );
 
-accountSchema.index({ institution: 1, contractNumber: 1 }, { unique: true });
-accountSchema.index({ institution: 1, accountNumber: 1 }, { unique: true });
+financialClearanceSchema.index({ institution: 1, borrowerNumber: 1 }, { unique: true });
+financialClearanceSchema.index({ institution: 1, accountNumber: 1 }, { unique: true });
 
-export const Account = model<AccountDocument>("Account", accountSchema);
-export default Account;
+export const FinancialClearance = model<FinancialClearanceDocument>("FinancialClearance", financialClearanceSchema);
+export default FinancialClearance;

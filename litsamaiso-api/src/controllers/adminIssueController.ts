@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import Issue from "../models/Issue.js";
-import { Account } from "../models/Account.js";
+import { FinancialClearance } from "../models/FinancialClearance.js";
 import { Student } from "../models/Student.js";
 import { User } from "../models/User.js";
 import { sendIssueStatusToStudent } from "../utils/email.js";
@@ -20,7 +20,7 @@ export const listAdminIssues = async (req: Request, res: Response) => {
     if (params.search) {
       const s = String(params.search).trim();
       q.$or = [
-        { contractNumber: { $regex: s, $options: "i" } },
+        { borrowerNumber: { $regex: s, $options: "i" } },
         { studentId: { $regex: s, $options: "i" } },
         { bankName: { $regex: s, $options: "i" } },
       ];
@@ -34,8 +34,8 @@ export const listAdminIssues = async (req: Request, res: Response) => {
 
     const results = await Promise.all(
       issues.map(async (it) => {
-        const acc = it.contractNumber
-          ? await Account.findOne({ contractNumber: it.contractNumber, institution: user.institution }).lean()
+        const acc = it.borrowerNumber
+          ? await FinancialClearance.findOne({ borrowerNumber: it.borrowerNumber, institution: user.institution }).lean()
           : null;
         return { ...it, account: acc || null, student: studentMap[String(it.studentId)] || null };
       }),
@@ -64,8 +64,8 @@ export const getAdminIssue = async (req: Request, res: Response) => {
       return;
     }
 
-    const account = issue.contractNumber
-      ? await Account.findOne({ contractNumber: issue.contractNumber, institution: user.institution }).lean()
+    const account = issue.borrowerNumber
+      ? await FinancialClearance.findOne({ borrowerNumber: issue.borrowerNumber, institution: user.institution }).lean()
       : null;
 
     res.json({ data: { ...issue, account, student } });
@@ -86,15 +86,15 @@ export const approveIssue = async (req: Request, res: Response) => {
     const student = await Student.findOne({ studentId: issue.studentId, institution: user.institution }).lean();
     if (!student) return res.status(404).json({ error: "Student not found in your institution" });
 
-    const contractNumber = String(issue.contractNumber || student.contractNumber || "").trim();
-    if (!contractNumber) return res.status(400).json({ error: "Issue missing contractNumber" });
+    const borrowerNumber = String(issue.borrowerNumber || student.borrowerNumber || "").trim();
+    if (!borrowerNumber) return res.status(400).json({ error: "Issue missing borrowerNumber" });
 
     const correctedBank = String(issue.correctedBankName || issue.bankName || "").trim();
     const correctedAccount = String(issue.correctedAccountNumber || issue.accountNumber || "").trim();
     if (!correctedBank || !correctedAccount) return res.status(400).json({ error: "Issue has no corrected bank/account to apply" });
 
-    const account = await Account.findOne({ contractNumber, institution: user.institution });
-    if (!account) return res.status(404).json({ error: "Account not found for contractNumber" });
+    const account = await FinancialClearance.findOne({ borrowerNumber, institution: user.institution });
+    if (!account) return res.status(404).json({ error: "Account not found for borrowerNumber" });
 
     const prev = { bankName: account.bankName, accountNumber: account.accountNumber };
 
@@ -122,7 +122,7 @@ export const approveIssue = async (req: Request, res: Response) => {
       actorId: user._id?.toString(),
       actorEmail: user.email,
       actorRole: (user.role && (user.role as any).name) || undefined,
-      targetCollection: "Account",
+      targetCollection: "FinancialClearance",
       targetId: account._id?.toString(),
       details: { studentId: issue.studentId, prev, updated: { bankName: correctedBank, accountNumber: correctedAccount } },
     });

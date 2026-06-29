@@ -71,7 +71,7 @@ const AccountConfirmationPage: React.FC = () => {
   const [extracted, setExtracted] = useState<ExtractedDetails | null>(null);
   const [reviewAccepted, setReviewAccepted] = useState(false);
   const [formData, setFormData] = useState({
-    contractNumber: '',
+    borrowerNumber: '',
     bankName: '',
     accountNumber: '',
     graduating: false,
@@ -83,13 +83,13 @@ const AccountConfirmationPage: React.FC = () => {
   // Confidence score is intentionally hidden from students (UX requirement).
 
   const escalateToIssues = async () => {
-    const contractNumber = String(formData.contractNumber || '').trim();
+    const borrowerNumber = String(formData.borrowerNumber || '').trim();
     const studentId = (user && (user as any).studentId) || '';
     const bankName = String(formData.bankName || extracted?.bankName || 'Unavailable').trim();
     const accountNumber = String(formData.accountNumber || extracted?.accountNumber || 'Unavailable').trim();
 
-    if (!contractNumber || !studentId) {
-      toast.error('Enter your contract number and ensure you are logged in');
+    if (!borrowerNumber || !studentId) {
+      toast.error("Enter your borrower's number and ensure you are logged in");
       return;
     }
 
@@ -109,7 +109,7 @@ const AccountConfirmationPage: React.FC = () => {
     }
 
     try {
-      const resp = await apiClient.post('/issues', { contractNumber, studentId, bankName, accountNumber, proofUrls });
+      const resp = await apiClient.post('/issues', { borrowerNumber, studentId, bankName, accountNumber, proofUrls });
       toast.success(resp?.data?.message || 'Issue logged. Redirecting to Issues page.');
       navigate('/issues', { replace: true, state: { issueLogged: true } });
     } catch (err: unknown) {
@@ -141,7 +141,7 @@ const AccountConfirmationPage: React.FC = () => {
         const contractResult = await accountService.validateContract();
         if (!contractResult.valid) {
           setContractValid(false);
-          setContractError(contractResult.message || 'Contract number not found in accounts list');
+          setContractError(contractResult.message || 'Borrower number not found in accounts list');
           setContractReason(contractResult.reason || '');
           setIsCheckingStatus(false);
           return;
@@ -246,8 +246,8 @@ const AccountConfirmationPage: React.FC = () => {
       return;
     }
 
-    if (!/^\d{12}$/.test(formData.contractNumber.trim())) {
-      toast.error('Contract number must be exactly 12 digits');
+    if (!/^\d{12}$/.test(formData.borrowerNumber.trim())) {
+      toast.error('Borrower number must be exactly 12 digits');
       return;
     }
 
@@ -263,7 +263,7 @@ const AccountConfirmationPage: React.FC = () => {
       if ((document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0]) {
         const file = (document.querySelector('input[type=file]') as HTMLInputElement).files![0];
         const form = new FormData();
-        form.append('contractNumber', formData.contractNumber);
+        form.append('borrowerNumber', formData.borrowerNumber);
         form.append('bankName', formData.bankName);
         form.append('accountNumber', formData.accountNumber);
         form.append('graduating', String(formData.graduating));
@@ -330,7 +330,7 @@ const AccountConfirmationPage: React.FC = () => {
             )}
           </div>
           <h1 className={`text-3xl font-bold ${isWarning ? "text-amber-600" : "text-red-600"}`}>
-            {isWarning ? "Your Account Not Ready For Confirmation" : "Contract Number Not Found"}
+            {isWarning ? "Your Account Not Ready For Confirmation" : "Borrower's Number Not Found"}
           </h1>
           <p className="mt-3 max-w-xl text-muted-foreground">
             {contractError}
@@ -341,7 +341,7 @@ const AccountConfirmationPage: React.FC = () => {
             </p>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
-              Please contact your institution admin or finance department to ensure your contract number is registered in the system if you do have a contract with NMDS.
+              Please contact your institution admin or finance department to ensure your borrower's number is registered in the system if you do have a contract with NMDS.
             </p>
           )}
         </div>
@@ -384,10 +384,10 @@ const AccountConfirmationPage: React.FC = () => {
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Contract Number</label>
+                  <label className="mb-2 block text-sm font-medium">Borrower's Number</label>
                   <input
-                    name="contractNumber"
-                    value={formData.contractNumber}
+                    name="borrowerNumber"
+                    value={formData.borrowerNumber}
                     onChange={handleChange}
                     required
                     className="w-full rounded-md border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-active"

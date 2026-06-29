@@ -1,5 +1,5 @@
 import { Types } from "mongoose";
-import { Account } from "../models/Account.js";
+import { FinancialClearance } from "../models/FinancialClearance.js";
 import { Institution } from "../models/Institution.js";
 
 export type AccountReportKey =
@@ -42,7 +42,7 @@ export interface AccountReportContext {
 
 interface ScopedAccountRow {
   _id: Types.ObjectId;
-  contractNumber: string;
+  borrowerNumber: string;
   accountNumber: string;
   bankName: string;
   batchNumber: number;
@@ -277,9 +277,9 @@ const groupByDate = (
 };
 
 const loadScopedAccounts = async (filter: Record<string, unknown>): Promise<ScopedAccountRow[]> => {
-  return Account.find(filter)
+  return FinancialClearance.find(filter)
     .select(
-      "contractNumber accountNumber bankName batchNumber courseOfStudy fullnames graduating status paidDate paidAt institution confirmedBy confirmationDate createdAt updatedAt",
+      "borrowerNumber accountNumber bankName batchNumber courseOfStudy fullnames graduating status paidDate paidAt institution confirmedBy confirmationDate createdAt updatedAt",
     )
     .lean<ScopedAccountRow[]>();
 };
@@ -304,7 +304,7 @@ const buildConfirmedNotPaid = (rows: ScopedAccountRow[]) => {
   const accounts = rows
     .filter((row) => normalizeStatus(row.status) === "confirmed")
     .map((row) => ({
-      contractNumber: row.contractNumber,
+      borrowerNumber: row.borrowerNumber,
       accountNumber: row.accountNumber,
       bankName: row.bankName,
       courseOfStudy: row.courseOfStudy,
@@ -371,7 +371,7 @@ const buildStuckConfirmed = (rows: ScopedAccountRow[], days: number) => {
     thresholdDate: threshold.toISOString(),
     total: accounts.length,
     accounts: accounts.map((row) => ({
-      contractNumber: row.contractNumber,
+      borrowerNumber: row.borrowerNumber,
       accountNumber: row.accountNumber,
       bankName: row.bankName,
       courseOfStudy: row.courseOfStudy,
@@ -395,7 +395,7 @@ const buildRecentPayments = (rows: ScopedAccountRow[], days: number) => {
     total: paidRows.length,
     byDay: groupByDate(paidRows, (row) => row.paidAt || null),
     latest: paidRows.slice(0, DEFAULT_SAMPLE_LIMIT).map((row) => ({
-      contractNumber: row.contractNumber,
+      borrowerNumber: row.borrowerNumber,
       accountNumber: row.accountNumber,
       bankName: row.bankName,
       courseOfStudy: row.courseOfStudy,
@@ -435,7 +435,7 @@ const buildAnomalies = (rows: ScopedAccountRow[]) => {
 
     return [
       {
-        contractNumber: row.contractNumber,
+        borrowerNumber: row.borrowerNumber,
         accountNumber: row.accountNumber,
         bankName: row.bankName,
         courseOfStudy: row.courseOfStudy,

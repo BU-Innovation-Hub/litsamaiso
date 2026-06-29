@@ -13,7 +13,7 @@ import { Issue } from "../models/Issue.js";
 import { Student } from "../models/Student.js";
 import { User } from "../models/User.js";
 import { recordAudit } from "../utils/auditLog.js";
-import { Account } from "../models/Account.js";
+import { FinancialClearance } from "../models/FinancialClearance.js";
 import { sendIssueResolvedEmail } from "../utils/email.js";
 
 export const uploadAccounts = async (req: Request, res: Response) => {
@@ -63,7 +63,7 @@ export const listAccounts = async (req: Request, res: Response) => {
     const limit = getAccountListLimit(params.limit);
     const q = getAccountListFilter(user, params);
 
-    const accounts = await Account.find(q).limit(limit).lean();
+    const accounts = await FinancialClearance.find(q).limit(limit).lean();
 
     // compute batches list
     const batches = Array.from(new Set((accounts || []).map((a: any) => a.batchNumber))).sort((a, b) => a - b);
@@ -131,21 +131,21 @@ export const confirmAccount = async (req: Request, res: Response) => {
   try {
     console.log("[confirmAccount] POST /accounts/confirm hit");
     const body = (req.body || {}) as {
-      contractNumber?: string;
+      borrowerNumber?: string;
       bankName?: string;
       accountNumber?: string;
       graduating?: boolean | string;
     };
-    const { contractNumber, bankName, accountNumber, graduating } = body;
+    const { borrowerNumber, bankName, accountNumber, graduating } = body;
 
     console.log(
-      `[confirmAccount] Input: contractNumber=${contractNumber}, bankName=${bankName}, accountNumber=${accountNumber}`,
+      `[confirmAccount] Input: borrowerNumber=${borrowerNumber}, bankName=${bankName}, accountNumber=${accountNumber}`,
     );
 
-    if (!contractNumber || String(contractNumber).trim() === "") {
+    if (!borrowerNumber || String(borrowerNumber).trim() === "") {
       res
         .status(400)
-        .json({ message: "Enter your correct NMDS contract number" });
+        .json({ message: "Enter your correct NMDS borrower number" });
       return;
     }
 
@@ -171,7 +171,7 @@ export const confirmAccount = async (req: Request, res: Response) => {
     }
 
     let confirmationInput: {
-      contractNumber: string;
+      borrowerNumber: string;
       bankName: string;
       accountNumber: string;
       institutionId: typeof instId;
@@ -179,7 +179,7 @@ export const confirmAccount = async (req: Request, res: Response) => {
       studentEmail?: string;
       graduating?: boolean;
     } = {
-      contractNumber: String(contractNumber || ""),
+      borrowerNumber: String(borrowerNumber || ""),
       bankName: String(bankName || ""),
       accountNumber: String(accountNumber || ""),
       institutionId: instId,
@@ -224,10 +224,10 @@ export const confirmAccount = async (req: Request, res: Response) => {
       actorId: user._id?.toString(),
       actorEmail: user.email,
       actorRole: (user.role && (user.role as any).name) || undefined,
-      targetCollection: "Account",
+      targetCollection: "FinancialClearance",
       targetId: result?.accountId?.toString(),
       details: {
-        contractNumber,
+        borrowerNumber,
         bankName,
         accountNumber,
         alreadyConfirmed: result.alreadyConfirmed,
@@ -262,7 +262,7 @@ export const confirmAccount = async (req: Request, res: Response) => {
           (req as any).user.role &&
           (req as any).user.role.name) ||
         (req as any).user?.role,
-      targetCollection: "Account",
+      targetCollection: "FinancialClearance",
       details: {
         bankName: (req as any).body?.bankName,
         accountNumber: (req as any).body?.accountNumber,
@@ -274,14 +274,14 @@ export const confirmAccount = async (req: Request, res: Response) => {
   }
 };
 
-export const validateContractNumber = async (req: Request, res: Response) => {
+export const validateBorrowerNumber = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const instId = user.institution;
 
-    const userRecord = await User.findById(user._id).select("contractNumber").lean();
+    const userRecord = await User.findById(user._id).select("borrowerNumber").lean();
 
-    if (!userRecord || !userRecord.contractNumber) {
+    if (!userRecord || !userRecord.borrowerNumber) {
       res.json({
         valid: false,
         reason: "no_contract",
@@ -290,9 +290,9 @@ export const validateContractNumber = async (req: Request, res: Response) => {
       return;
     }
 
-    const account = await Account.findOne({
+    const account = await FinancialClearance.findOne({
       institution: instId,
-      contractNumber: userRecord.contractNumber,
+      borrowerNumber: userRecord.borrowerNumber,
     }).lean();
 
     if (!account) {
@@ -304,9 +304,9 @@ export const validateContractNumber = async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ valid: true, contractNumber: userRecord.contractNumber });
+    res.json({ valid: true, borrowerNumber: userRecord.borrowerNumber });
   } catch (err: any) {
-    console.error("validateContractNumber error:", err);
+    console.error("validateBorrowerNumber error:", err);
     res.status(500).json({ valid: false, message: err.message || String(err) });
   }
 };
@@ -328,15 +328,15 @@ export const getConfirmationStatus = async (req: Request, res: Response) => {
     }
 
     let account = null as any;
-    if (student.contractNumber) {
-      account = await Account.findOne({ institution: instId, contractNumber: student.contractNumber }).lean();
+    if (student.borrowerNumber) {
+      account = await FinancialClearance.findOne({ institution: instId, borrowerNumber: student.borrowerNumber }).lean();
     }
 
     if (!account) {
       // fallback: find account confirmed by this student id
       const stud = await Student.findOne({ institution: instId, studentId: user.studentId }).lean();
       if (stud && stud._id) {
-        account = await Account.findOne({ institution: instId, confirmedBy: stud._id }).lean();
+        account = await FinancialClearance.findOne({ institution: instId, confirmedBy: stud._id }).lean();
       }
     }
 
@@ -372,8 +372,8 @@ export const getStudentAccounts = async (req: Request, res: Response) => {
 
     const q: any = { institution: instId };
     const or: any[] = [];
-    if (student.contractNumber) {
-      or.push({ contractNumber: student.contractNumber });
+    if (student.borrowerNumber) {
+      or.push({ borrowerNumber: student.borrowerNumber });
     }
     // accounts confirmed by this student
     if (student._id) {
@@ -382,7 +382,7 @@ export const getStudentAccounts = async (req: Request, res: Response) => {
 
     if (or.length > 0) q.$or = or;
 
-    const accounts = await Account.find(q).lean();
+    const accounts = await FinancialClearance.find(q).lean();
     res.json({ data: accounts });
   } catch (err: any) {
     console.error('[getStudentAccounts] Error:', err);
@@ -440,7 +440,7 @@ export const resolveAccountIssue = async (req: Request, res: Response) => {
     }
 
     const setUpdates: {
-      contractNumber?: string;
+      borrowerNumber?: string;
       correctedBankName: string;
       correctedAccountNumber: string;
       documentBase64: string;
@@ -462,14 +462,14 @@ export const resolveAccountIssue = async (req: Request, res: Response) => {
     }).lean();
 
     const issuePayload: any = { ...setUpdates };
-    if (student.contractNumber) {
-      issuePayload.contractNumber = student.contractNumber;
+    if (student.borrowerNumber) {
+      issuePayload.borrowerNumber = student.borrowerNumber;
     }
 
-    const recordContractNumber = String(issuePayload.contractNumber || existingIssue?.contractNumber || "").trim();
-    if (recordContractNumber) {
-      const recordedAccount = await Account.findOne({
-        contractNumber: recordContractNumber,
+    const recordBorrowerNumber = String(issuePayload.borrowerNumber || existingIssue?.borrowerNumber || "").trim();
+    if (recordBorrowerNumber) {
+      const recordedAccount = await FinancialClearance.findOne({
+        borrowerNumber: recordBorrowerNumber,
         institution: instId,
       }).select("bankName accountNumber").lean();
 
@@ -494,8 +494,8 @@ export const resolveAccountIssue = async (req: Request, res: Response) => {
         institutionId: instId,
         studentId: user.studentId,
         studentEmail: studentUser?.email || user.email,
-        contractNumber: String(
-          issuePayload.contractNumber || existingIssue.contractNumber || "",
+        borrowerNumber: String(
+          issuePayload.borrowerNumber || existingIssue.borrowerNumber || "",
         ),
         bankName: String(issuePayload.correctedBankName || ""),
         accountNumber: String(issuePayload.correctedAccountNumber || ""),
@@ -503,7 +503,7 @@ export const resolveAccountIssue = async (req: Request, res: Response) => {
         notificationType: "updated",
       });
     } else {
-      // Create new Issue (contractNumber optional for student submissions)
+      // Create new Issue (borrowerNumber optional for student submissions)
       console.log(
         `[resolveAccountIssue] Creating new Issue with payload:`,
         JSON.stringify(issuePayload, null, 2),
@@ -513,7 +513,7 @@ export const resolveAccountIssue = async (req: Request, res: Response) => {
         institutionId: instId,
         studentId: user.studentId,
         studentEmail: studentUser?.email || user.email,
-        contractNumber: String(issuePayload.contractNumber || ""),
+        borrowerNumber: String(issuePayload.borrowerNumber || ""),
         bankName: String(issuePayload.correctedBankName || ""),
         accountNumber: String(issuePayload.correctedAccountNumber || ""),
         reasons: issuePayload.reasons,
@@ -608,21 +608,21 @@ export const financeResolveAccountIssue = async (
       return;
     }
 
-    const issueContractNumber = String(issue.contractNumber || "").trim();
-    if (!issueContractNumber) {
+    const issueBorrowerNumber = String(issue.borrowerNumber || "").trim();
+    if (!issueBorrowerNumber) {
       res
         .status(400)
-        .json({ message: "Issue does not contain contractNumber" });
+        .json({ message: "Issue does not contain borrowerNumber" });
       return;
     }
 
-    const account = await Account.findOne({
+    const account = await FinancialClearance.findOne({
       institution: instId,
-      contractNumber: issueContractNumber,
+      borrowerNumber: issueBorrowerNumber,
     });
 
     if (!account) {
-      res.status(404).json({ message: "Account not found for contractNumber" });
+      res.status(404).json({ message: "Account not found for borrowerNumber" });
       return;
     }
 
@@ -670,7 +670,7 @@ export const financeResolveAccountIssue = async (
       actorEmail: financeUser.email,
       actorRole:
         (financeUser.role && (financeUser.role as any).name) || undefined,
-      targetCollection: "Account",
+      targetCollection: "FinancialClearance",
       targetId: account._id?.toString(),
       details: {
         studentId: targetStudentId,
@@ -717,7 +717,7 @@ export const updateAccount = async (req: Request, res: Response) => {
     // Only allow certain fields to be updated via this endpoint
     const allowed: Array<string> = [
       "fullnames",
-      "contractNumber",
+      "borrowerNumber",
       "courseOfStudy",
       "bankName",
       "accountNumber",
@@ -741,7 +741,7 @@ export const updateAccount = async (req: Request, res: Response) => {
       q.institution = instId;
     }
 
-    const account = await Account.findOne(q);
+    const account = await FinancialClearance.findOne(q);
     if (!account) return res.status(404).json({ message: "Account not found" });
 
     for (const key of Object.keys(setObj)) {
@@ -765,7 +765,7 @@ export const updateAccount = async (req: Request, res: Response) => {
       actorId: user._id?.toString(),
       actorEmail: user.email,
       actorRole: (user.role && (user.role as any).name) || undefined,
-      targetCollection: "Account",
+      targetCollection: "FinancialClearance",
       targetId: account._id?.toString(),
       details: { updates: setObj },
     });

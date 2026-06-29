@@ -13,7 +13,7 @@ const RegisterPage: React.FC = () => {
     password: '',
     confirmPassword: '',
     studentId: '',
-    contractNumber: '',
+    borrowerNumber: '',
   });
 
   const handleChange = (
@@ -36,13 +36,13 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    if (!formData.contractNumber.trim()) {
-      toast.error('Enter your NMDS contract number');
+    if (!formData.borrowerNumber.trim()) {
+      toast.error("Enter your NMDS borrower's number");
       return;
     }
 
-    if (!/^\d{12}$/.test(formData.contractNumber.trim())) {
-      toast.error('Contract number must be exactly 12 digits');
+    if (!/^\d{12}$/.test(formData.borrowerNumber.trim())) {
+      toast.error('Borrower number must be exactly 12 digits');
       return;
     }
 
@@ -52,7 +52,7 @@ const RegisterPage: React.FC = () => {
         password: formData.password,
         role,
         studentId: formData.studentId || undefined,
-        contractNumber: formData.contractNumber || undefined,
+        borrowerNumber: formData.borrowerNumber || undefined,
       });
 
       toast.success('Account created successfully! Please sign in.');
@@ -136,10 +136,10 @@ const RegisterPage: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">NMDS Contract Number</label>
+              <label className="text-sm font-medium">NMDS Borrower's Number</label>
               <input
-                name="contractNumber"
-                value={formData.contractNumber}
+                name="borrowerNumber"
+                value={formData.borrowerNumber}
                 onChange={handleChange}
                 placeholder="e.g. 202211001706"
                 required

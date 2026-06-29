@@ -5,7 +5,7 @@ import {
   uploadAccounts,
   confirmAccount,
   getConfirmationStatus,
-  validateContractNumber,
+  validateBorrowerNumber,
   getStudentAccounts,
   resolveAccountIssue,
   financeResolveAccountIssue,
@@ -28,7 +28,7 @@ router.post(
 
 router.post("/confirm", requireAuth, requireRole("Student"), upload.single("document"), confirmAccount);
 router.get("/status", requireAuth, requireRole("Student"), getConfirmationStatus);
-router.get("/validate-contract", requireAuth, requireRole("Student"), validateContractNumber);
+router.get("/validate-contract", requireAuth, requireRole("Student"), validateBorrowerNumber);
 // Compatibility alias used by the client: /accounts/confirmation-status
 router.get("/confirmation-status", requireAuth, requireRole("Student"), getConfirmationStatus);
 

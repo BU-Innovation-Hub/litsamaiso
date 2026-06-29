@@ -7,7 +7,7 @@ export interface UserDocument {
   role: Types.ObjectId;
   institution: Types.ObjectId;
   studentId?: string;
-  contractNumber?: string;
+  borrowerNumber?: string;
   studentCardUrl?: string;
   faceDescriptor: number[];
   faceImageUrl?: string;
@@ -27,7 +27,7 @@ const userSchema = new Schema<UserDocument>(
       required: true,
     },
     studentId: { type: String, trim: true, unique: true, sparse: true },
-    contractNumber: { type: String, trim: true },
+    borrowerNumber: { type: String, trim: true },
     studentCardUrl: { type: String, trim: true },
     faceDescriptor: { type: [Number], default: [] },
     faceImageUrl: { type: String, trim: true },

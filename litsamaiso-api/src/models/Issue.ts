@@ -1,7 +1,7 @@
 import { model, Schema } from "mongoose";
 
 export interface IssueDocument {
-  contractNumber?: string;
+  borrowerNumber?: string;
   studentId: string;
   bankName?: string;
   accountNumber?: string;
@@ -25,7 +25,7 @@ export interface IssueDocument {
 
 const issueSchema = new Schema<IssueDocument>(
   {
-    contractNumber: { type: String, trim: true },
+    borrowerNumber: { type: String, trim: true },
     studentId: { type: String, required: true, trim: true, unique: true },
     bankName: { type: String, trim: true },
     accountNumber: { type: String, trim: true },

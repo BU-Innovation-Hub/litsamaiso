@@ -4,7 +4,7 @@ import { Text } from "@react-email/components";
 
 type Issue = {
   _id?: string;
-  contractNumber?: string;
+  borrowerNumber?: string;
   studentId?: string;
   bankName?: string;
   accountNumber?: string;
@@ -43,7 +43,7 @@ export default function IssueStatusEmail({
       logoUrl={logoUrl}
       appName={appName}
       title={title}
-      preheader={status === "approved" ? `Your confirmation for ${issue.contractNumber} was approved.` : `Your submission for ${issue.contractNumber} was reviewed by finance.`}
+      preheader={status === "approved" ? `Your confirmation for ${issue.borrowerNumber} was approved.` : `Your submission for ${issue.borrowerNumber} was reviewed by finance.`}
       ctaText={status === "approved" ? "View Account" : "Update Submission"}
       ctaUrl={ctaUrl}
       accentColor={accentColor}
@@ -53,7 +53,7 @@ export default function IssueStatusEmail({
       {status === "approved" ? (
         <>
           <Text style={{ color: textColor, fontSize: 14, lineHeight: 1.6, margin: "0 0 12px 0" }}>
-            Good news — the finance team has verified and approved your submitted details for contract {issue.contractNumber}.
+            Good news — the finance team has verified and approved your submitted details for borrower's number: {issue.borrowerNumber}.
           </Text>
           <Text style={{ color: textColor, fontSize: 14, lineHeight: 1.6 }}>
             You can view your account status by clicking the button below.
@@ -62,7 +62,7 @@ export default function IssueStatusEmail({
       ) : (
         <>
           <Text style={{ color: textColor, fontSize: 14, lineHeight: 1.6, margin: "0 0 12px 0" }}>
-            The finance team reviewed your submission for contract {issue.contractNumber} and could not approve it.
+            The finance team reviewed your submission for borrower's number: {issue.borrowerNumber} and could not approve it.
           </Text>
           {reason && (
             <Text style={{ color: textColor, fontSize: 14, lineHeight: 1.6, margin: "0 0 12px 0" }}>

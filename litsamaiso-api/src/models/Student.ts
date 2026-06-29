@@ -7,7 +7,7 @@ export interface StudentDocument {
   surname: string;
   studentStatus: boolean;
   institution: Types.ObjectId;
-  contractNumber?: string;
+  borrowerNumber?: string;
   confirmationAttempts?: number;
 }
 
@@ -23,7 +23,7 @@ const studentSchema = new Schema<StudentDocument>(
       ref: "Institution",
       required: true,
     },
-    contractNumber: { type: String, trim: true },
+    borrowerNumber: { type: String, trim: true },
     confirmationAttempts: { type: Number, default: 0 },
   },
   {
