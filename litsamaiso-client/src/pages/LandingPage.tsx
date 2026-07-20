@@ -281,7 +281,7 @@ const LandingPage = () => {
                 <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" />
               </Link>
               <a
-                href="#capabilities"
+                href="#video"
                 className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-7 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 sm:w-auto"
               >
                 Explore platform
@@ -293,7 +293,9 @@ const LandingPage = () => {
       </section>
 
       <main>
-        <ExplainerVideo />
+        <section id="video">
+          <ExplainerVideo />
+        </section>
 
         <section
           id="capabilities"
@@ -505,13 +507,13 @@ const LandingPage = () => {
                   specialists building a platform institutions can trust.
                 </p>
               </div>
-              <Link
-                to="/login"
+              <a
+                href="mailto:support@litsamaiso.com"
                 className="inline-flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:bg-gray-50"
               >
                 Work with us
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -574,7 +576,7 @@ const LandingPage = () => {
                   to="/login"
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary-clr px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90"
                 >
-                  Launch workspace
+                  Launch platform
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
@@ -602,6 +604,12 @@ const LandingPage = () => {
               Academic support, confirmations, and student operations made
               clearer for every team involved.
             </p>
+            <a
+              href="mailto:support@litsamaiso.com"
+              className="mt-3 inline-flex text-sm font-medium text-primary-clr transition hover:text-active"
+            >
+              support@litsamaiso.com
+            </a>
           </div>
           <div className="flex flex-wrap gap-3">
             {footerLinks.map((item) => (
