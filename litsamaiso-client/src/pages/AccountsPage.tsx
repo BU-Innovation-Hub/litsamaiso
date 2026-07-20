@@ -899,7 +899,7 @@ const AccountsPage: React.FC = () => {
                     <button
                       disabled={Boolean(reviewingIssue)}
                       onClick={async () => {
-                        if (!confirm('Approve this issue and update the student's account details?')) return;
+                        if (!confirm("Approve this issue and update the student's account details?")) return;
                         setReviewingIssue({ id: selectedIssue._id, action: 'approve' });
                         try {
                           await adminIssueService.approveIssue(selectedIssue._id);
