@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import type { AxiosProgressEvent } from 'axios';
 import apiClient from '../lib/api';
 import type { Account } from '../types';
 
@@ -90,12 +91,19 @@ export const accountService = {
     return response.data;
   },
 
-  uploadAccounts: async (file: File) => {
+  uploadAccounts: async (file: File, onProgress?: (percent: number) => void) => {
     const formData = new FormData();
     formData.append('file', file);
 
     const response = await apiClient.post('/accounts/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: onProgress
+        ? (event: AxiosProgressEvent) => {
+            const total = event.total || file.size;
+            if (!total) return;
+            onProgress(Math.max(0, Math.min(100, Math.round((event.loaded / total) * 100))));
+          }
+        : undefined,
     });
     return response.data;
   },

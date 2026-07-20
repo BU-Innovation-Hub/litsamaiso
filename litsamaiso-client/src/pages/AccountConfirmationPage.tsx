@@ -358,7 +358,7 @@ const AccountConfirmationPage: React.FC = () => {
             alt="Confirmed"
             className="mb-8 h-52 w-52 object-contain"
           />
-          <h1 className="text-4xl font-bold text-primary-clr">Account Already Confirmed</h1>
+          <h1 className="text-4xl font-bold text-primary-clr">Account Confirmed</h1>
           <p className="mt-3 max-w-xl text-muted-foreground">
             Your account details have already been confirmed. No further action is required.
           </p>
