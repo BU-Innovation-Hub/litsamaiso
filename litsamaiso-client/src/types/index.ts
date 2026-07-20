@@ -200,6 +200,17 @@ export interface Issue {
   updatedAt?: string;
 }
 
+// Branch Code Types
+export interface BranchCode {
+  _id: string;
+  bankName: string;
+  branchCode: string;
+  description?: string;
+  institution: string | Institution;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // Audit Log Types
 export interface AuditLog {
   _id: string;

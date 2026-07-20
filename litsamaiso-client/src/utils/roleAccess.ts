@@ -10,6 +10,7 @@ export const roleAccess = {
   electionManagement: ['SAAD'],
   users: ['AppAdmin', 'InstitutionAdmin'],
   institutions: ['AppAdmin'],
+  branchCodes: ['AppAdmin', 'Finance'],
 } satisfies Record<string, RoleName[]>;
 
 export const canAccess = (roleName: string, allowedRoles: readonly RoleName[]) =>

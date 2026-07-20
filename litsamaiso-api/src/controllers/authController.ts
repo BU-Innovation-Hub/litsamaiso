@@ -7,7 +7,6 @@ import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 import { Institution } from "../models/Institution.js";
 import { Student } from "../models/Student.js";
-import { FinancialClearance } from "../models/FinancialClearance.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { createHash, randomBytes } from "crypto";
 
@@ -168,31 +167,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         return;
       }
 
-      // use borrowerNumber from the Student record (imported via spreadsheet)
+      // use borrowerNumber from the Student record (imported via spreadsheet) if available
       const studentBorrowerNumber = studentRecord.borrowerNumber;
-      if (!studentBorrowerNumber) {
-        res.status(400).json({
-          message:
-            "No borrower number found for your record. Please contact your institution admin.",
-        });
-        return;
+      if (studentBorrowerNumber) {
+        borrowerNumberForUser = studentBorrowerNumber;
       }
-
-      // validate borrowerNumber exists in the FinancialClearance collection for this institution
-      const accountExists = await FinancialClearance.findOne({
-        institution: studentRecord.institution,
-        borrowerNumber: studentBorrowerNumber,
-      });
-      if (!accountExists) {
-        res.status(400).json({
-          message:
-            "Borrower number not found in the accounts list. Please contact your institution admin.",
-        });
-        return;
-      }
-
-      // pass borrowerNumber to the user creation step
-      borrowerNumberForUser = studentBorrowerNumber;
     } else {
       // no studentId -> institution must have been provided and validated earlier
       const studentByEmail = await Student.findOne({
@@ -207,20 +186,9 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         return;
       }
 
-      // use borrowerNumber from the Student record
+      // use borrowerNumber from the Student record if available
       const studentBorrowerNumber = studentByEmail.borrowerNumber;
       if (studentBorrowerNumber) {
-        const accountExists = await FinancialClearance.findOne({
-          institution: institution._id,
-          borrowerNumber: studentBorrowerNumber,
-        });
-        if (!accountExists) {
-          res.status(400).json({
-            message:
-              "Borrower number not found in the accounts list. Please contact your institution admin.",
-          });
-          return;
-        }
         borrowerNumberForUser = studentBorrowerNumber;
       }
     }

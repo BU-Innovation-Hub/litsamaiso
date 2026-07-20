@@ -6,6 +6,7 @@ import { Institution } from "../models/Institution.js";
 import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 import { Student } from "../models/Student.js";
+import { lookupBranchCode } from "./branchCodeService.js";
 import type { Types } from "mongoose";
 import { getEmailBranding, sendEmail } from "../utils/email.js";
 import React from "react";
@@ -774,6 +775,25 @@ export const accountConfirmation = async (
 
   if (shouldSave) {
     await accountByBorrowerNo.save();
+  }
+
+  // Assign branch code based on bank name
+  if (!accountByBorrowerNo.branchCode) {
+    try {
+      const branchEntry = await lookupBranchCode(
+        accountByBorrowerNo.bankName,
+        input.institutionId,
+      );
+      if (branchEntry) {
+        accountByBorrowerNo.branchCode = branchEntry.branchCode;
+        await accountByBorrowerNo.save();
+      }
+    } catch (lookupErr) {
+      console.warn(
+        `[accountConfirmation] Branch code lookup failed for bankName=${accountByBorrowerNo.bankName}:`,
+        lookupErr,
+      );
+    }
   }
 
   const result: AccountConfirmationResult = {
