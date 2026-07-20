@@ -975,22 +975,6 @@ const AccountsPage: React.FC = () => {
           </div>
         )}
 
-        {role === 'InstitutionAdmin' && (
-          <div className="bg-white rounded-lg border border-border p-6 shadow-sm max-w-xl">
-            <Upload className="text-active mb-4" size={32} />
-            <h2 className="text-xl font-semibold text-primary-clr mb-2">Upload student records</h2>
-            <p className="text-muted-foreground mb-5">
-              Import students before they register. Required columns: studentId, email, name, surname, studentStatus.
-            </p>
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={(event) => handleUpload(event, 'students')}
-              className="block w-full text-sm"
-            />
-          </div>
-        )}
-
         {/* Finance upload panels and resolve controls are integrated into the table toolbar below */}
 
         {activeTab === 'records' && canViewReports && (
