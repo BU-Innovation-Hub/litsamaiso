@@ -264,7 +264,7 @@ export default function StudentIssues() {
                 <Button type="button" variant="outline" disabled={isUpdatingIssue} onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }}>Cancel</Button>
                 <Button type="submit" disabled={isUpdatingIssue} className="inline-flex items-center gap-2 bg-primary-clr hover:bg-black disabled:cursor-not-allowed disabled:opacity-60">
                   {isUpdatingIssue && <Loader className="h-4 w-4 animate-spin" />}
-                  {isUpdatingIssue ? 'Updating bank details...' : 'Update Bank Details'}
+                  {isUpdatingIssue ? 'Sending...' : 'Send for review'}
                 </Button>
               </div>
             </form>

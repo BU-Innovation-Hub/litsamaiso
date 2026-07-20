@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle, FileImage, Loader, RefreshCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
@@ -64,7 +64,6 @@ const AccountConfirmationPage: React.FC = () => {
   const [contractError, setContractError] = useState('');
   const [contractReason, setContractReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoggingIssue, setIsLoggingIssue] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -77,55 +76,41 @@ const AccountConfirmationPage: React.FC = () => {
     graduating: false,
   });
 
-  const ocrAttemptsRef = useRef<number>(0);
-  const MAX_OCR_ATTEMPTS = 2;
-
   // Confidence score is intentionally hidden from students (UX requirement).
 
-  const escalateToIssues = async () => {
-    const borrowerNumber = String(formData.borrowerNumber || '').trim();
-    const studentId = (user && (user as any).studentId) || '';
-    const bankName = String(formData.bankName || extracted?.bankName || 'Unavailable').trim();
-    const accountNumber = String(formData.accountNumber || extracted?.accountNumber || 'Unavailable').trim();
-
-    if (!borrowerNumber || !studentId) {
-      toast.error("Enter your borrower's number and ensure you are logged in");
-      return;
-    }
-
-    setIsLoggingIssue(true);
-    const proofUrls: string[] = [];
-    const file = (document.querySelector('input[type=file]') as HTMLInputElement | null)?.files?.[0];
-    if (file) {
-      try {
-        const fd = new FormData();
-        fd.append('file', file);
-        const upRes = await apiClient.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-        const upJson = upRes?.data;
-        if (upJson && upJson.url) proofUrls.push(upJson.url);
-      } catch (uErr) {
-        console.warn('Upload failed', uErr);
-      }
-    }
-
-    try {
-      const resp = await apiClient.post('/issues', { borrowerNumber, studentId, bankName, accountNumber, proofUrls });
-      toast.success(resp?.data?.message || 'Issue logged. Redirecting to Issues page.');
-      navigate('/issues', { replace: true, state: { issueLogged: true } });
-    } catch (err: unknown) {
-      toast.error(getApiErrorMessage(err, 'Could not log the issue'));
-    } finally {
-      setIsLoggingIssue(false);
-    }
+  type ConfirmationErrorPayload = {
+    message?: string;
+    error?: string;
+    needsProof?: boolean;
+    issue?: unknown;
+    issueCreated?: boolean;
+    redirectTo?: string;
+    status?: string;
   };
 
-  const handleRetry = async () => {
-    if (ocrAttemptsRef.current >= MAX_OCR_ATTEMPTS) {
-      toast.error("No more retries left. We'll log this as an issue.");
-      await escalateToIssues();
-      return;
+  const handleConfirmationError = (error: unknown): boolean => {
+    const responseData = (error as { response?: { data?: ConfirmationErrorPayload } } | undefined)?.response?.data;
+    const payload = responseData || (error as ConfirmationErrorPayload | undefined);
+
+    if (!payload || typeof payload !== 'object') {
+      return false;
     }
 
+    if (payload.issueCreated || payload.issue || payload.redirectTo === '/issues') {
+      toast.message(getApiErrorMessage(payload, 'Issue created. Redirecting to Issues for resolution.'));
+      navigate(payload.redirectTo || '/issues', { replace: true, state: { issueLogged: true } });
+      return true;
+    }
+
+    if (payload.needsProof || payload.status === 'mismatch') {
+      toast.error(getApiErrorMessage(payload, 'Account details do not match. Please try again.'));
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleRetry = () => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setExtracted(null);
@@ -224,15 +209,6 @@ const AccountConfirmationPage: React.FC = () => {
       return;
     }
 
-    const nextAttempt = ocrAttemptsRef.current + 1;
-    if (nextAttempt > MAX_OCR_ATTEMPTS) {
-      toast.error('Maximum OCR attempts reached. Logging this as an issue.');
-      await escalateToIssues();
-      return;
-    }
-
-    ocrAttemptsRef.current = nextAttempt;
-
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(URL.createObjectURL(file));
     void runOcr(file);
@@ -274,22 +250,7 @@ const AccountConfirmationPage: React.FC = () => {
           toast.success(data.message || 'Account confirmed');
           setIsConfirmed(true);
         } catch (err: unknown) {
-          // axios throws for non-2xx; inspect response for server-provided indicators
-          type RespErrShape = { needsProof?: boolean; issue?: unknown;[key: string]: unknown };
-          const respErr = (err as unknown as { response?: { data?: RespErrShape } } | undefined)?.response?.data;
-          if (respErr) {
-            if (respErr.needsProof) {
-              toast.message('Account mismatch. Redirected to Issues for resolution.');
-              navigate('/issues', { replace: true });
-              return;
-            }
-            if (respErr.issue) {
-              toast.message('Issue created. Redirected to Issues for resolution.');
-              navigate('/issues', { replace: true });
-              return;
-            }
-            toast.error(getApiErrorMessage(respErr, 'Account confirmation failed'));
-          } else {
+          if (!handleConfirmationError(err)) {
             toast.error(getApiErrorMessage(err, 'Account confirmation failed'));
           }
         }
@@ -299,7 +260,9 @@ const AccountConfirmationPage: React.FC = () => {
         setIsConfirmed(true);
       }
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Account confirmation failed'));
+      if (!handleConfirmationError(error)) {
+        toast.error(getApiErrorMessage(error, 'Account confirmation failed'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -445,7 +408,7 @@ const AccountConfirmationPage: React.FC = () => {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={!formData.bankName.trim() || !formData.accountNumber.trim() || isLoggingIssue}
+                        disabled={!formData.bankName.trim() || !formData.accountNumber.trim()}
                         onClick={() => {
                           applyExtractedDetails(extracted);
                           setReviewAccepted(true);
@@ -458,12 +421,11 @@ const AccountConfirmationPage: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        disabled={isLoggingIssue}
                         onClick={handleRetry}
                         className="inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        {isLoggingIssue ? <Loader size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
-                        {isLoggingIssue ? 'Logging issue...' : 'Retry upload'}
+                        <RefreshCcw size={16} />
+                        Retry upload
                       </button>
                     </div>
                   </div>
@@ -506,11 +468,11 @@ const AccountConfirmationPage: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || isExtracting || isLoggingIssue || !reviewAccepted}
+                  disabled={isSubmitting || isExtracting || !reviewAccepted}
                   className="flex w-full items-center justify-center gap-2 rounded-md bg-button py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {(isSubmitting || isLoggingIssue) && <Loader size={18} className="animate-spin" />}
-                  {isLoggingIssue ? 'Logging issue...' : isSubmitting ? 'Confirming...' : 'Confirm Account'}
+                  {isSubmitting && <Loader size={18} className="animate-spin" />}
+                  {isSubmitting ? 'Confirming...' : 'Confirm Account'}
                 </button>
               </form>
             </div>
