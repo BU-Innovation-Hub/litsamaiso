@@ -22,7 +22,17 @@ export const uploadStudents = async (req: Request, res: Response) => {
     }
 
     const result = await loadStudentsFromExcel(file.buffer, instId);
-    res.json({ message: "Import completed", result });
+    const totalRows = result.inserted + result.skipped + result.errors.length;
+    res.json({
+      message: "Import completed",
+      summary: {
+        totalRows,
+        inserted: result.inserted,
+        skipped: result.skipped,
+        failed: result.errors.length,
+      },
+      errors: result.errors,
+    });
   } catch (err: any) {
     res.status(500).json({ message: err.message || String(err) });
   }
