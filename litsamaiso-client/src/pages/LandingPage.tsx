@@ -253,7 +253,7 @@ const LandingPage = () => {
           </div>
         </nav>
 
-        <div className="relative z-10 flex justify-center items-center min-h-[calc(100vh-96px)] w-full pb-16 pt-10 md:px-8">
+        <div className="relative z-10 flex justify-center items-center min-h-[calc(100vh-96px)] w-full px-4 pb-16 pt-10 md:px-8">
           <motion.div
             className="mx-auto max-w-4xl text-center"
             initial="hidden"
@@ -261,11 +261,6 @@ const LandingPage = () => {
             variants={fadeUp}
             transition={{ duration: 0.7, ease: "easeOut" }}
           >
-            <div className="mx-auto mb-7 inline-flex sm:hidden items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-active-clr shadow-[0_0_22px_rgba(83,91,192,0.9)]" />
-              Student services, funding confirmations, and governance in one
-              place
-            </div>
 
             <h1 className="mx-auto max-w-4xl text-5xl font-semibold leading-[1.02] text-primary-clr md:text-7xl">
               Make academic support feel connected, and accountable.
