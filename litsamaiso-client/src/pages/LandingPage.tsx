@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
+import { ExplainerVideo } from "@/components/ExplainerVideo";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
@@ -297,6 +298,8 @@ const LandingPage = () => {
       </section>
 
       <main>
+        <ExplainerVideo />
+
         <section
           id="capabilities"
           className="relative overflow-hidden py-24 md:py-32"
