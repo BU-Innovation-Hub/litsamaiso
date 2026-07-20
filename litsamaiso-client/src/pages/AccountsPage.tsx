@@ -529,13 +529,13 @@ const AccountsPage: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-primary-clr">Accounts</h1>
           <p className="text-muted-foreground">
-            Confirm accounts, import records, and resolve payment issues.
+            Confirm student account details, import lists, and resolve payment issues.
           </p>
         </div>
 
         <div className="bg-white rounded-md shadow-sm">
           <nav className="flex items-center gap-6 px-4 py-3">
-            <button onClick={() => setActiveTab('records')} className={`text-sm font-medium ${activeTab === 'records' ? 'text-blue-600 border-b-2 border-blue-600 pb-2' : 'text-gray-600'}`}>Account Records</button>
+            <button onClick={() => setActiveTab('records')} className={`text-sm font-medium ${activeTab === 'records' ? 'text-blue-600 border-b-2 border-blue-600 pb-2' : 'text-gray-600'}`}>Account Details</button>
             <button onClick={() => setActiveTab('issues')} className={`text-sm font-medium ${activeTab === 'issues' ? 'text-blue-600 border-b-2 border-blue-600 pb-2' : 'text-gray-600'}`}>Issues Review</button>
           </nav>
         </div>
@@ -754,7 +754,7 @@ const AccountsPage: React.FC = () => {
               )}
 
               {role !== 'Student' && role !== 'Finance' && (
-                <p className="text-gray-600">Listing all student issues is not available on this API. Finance users can resolve issues by Student ID.</p>
+                <p className="text-gray-600">Issue lists are only available to selected finance teams. Finance users can resolve issues by Student ID.</p>
               )}
             </div>
           </div>
@@ -807,7 +807,7 @@ const AccountsPage: React.FC = () => {
                     <section className="px-5 py-5">
                       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-primary-clr">
                         <XCircle className="h-4 w-4" />
-                        Current record
+                        Current details
                       </div>
                       <dl className="space-y-3">
                         <div>
@@ -820,7 +820,7 @@ const AccountsPage: React.FC = () => {
                         </div>
                         {!selectedIssue.account && (
                           <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                            No matching account record was returned for this contract.
+                            We could not find account details for this contract.
                           </p>
                         )}
                       </dl>
@@ -899,7 +899,7 @@ const AccountsPage: React.FC = () => {
                     <button
                       disabled={Boolean(reviewingIssue)}
                       onClick={async () => {
-                        if (!confirm('Approve this issue and update account records?')) return;
+                        if (!confirm('Approve this issue and update the student's account details?')) return;
                         setReviewingIssue({ id: selectedIssue._id, action: 'approve' });
                         try {
                           await adminIssueService.approveIssue(selectedIssue._id);
@@ -1015,7 +1015,7 @@ const AccountsPage: React.FC = () => {
                 Confirm your NMDS account
               </h2>
               <p className="text-muted-foreground mb-5">
-                Submit your borrower's number and banking details for verification against your institution's records.
+                Submit your borrower's number and banking details so your institution can verify them.
               </p>
               <Link
                 to="/accounts/confirm"
@@ -1205,7 +1205,7 @@ const AccountsPage: React.FC = () => {
                         <h3 className="text-sm font-semibold text-gray-900">Student import</h3>
                       </div>
                       <p className="mt-1 text-sm text-gray-600">
-                        {studentImport.message || 'Importing student records'}: {studentImport.fileName}
+                        {studentImport.message || 'Importing student list'}: {studentImport.fileName}
                       </p>
                     </div>
                     <span className="text-sm font-semibold text-blue-800">{studentImport.percent}%</span>

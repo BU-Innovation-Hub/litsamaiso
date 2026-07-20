@@ -300,7 +300,7 @@ const AccountConfirmationPage: React.FC = () => {
           </p>
           {isWarning ? (
             <p className="mt-2 text-sm text-muted-foreground">
-              Your Finance Department has not yet uploaded your account records for confrimation. Please check back later.
+              Your Finance Department has not yet prepared your account details for confirmation. Please check back later.
             </p>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">

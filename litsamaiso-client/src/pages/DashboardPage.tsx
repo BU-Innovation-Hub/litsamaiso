@@ -224,7 +224,7 @@ const DashboardPage: React.FC = () => {
         {
           label: 'Total elections',
           value: elections.length,
-          description: 'Election records in scope',
+          description: 'Elections you can manage',
           icon: CalendarDays,
           tone: 'bg-indigo-50 text-active-clr',
         },
@@ -407,7 +407,7 @@ const DashboardPage: React.FC = () => {
         {!isLoading && kpiCards.length === 0 && (
           <EmptyState
             title="No dashboard metrics available"
-            description="Your role does not currently have dashboard metrics exposed by the API."
+            description="There are no dashboard insights available for your role yet."
           />
         )}
 
@@ -419,7 +419,7 @@ const DashboardPage: React.FC = () => {
                   {canViewReports ? 'Account status' : 'Workflow status'}
                 </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  {canViewReports ? 'Breakdown from account reports' : 'Current records available to this role'}
+                  {canViewReports ? 'Breakdown from account reports' : 'Current activity for your role'}
                 </p>
               </div>
               <ListChecks className="h-5 w-5 text-active-clr" aria-hidden="true" />
@@ -460,7 +460,7 @@ const DashboardPage: React.FC = () => {
               ) : (
                 <EmptyState
                   title="No status data to show"
-                  description="There are no API records available for this dashboard section yet."
+                  description="There is no activity to show in this section yet."
                 />
               )}
             </div>
@@ -470,9 +470,9 @@ const DashboardPage: React.FC = () => {
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
               <div>
                 <h2 className="text-lg font-bold text-primary-clr">
-                  {canViewAdminIssues ? 'Issue queue' : canViewStudentActions ? 'Your issues' : 'Recent records'}
+                  {canViewAdminIssues ? 'Issue queue' : canViewStudentActions ? 'Your issues' : 'Recent activity'}
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">Latest records from available endpoints</p>
+                <p className="mt-1 text-sm text-slate-500">Latest updates available to you</p>
               </div>
               <FileWarning className="h-5 w-5 text-active-clr" aria-hidden="true" />
             </div>
@@ -527,8 +527,8 @@ const DashboardPage: React.FC = () => {
                 </div>
               ) : (
                 <EmptyState
-                  title="No recent records"
-                  description="This section will populate when matching records are returned by the API."
+                  title="No recent activity"
+                  description="This section will update when there is recent activity to show."
                 />
               )}
             </div>
