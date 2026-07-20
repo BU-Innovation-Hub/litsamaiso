@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "../hooks/useAuth";
 import { getApiErrorMessage } from "../utils/apiError";
+import PasswordInput from "../components/ui/PasswordInput";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -88,9 +89,8 @@ const LoginPage: React.FC = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Password</label>
-              <input
+              <PasswordInput
                 name="password"
-                type="password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"

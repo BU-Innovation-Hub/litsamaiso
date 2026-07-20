@@ -1,19 +1,24 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, CheckCircle, ChevronLeft, ChevronRight, Clock, CreditCard, Eye, FileText, Filter, Image as ImageIcon, Receipt, RefreshCcw, Search, ShieldCheck, Upload, X, XCircle, Download, Edit, Loader } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle, ChevronLeft, ChevronRight, Clock, CreditCard, Eye, FileText, Filter, Image as ImageIcon, Receipt, RefreshCcw, Search, ShieldCheck, X, XCircle, Download, Edit, Loader } from 'lucide-react';
 import exportData from '../exporters';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { accountService, type AccountReports } from '../services/accountService';
 import { institutionService } from '../services/institutionService';
-import { studentService } from '../services/studentService';
+import { studentService, type StudentImportProgress } from '../services/studentService';
 import { issueService } from '../services/issueService';
 import { adminIssueService } from '../services/adminIssueService';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getRoleName } from '../utils/userDisplay';
 import type { Account, Institution } from '../types';
 import Lightbox from '../components/Lightbox';
+
+type StudentImportState = StudentImportProgress & {
+  fileName: string;
+  status: 'running' | 'completed' | 'error';
+};
 
 const AccountsPage: React.FC = () => {
   const { user } = useAuth();
@@ -42,6 +47,7 @@ const AccountsPage: React.FC = () => {
   const accountsFileRef = useRef<HTMLInputElement | null>(null);
   const paidFileRef = useRef<HTMLInputElement | null>(null);
   const studentsFileRef = useRef<HTMLInputElement | null>(null);
+  const [studentImport, setStudentImport] = useState<StudentImportState | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [issueList, setIssueList] = useState<any[] | null>(null);
@@ -184,12 +190,50 @@ const AccountsPage: React.FC = () => {
     if (!file) return;
 
     try {
+      if (uploadType === 'students') {
+        setStudentImport({
+          fileName: file.name,
+          status: 'running',
+          processed: 0,
+          total: 0,
+          inserted: 0,
+          skipped: 0,
+          errors: 0,
+          percent: 0,
+          message: 'Preparing student import',
+          type: 'started',
+        });
+      }
+
       const response =
         uploadType === 'accounts'
           ? await accountService.uploadAccounts(file)
           : uploadType === 'paid'
             ? await accountService.uploadPaidStudents(file)
-            : await studentService.uploadStudents(file);
+            : await studentService.uploadStudents(file, (progress) => {
+              setStudentImport({
+                ...progress,
+                fileName: file.name,
+                status: progress.type === 'completed' ? 'completed' : 'running',
+                percent: Math.max(0, Math.min(100, progress.percent || 0)),
+              });
+            });
+
+      if (uploadType === 'students') {
+        setStudentImport((current) => ({
+          fileName: file.name,
+          status: 'completed',
+          processed: response.result?.total || current?.processed || current?.total || 0,
+          total: response.result?.total || current?.total || current?.processed || 0,
+          inserted: response.result?.inserted || current?.inserted || 0,
+          skipped: response.result?.skipped || current?.skipped || 0,
+          errors: response.result?.errors?.length || current?.errors || 0,
+          percent: 100,
+          message: response.message || 'Import completed',
+          type: 'completed',
+        }));
+      }
+
       toast.success(response.message || 'Upload completed');
       if (canViewReports) {
         setReports(await accountService.getReports({
@@ -197,7 +241,25 @@ const AccountsPage: React.FC = () => {
         }));
         await loadAccountRows();
       }
+
+      if (uploadType === 'students') {
+        setStudentImport(null);
+      }
     } catch (error: unknown) {
+      if (uploadType === 'students') {
+        setStudentImport((current) => ({
+          fileName: file.name,
+          status: 'error',
+          processed: current?.processed || 0,
+          total: current?.total || 0,
+          inserted: current?.inserted || 0,
+          skipped: current?.skipped || 0,
+          errors: current?.errors || 0,
+          percent: current?.percent || 0,
+          message: getApiErrorMessage(error, 'Upload failed'),
+          type: 'error',
+        }));
+      }
       toast.error(getApiErrorMessage(error, 'Upload failed'));
     } finally {
       event.target.value = '';
@@ -975,22 +1037,6 @@ const AccountsPage: React.FC = () => {
           </div>
         )}
 
-        {role === 'InstitutionAdmin' && (
-          <div className="bg-white rounded-lg border border-border p-6 shadow-sm max-w-xl">
-            <Upload className="text-active mb-4" size={32} />
-            <h2 className="text-xl font-semibold text-primary-clr mb-2">Upload student records</h2>
-            <p className="text-muted-foreground mb-5">
-              Import students before they register. Required columns: studentId, email, name, surname, studentStatus.
-            </p>
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={(event) => handleUpload(event, 'students')}
-              className="block w-full text-sm"
-            />
-          </div>
-        )}
-
         {/* Finance upload panels and resolve controls are integrated into the table toolbar below */}
 
         {activeTab === 'records' && canViewReports && (
@@ -1006,6 +1052,31 @@ const AccountsPage: React.FC = () => {
 
                 <div className="flex items-center gap-3">
                   <span className="rounded bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">{accounts.length} loaded</span>
+
+                  <div>
+                    <button type="button" onClick={() => accountsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white">Import Accounts</button>
+                    <input ref={accountsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'accounts')} className="hidden" />
+                  </div>
+                  <div>
+                    <button type="button" onClick={() => paidFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Paid</button>
+                    <input ref={paidFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'paid')} className="hidden" />
+                  </div>
+
+                  {isAppAdmin || role === 'InstitutionAdmin' ? (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => studentsFileRef.current?.click()}
+                        disabled={studentImport?.status === 'running'}
+                        className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                      >
+                        {studentImport?.status === 'running' && <Loader className="h-4 w-4 animate-spin" />}
+                        {studentImport?.status === 'running' ? 'Importing...' : 'Import Students'}
+                      </button>
+                      <input ref={studentsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'students')} className="hidden" />
+                    </div>
+                  ) : null}
+
                   <div className="relative">
                     <button onClick={() => setShowExportMenu((s) => !s)} className="inline-flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold">
                       <Download className="w-4 h-4" /> Export
@@ -1045,23 +1116,48 @@ const AccountsPage: React.FC = () => {
                     )}
                   </div>
 
-                  <div>
-                    <button onClick={() => accountsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white">Import Accounts</button>
-                    <input ref={accountsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'accounts')} className="hidden" />
-                  </div>
-                  <div>
-                    <button onClick={() => paidFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Paid</button>
-                    <input ref={paidFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'paid')} className="hidden" />
-                  </div>
-                  {isAppAdmin || role === 'InstitutionAdmin' ? (
-                    <div>
-                      <button onClick={() => studentsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Students</button>
-                      <input ref={studentsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'students')} className="hidden" />
-                    </div>
-                  ) : null}
                 </div>
               </div>
             </div>
+
+            {studentImport && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm">
+                <div className="w-full max-w-lg rounded-2xl border border-blue-100 bg-white p-5 shadow-2xl">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {studentImport.status === 'running' ? (
+                          <Loader className="h-4 w-4 animate-spin text-blue-700" />
+                        ) : studentImport.status === 'completed' ? (
+                          <CheckCircle className="h-4 w-4 text-green-700" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-red-700" />
+                        )}
+                        <h3 className="text-sm font-semibold text-gray-900">Student import</h3>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {studentImport.message || 'Importing student records'}: {studentImport.fileName}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-blue-800">{studentImport.percent}%</span>
+                  </div>
+                  <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        studentImport.status === 'error' ? 'bg-red-600' : 'bg-blue-600'
+                      }`}
+                      style={{ width: `${studentImport.percent}%` }}
+                    />
+                  </div>
+                  <div className="mt-4 grid gap-2 text-xs text-gray-700 sm:grid-cols-4">
+                    <span>Processed {studentImport.processed}{studentImport.total ? `/${studentImport.total}` : ''}</span>
+                    <span>Inserted {studentImport.inserted}</span>
+                    <span>Skipped {studentImport.skipped}</span>
+                    <span>Errors {studentImport.errors}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4 p-6">
               <div className="relative">

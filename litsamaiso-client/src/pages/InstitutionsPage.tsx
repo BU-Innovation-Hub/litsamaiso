@@ -6,6 +6,7 @@ import { institutionService, type InstitutionUsersResponse } from '../services/i
 import { userService } from '../services/userService';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getInstitutionName, getRoleName } from '../utils/userDisplay';
+import PasswordInput from '../components/ui/PasswordInput';
 
 const emptyForm = {
   name: '',
@@ -335,8 +336,7 @@ const InstitutionsPage: React.FC = () => {
                   required
                   className="w-full rounded-md border border-gray-300 px-3 py-2"
                 />
-                <input
-                  type="password"
+                <PasswordInput
                   value={form.adminPassword}
                   onChange={(event) => setForm((prev) => ({ ...prev, adminPassword: event.target.value }))}
                   placeholder="Admin password"
@@ -344,8 +344,7 @@ const InstitutionsPage: React.FC = () => {
                   minLength={6}
                   className="w-full rounded-md border border-gray-300 px-3 py-2"
                 />
-                <input
-                  type="password"
+                <PasswordInput
                   value={form.confirmAdminPassword}
                   onChange={(event) => setForm((prev) => ({ ...prev, confirmAdminPassword: event.target.value }))}
                   placeholder="Confirm admin password"
@@ -616,8 +615,7 @@ const InstitutionsPage: React.FC = () => {
                         <option value="Finance">Finance</option>
                         <option value="SAAD">SAAD</option>
                       </select>
-                      <input
-                        type="password"
+                      <PasswordInput
                         value={roleUserForm.password}
                         onChange={(event) => setRoleUserForm((prev) => ({ ...prev, password: event.target.value }))}
                         placeholder="Password"
@@ -625,8 +623,7 @@ const InstitutionsPage: React.FC = () => {
                         minLength={6}
                         className="rounded-md border border-gray-300 px-3 py-2"
                       />
-                      <input
-                        type="password"
+                      <PasswordInput
                         value={roleUserForm.confirmPassword}
                         onChange={(event) => setRoleUserForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
                         placeholder="Confirm password"
@@ -846,15 +843,13 @@ const InstitutionsPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-gray-900">Reset password</h2>
             <p className="mt-1 text-sm text-gray-500">{passwordUserTarget.email}</p>
             <div className="mt-5 space-y-4">
-              <input
-                type="password"
+              <PasswordInput
                 value={passwordUserForm.password}
                 onChange={(event) => setPasswordUserForm((prev) => ({ ...prev, password: event.target.value }))}
                 placeholder="New password"
                 className="w-full rounded-md border border-gray-300 px-3 py-2"
               />
-              <input
-                type="password"
+              <PasswordInput
                 value={passwordUserForm.confirmPassword}
                 onChange={(event) => setPasswordUserForm((prev) => ({ ...prev, confirmPassword: event.target.value }))}
                 placeholder="Confirm password"

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { authService } from '../services/authService';
+import PasswordInput from '../components/ui/PasswordInput';
 
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ const ResetPasswordPage: React.FC = () => {
       const resp = await authService.resetPassword(email, token, password);
       toast.success(resp?.message || 'Password updated successfully');
       navigate('/login');
-    } catch (err: unknown) {
+    } catch {
       toast.error('Failed to reset password');
     } finally {
       setLoading(false);
@@ -55,12 +56,12 @@ const ResetPasswordPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-medium">New password</label>
-              <input name="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter new password" required />
+              <PasswordInput name="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter new password" required />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Confirm password</label>
-              <input name="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm new password" required />
+              <PasswordInput name="confirm" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm new password" required />
             </div>
 
             {loading ? (

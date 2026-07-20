@@ -185,6 +185,10 @@ button:disabled,
   box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.35);
 }
 
+.auth-right .password-input input {
+  padding-right: 2.75rem;
+}
+
 .auth-right input:disabled {
   background-color: #f3f4f6;
   color: #6b7280;
