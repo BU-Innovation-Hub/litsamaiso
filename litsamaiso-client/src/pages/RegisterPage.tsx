@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage } from '../utils/apiError';
+import PasswordInput from '../components/ui/PasswordInput';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -103,15 +104,7 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Register As</label>
-              <input
-                type="text"
-                value="Student"
-                disabled
-              />
-            </div>
-
+            
             <div className="space-y-2">
               <label className="text-sm font-medium">Email Address</label>
               <input
@@ -148,9 +141,8 @@ const RegisterPage: React.FC = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Password</label>
-              <input
+              <PasswordInput
                 name="password"
-                type="password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"
@@ -160,9 +152,8 @@ const RegisterPage: React.FC = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Confirm Password</label>
-              <input
+              <PasswordInput
                 name="confirmPassword"
-                type="password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="Confirm your password"

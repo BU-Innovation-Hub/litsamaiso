@@ -7,6 +7,7 @@ interface LoadResult {
   inserted: number;
   skipped: number;
   errors: string[];
+  total: number;
 }
 
 const REQUIRED_COLUMNS = [
@@ -17,9 +18,19 @@ const REQUIRED_COLUMNS = [
   "studentstatus",
 ];
 
+export interface StudentImportProgress {
+  processed: number;
+  total: number;
+  inserted: number;
+  skipped: number;
+  errors: number;
+  percent: number;
+}
+
 export const loadStudentsFromExcel = async (
   fileBuffer: Buffer,
   institutionId: Types.ObjectId,
+  onProgress?: (progress: StudentImportProgress) => void,
 ): Promise<LoadResult> => {
   const workbook = XLSX.read(fileBuffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
@@ -48,6 +59,21 @@ export const loadStudentsFromExcel = async (
   let inserted = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const total = rows.length;
+  const batchSize = 25;
+
+  const emitProgress = (processed: number) => {
+    onProgress?.({
+      processed,
+      total,
+      inserted,
+      skipped,
+      errors: errors.length,
+      percent: total === 0 ? 100 : Math.round((processed / total) * 100),
+    });
+  };
+
+  emitProgress(0);
 
   for (const [idx, row] of rows.entries()) {
     try {
@@ -99,7 +125,12 @@ export const loadStudentsFromExcel = async (
     } catch (err: any) {
       errors.push(`Row ${idx + 2}: ${err.message || String(err)}`);
     }
+
+    const processed = idx + 1;
+    if (processed % batchSize === 0 || processed === total) {
+      emitProgress(processed);
+    }
   }
 
-  return { inserted, skipped, errors };
+  return { inserted, skipped, errors, total };
 };
