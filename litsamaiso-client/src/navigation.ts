@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarDays,
   ClipboardCheck,
+  GitBranch,
   History,
   LayoutDashboard,
   MessageSquareWarning,
@@ -83,6 +84,13 @@ export const navigationItems: NavigationItem[] = [
     href: '/audit-logs',
     roles: ['AppAdmin'],
     icon: History,
+  },
+  {
+    id: 'branch-codes',
+    label: 'Branch Codes',
+    href: '/branch-codes',
+    roles: roleAccess.branchCodes,
+    icon: GitBranch,
   },
 ];
 

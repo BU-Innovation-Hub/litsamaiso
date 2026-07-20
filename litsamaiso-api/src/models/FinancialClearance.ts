@@ -14,6 +14,7 @@ export interface FinancialClearanceDocument {
   institution: Types.ObjectId;
   confirmedBy?: Types.ObjectId;
   confirmationDate?: Date;
+  branchCode?: string;
 }
 
 const financialClearanceSchema = new Schema<FinancialClearanceDocument>(
@@ -40,6 +41,7 @@ const financialClearanceSchema = new Schema<FinancialClearanceDocument>(
     },
     confirmedBy: { type: Schema.Types.ObjectId, ref: "Student" },
     confirmationDate: { type: Date },
+    branchCode: { type: String, trim: true },
   },
   {
     timestamps: true,
