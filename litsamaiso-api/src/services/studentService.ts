@@ -15,6 +15,7 @@ const REQUIRED_COLUMNS = [
   "name",
   "surname",
   "studentstatus",
+  "borrowernumber",
 ];
 
 export const loadStudentsFromExcel = async (
@@ -49,10 +50,14 @@ export const loadStudentsFromExcel = async (
   let skipped = 0;
   const errors: string[] = [];
 
+  const VALUE_REQUIRED_COLUMNS = REQUIRED_COLUMNS.filter(
+    (c) => c !== "borrowernumber",
+  );
+
   for (const [idx, row] of rows.entries()) {
     try {
-      // ensure all required fields have a value
-      const hasAll = REQUIRED_COLUMNS.every((c) => {
+      // ensure all value-required fields have a value (borrowernumber is optional per-row)
+      const hasAll = VALUE_REQUIRED_COLUMNS.every((c) => {
         const v = row[c];
         return v !== null && v !== undefined && String(v).trim() !== "";
       });
@@ -65,6 +70,13 @@ export const loadStudentsFromExcel = async (
       const email = String(row["email"]).trim().toLowerCase();
       const name = String(row["name"]).trim();
       const surname = String(row["surname"]).trim();
+      const borrowerNumberRaw = row["borrowernumber"];
+      const borrowerNumber =
+        borrowerNumberRaw !== null &&
+        borrowerNumberRaw !== undefined &&
+        String(borrowerNumberRaw).trim() !== ""
+          ? String(borrowerNumberRaw).trim()
+          : undefined;
       const studentStatusRaw = row["studentstatus"];
       const sval =
         studentStatusRaw === null || studentStatusRaw === undefined
@@ -87,14 +99,18 @@ export const loadStudentsFromExcel = async (
         continue;
       }
 
-      await Student.create({
+      const doc: Record<string, any> = {
         studentId,
         email,
         name,
         surname,
         studentStatus,
         institution: institutionId,
-      });
+      };
+      if (borrowerNumber) {
+        doc.borrowerNumber = borrowerNumber;
+      }
+      await Student.create(doc);
       inserted += 1;
     } catch (err: any) {
       errors.push(`Row ${idx + 2}: ${err.message || String(err)}`);

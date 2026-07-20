@@ -54,7 +54,6 @@ export interface RegisterRequest {
   institutionName?: string;
   institutionEmail?: string;
   studentId?: string;
-  borrowerNumber?: string;
   faceImageBase64?: string;
   faceDescriptor?: number[];
   faceImageUrl?: string;

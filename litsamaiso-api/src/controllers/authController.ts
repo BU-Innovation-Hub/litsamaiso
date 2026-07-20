@@ -46,7 +46,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionName,
     institutionEmail,
     studentId,
-    borrowerNumber,
     studentCardUrl,
     faceImageBase64,
     faceDescriptor,
@@ -59,7 +58,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionName?: string;
     institutionEmail?: string;
     studentId?: string;
-    borrowerNumber?: string;
     studentCardUrl?: string;
     faceImageBase64?: string;
     faceDescriptor?: number[];
@@ -144,6 +142,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  let borrowerNumberForUser: string | undefined;
 
   // If registering as a Student, validate against records loaded by the InstitutionAdmin
   if (roleName === "student") {
@@ -169,26 +168,31 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         return;
       }
 
-      // validate borrowerNumber exists in the FinancialClearance collection for this institution
-      if (borrowerNumber) {
-        const accountExists = await FinancialClearance.findOne({
-          institution: studentRecord.institution,
-          borrowerNumber: String(borrowerNumber).trim(),
+      // use borrowerNumber from the Student record (imported via spreadsheet)
+      const studentBorrowerNumber = studentRecord.borrowerNumber;
+      if (!studentBorrowerNumber) {
+        res.status(400).json({
+          message:
+            "No borrower number found for your record. Please contact your institution admin.",
         });
-        if (!accountExists) {
-          res.status(400).json({
-            message:
-              "Borrower number not found in the accounts list. Please check and try again.",
-          });
-          return;
-        }
-
-        // save borrowerNumber to the student record
-        await Student.findOneAndUpdate(
-          { studentId },
-          { borrowerNumber: String(borrowerNumber).trim() },
-        );
+        return;
       }
+
+      // validate borrowerNumber exists in the FinancialClearance collection for this institution
+      const accountExists = await FinancialClearance.findOne({
+        institution: studentRecord.institution,
+        borrowerNumber: studentBorrowerNumber,
+      });
+      if (!accountExists) {
+        res.status(400).json({
+          message:
+            "Borrower number not found in the accounts list. Please contact your institution admin.",
+        });
+        return;
+      }
+
+      // pass borrowerNumber to the user creation step
+      borrowerNumberForUser = studentBorrowerNumber;
     } else {
       // no studentId -> institution must have been provided and validated earlier
       const studentByEmail = await Student.findOne({
@@ -202,7 +206,23 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         });
         return;
       }
-      // if they later provide studentId it will be checked; here we accept matching email record
+
+      // use borrowerNumber from the Student record
+      const studentBorrowerNumber = studentByEmail.borrowerNumber;
+      if (studentBorrowerNumber) {
+        const accountExists = await FinancialClearance.findOne({
+          institution: institution._id,
+          borrowerNumber: studentBorrowerNumber,
+        });
+        if (!accountExists) {
+          res.status(400).json({
+            message:
+              "Borrower number not found in the accounts list. Please contact your institution admin.",
+          });
+          return;
+        }
+        borrowerNumberForUser = studentBorrowerNumber;
+      }
     }
   }
 
@@ -227,8 +247,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     userData.studentId = studentId;
   }
 
-  if (borrowerNumber) {
-    userData.borrowerNumber = String(borrowerNumber).trim();
+  if (borrowerNumberForUser) {
+    userData.borrowerNumber = borrowerNumberForUser;
   }
 
   if (studentCardUrl) {
