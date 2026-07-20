@@ -3,7 +3,7 @@ import { Institution } from "../models/Institution.js";
 import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
 import { Student } from "../models/Student.js";
-import { Account } from "../models/Account.js";
+import { FinancialClearance } from "../models/FinancialClearance.js";
 import { Election } from "../models/Election.js";
 import { Candidate } from "../models/Candidate.js";
 import { Position } from "../models/Position.js";
@@ -354,7 +354,7 @@ export const deleteInstitution = async (req: Request, res: Response): Promise<vo
     // Delete users, students, accounts belonging to institution
     const usersRes = await User.deleteMany({ institution: instId } as any);
     const studentsRes = await Student.deleteMany({ institution: instId } as any);
-    const accountsRes = await Account.deleteMany({ institution: instId } as any);
+    const accountsRes = await FinancialClearance.deleteMany({ institution: instId } as any);
 
     // Find elections for this institution and delete related election data
     const elections = await Election.find({ institution: instId } as any).select('_id').lean();

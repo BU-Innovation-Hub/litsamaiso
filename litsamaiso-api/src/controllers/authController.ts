@@ -7,6 +7,7 @@ import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 import { Institution } from "../models/Institution.js";
 import { Student } from "../models/Student.js";
+import { FinancialClearance } from "../models/FinancialClearance.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { createHash, randomBytes } from "crypto";
 
@@ -45,6 +46,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionName,
     institutionEmail,
     studentId,
+    borrowerNumber,
     studentCardUrl,
     faceImageBase64,
     faceDescriptor,
@@ -57,6 +59,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionName?: string;
     institutionEmail?: string;
     studentId?: string;
+    borrowerNumber?: string;
     studentCardUrl?: string;
     faceImageBase64?: string;
     faceDescriptor?: number[];
@@ -165,6 +168,27 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         });
         return;
       }
+
+      // validate borrowerNumber exists in the FinancialClearance collection for this institution
+      if (borrowerNumber) {
+        const accountExists = await FinancialClearance.findOne({
+          institution: studentRecord.institution,
+          borrowerNumber: String(borrowerNumber).trim(),
+        });
+        if (!accountExists) {
+          res.status(400).json({
+            message:
+              "Borrower number not found in the accounts list. Please check and try again.",
+          });
+          return;
+        }
+
+        // save borrowerNumber to the student record
+        await Student.findOneAndUpdate(
+          { studentId },
+          { borrowerNumber: String(borrowerNumber).trim() },
+        );
+      }
     } else {
       // no studentId -> institution must have been provided and validated earlier
       const studentByEmail = await Student.findOne({
@@ -188,6 +212,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     role: typeof roleDoc._id;
     institution: typeof institution._id;
     studentId?: string;
+    borrowerNumber?: string;
     studentCardUrl?: string;
     faceDescriptor?: number[];
     faceImageUrl?: string;
@@ -200,6 +225,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   if (studentId) {
     userData.studentId = studentId;
+  }
+
+  if (borrowerNumber) {
+    userData.borrowerNumber = String(borrowerNumber).trim();
   }
 
   if (studentCardUrl) {
@@ -224,6 +253,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       role: roleDoc.name,
       institution: institution._id,
       studentId: user.studentId,
+      borrowerNumber: user.borrowerNumber,
       studentCardUrl: user.studentCardUrl,
       faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,

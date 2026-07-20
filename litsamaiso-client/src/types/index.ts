@@ -54,6 +54,7 @@ export interface RegisterRequest {
   institutionName?: string;
   institutionEmail?: string;
   studentId?: string;
+  borrowerNumber?: string;
   faceImageBase64?: string;
   faceDescriptor?: number[];
   faceImageUrl?: string;
@@ -172,7 +173,7 @@ export interface ResultPositionDetail {
 export interface Account {
   _id: string;
   fullnames: string;
-  contractNumber: string;
+  borrowerNumber: string;
   accountNumber?: string;
   bankName?: string;
   batchNumber?: number;

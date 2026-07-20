@@ -149,10 +149,10 @@ export async function sendIssueStatusToStudent(issue: any, status: "approved" | 
     let text = "";
     if (status === "approved") {
       subject = "Your account verification has been approved";
-      text = `Good news — your submitted details for contract ${issue.contractNumber || ""} have been verified and approved by the finance team.`;
+      text = `Good news — your submitted details for contract ${issue.borrowerNumber || ""} have been verified and approved by the finance team.`;
     } else {
       subject = "Action required: Issue with your account verification";
-      text = `The finance team reviewed your submitted details for contract ${issue.contractNumber || ""} and could not approve them.`;
+      text = `The finance team reviewed your submitted details for contract ${issue.borrowerNumber || ""} and could not approve them.`;
       if (reason) text += `\n\nReason: ${reason}`;
     }
 

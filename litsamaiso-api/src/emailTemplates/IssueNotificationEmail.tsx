@@ -4,7 +4,7 @@ import { Text, Link, Row, Column } from "@react-email/components";
 
 type Issue = {
   _id?: string;
-  contractNumber?: string;
+  borrowerNumber?: string;
   studentId?: string;
   bankName?: string;
   accountNumber?: string;
@@ -27,7 +27,7 @@ export default function IssueNotificationEmail({
   logoUrl,
   accentColor = "#535BC0",
 }: Props) {
-  const title = `Issue submitted — ${issue.contractNumber || "Unknown"}`;
+  const title = `Issue submitted — ${issue.borrowerNumber || "Unknown"}`;
 
   const textColor = "#f1f5f9";
   const headingStyle: React.CSSProperties = {
@@ -42,7 +42,7 @@ export default function IssueNotificationEmail({
       logoUrl={logoUrl}
       appName={appName}
       title={title}
-      preheader={`A student submitted an account verification issue for ${issue.contractNumber || "a contract"}.`}
+      preheader={`A student submitted an account verification issue for ${issue.borrowerNumber || "a contract"}.`}
       ctaText="Review Issue"
       ctaUrl={adminLink}
       accentColor={accentColor}
@@ -55,8 +55,8 @@ export default function IssueNotificationEmail({
 
       <Row style={{ marginTop: 8, marginBottom: 8 }}>
         <Column>
-          <Text style={{ color: "#94a3b8", fontSize: 13, margin: "6px 0" }}>Contract</Text>
-          <Text style={{ color: textColor, fontSize: 15, margin: 0 }}>{issue.contractNumber || "-"}</Text>
+          <Text style={{ color: "#94a3b8", fontSize: 13, margin: "6px 0" }}>Borrower Number</Text>
+          <Text style={{ color: textColor, fontSize: 15, margin: 0 }}>{issue.borrowerNumber || "-"}</Text>
         </Column>
         <Column>
           <Text style={{ color: "#94a3b8", fontSize: 13, margin: "6px 0" }}>Student ID</Text>

@@ -5,11 +5,13 @@ import {
   uploadAccounts,
   confirmAccount,
   getConfirmationStatus,
+  validateBorrowerNumber,
   getStudentAccounts,
   resolveAccountIssue,
   financeResolveAccountIssue,
   loadPayedStudents,
   updateAccount,
+  exportAccountRecords,
 } from "../controllers/accountController.js";
 
 const router = Router();
@@ -26,6 +28,7 @@ router.post(
 
 router.post("/confirm", requireAuth, requireRole("Student"), upload.single("document"), confirmAccount);
 router.get("/status", requireAuth, requireRole("Student"), getConfirmationStatus);
+router.get("/validate-contract", requireAuth, requireRole("Student"), validateBorrowerNumber);
 // Compatibility alias used by the client: /accounts/confirmation-status
 router.get("/confirmation-status", requireAuth, requireRole("Student"), getConfirmationStatus);
 
@@ -53,6 +56,13 @@ router.post(
   requireRole("Finance"),
   upload.single("file"),
   loadPayedStudents,
+);
+
+router.get(
+  "/export",
+  requireAuth,
+  requireRole(["AppAdmin", "InstitutionAdmin", "Finance"]),
+  exportAccountRecords,
 );
 
 // List accounts - available to Finance, InstitutionAdmin and AppAdmin

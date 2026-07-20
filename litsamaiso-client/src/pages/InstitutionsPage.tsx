@@ -317,7 +317,7 @@ const InstitutionsPage: React.FC = () => {
               className="w-full rounded-md border border-gray-300 px-3 py-2"
             />
             {!editingId && (
-              <div className="space-y-3 border-t pt-4">
+              <div className="space-y-3 border-t border-gray-300 pt-4">
                 <p className="text-sm font-semibold text-gray-700">
                   First Institution Admin
                 </p>
@@ -379,7 +379,7 @@ const InstitutionsPage: React.FC = () => {
           </form>
 
           <div className="rounded-lg bg-white shadow">
-            <div className="border-b px-6 py-4">
+            <div className="px-6 border-b border-gray-200 py-4">
               <h2 className="font-semibold text-gray-900">Institution Records</h2>
             </div>
             <div className="divide-y divide-gray-200">
@@ -397,11 +397,10 @@ const InstitutionsPage: React.FC = () => {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="text-sm text-gray-500">{institution.email}</p>
                           <span
-                            className={`rounded px-2 py-0.5 text-xs font-semibold ${
-                              institution.locked
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-green-100 text-green-700'
-                            }`}
+                            className={`rounded px-2 py-0.5 text-xs font-semibold ${institution.locked
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-green-100 text-green-700'
+                              }`}
                           >
                             {institution.locked ? 'Locked' : 'Active'}
                           </span>
@@ -426,9 +425,8 @@ const InstitutionsPage: React.FC = () => {
                         className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
                       >
                         <ChevronUp
-                          className={`h-5 w-5 transition-transform ${
-                            openActionsId === institution._id ? 'rotate-180' : ''
-                          }`}
+                          className={`h-5 w-5 transition-transform ${openActionsId === institution._id ? 'rotate-180' : ''
+                            }`}
                         />
                       </button>
 
@@ -470,9 +468,8 @@ const InstitutionsPage: React.FC = () => {
                               setLockTarget(institution);
                               setLockReason(institution.lockedReason || '');
                             }}
-                            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-gray-50 ${
-                              institution.locked ? 'text-green-700' : 'text-amber-700'
-                            }`}
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-gray-50 ${institution.locked ? 'text-green-700' : 'text-amber-700'
+                              }`}
                           >
                             {institution.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                             {institution.locked ? 'Unlock' : 'Lock'}
@@ -537,9 +534,8 @@ const InstitutionsPage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleLock}
-                className={`rounded-md px-4 py-2 font-semibold text-white ${
-                  lockTarget.locked ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'
-                }`}
+                className={`rounded-md px-4 py-2 font-semibold text-white ${lockTarget.locked ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
               >
                 {lockTarget.locked ? 'Unlock' : 'Lock'}
               </button>
@@ -686,105 +682,104 @@ const InstitutionsPage: React.FC = () => {
                 )}
               </div>
 
-            <div className="overflow-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Role</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Institution</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Student ID</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 bg-white">
-                  {usersLoading ? (
+              <div className="overflow-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading users...</td>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">User</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Role</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Institution</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Student ID</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
                     </tr>
-                  ) : !institutionUsers || institutionUsers.users.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No users found</td>
-                    </tr>
-                  ) : (
-                    institutionUsers.users.map((user: User) => (
-                      <tr key={user.id || user._id}>
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
-                          <p className="text-sm text-gray-500">{user.email}</p>
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                          {getRoleName(user) || '-'}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                          {getInstitutionName(user) || '-'}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                          {user.studentId || '-'}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                          <div className="relative inline-block text-left">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setOpenUserActionsId((current) =>
-                                  current === getUserId(user) ? '' : getUserId(user),
-                                )
-                              }
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
-                              aria-label={`Actions for ${user.email}`}
-                              aria-expanded={openUserActionsId === getUserId(user)}
-                            >
-                              <ChevronUp
-                                className={`h-4 w-4 transition-transform ${
-                                  openUserActionsId === getUserId(user) ? 'rotate-180' : ''
-                                }`}
-                              />
-                            </button>
-
-                            {openUserActionsId === getUserId(user) && (
-                              <div className="absolute right-0 top-10 z-30 w-48 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-left shadow-lg">
-                                <button
-                                  type="button"
-                                  onClick={() => beginEditUser(user)}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                  Edit user
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenUserActionsId('');
-                                    setPasswordUserTarget(user);
-                                    setPasswordUserForm({ password: '', confirmPassword: '' });
-                                  }}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                                >
-                                  <KeyRound className="h-4 w-4" />
-                                  Reset password
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setOpenUserActionsId('');
-                                    setDeleteUserTarget(user);
-                                  }}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                  Delete user
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </td>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {usersLoading ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading users...</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    ) : !institutionUsers || institutionUsers.users.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No users found</td>
+                      </tr>
+                    ) : (
+                      institutionUsers.users.map((user: User) => (
+                        <tr key={user.id || user._id}>
+                          <td className="whitespace-nowrap px-6 py-4">
+                            <p className="text-sm font-medium text-gray-900">{user.name || user.email}</p>
+                            <p className="text-sm text-gray-500">{user.email}</p>
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                            {getRoleName(user) || '-'}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                            {getInstitutionName(user) || '-'}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                            {user.studentId || '-'}
+                          </td>
+                          <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                            <div className="relative inline-block text-left">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setOpenUserActionsId((current) =>
+                                    current === getUserId(user) ? '' : getUserId(user),
+                                  )
+                                }
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+                                aria-label={`Actions for ${user.email}`}
+                                aria-expanded={openUserActionsId === getUserId(user)}
+                              >
+                                <ChevronUp
+                                  className={`h-4 w-4 transition-transform ${openUserActionsId === getUserId(user) ? 'rotate-180' : ''
+                                    }`}
+                                />
+                              </button>
+
+                              {openUserActionsId === getUserId(user) && (
+                                <div className="absolute right-0 top-10 z-30 w-48 overflow-hidden rounded-md border border-gray-200 bg-white py-1 text-left shadow-lg">
+                                  <button
+                                    type="button"
+                                    onClick={() => beginEditUser(user)}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                    Edit user
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenUserActionsId('');
+                                      setPasswordUserTarget(user);
+                                      setPasswordUserForm({ password: '', confirmPassword: '' });
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                  >
+                                    <KeyRound className="h-4 w-4" />
+                                    Reset password
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOpenUserActionsId('');
+                                      setDeleteUserTarget(user);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete user
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

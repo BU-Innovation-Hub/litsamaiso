@@ -9,7 +9,7 @@
   --color-primary-clr: #020618;
   --color-stroke-clr: #919DC2;
   --color-active: #535BC0;
-  --color-active-clr: #535BC0;
+  --color-active-clr: #020618;
 }
 
 :root {
@@ -72,6 +72,7 @@ button:disabled,
   0% {
     transform: translateY(-50%);
   }
+
   100% {
     transform: translateY(0);
   }
@@ -217,59 +218,76 @@ button:disabled,
 }
 
 @theme inline {
-  --animate-ripple: ripple var(--duration,2s) ease calc(var(--i, 0)*.2s) infinite;
+  --animate-ripple: ripple var(--duration, 2s) ease calc(var(--i, 0)*.2s) infinite;
+
   @keyframes ripple {
-  0%, 100% {
-    transform: translate(-50%, -50%) scale(1);
+
+    0%,
+    100% {
+      transform: translate(-50%, -50%) scale(1);
     }
-  50% {
-    transform: translate(-50%, -50%) scale(0.9);
+
+    50% {
+      transform: translate(-50%, -50%) scale(0.9);
     }
   }
-  --animate-orbit: orbit calc(var(--duration)*1s) linear infinite
-;
+
+  --animate-orbit: orbit calc(var(--duration)*1s) linear infinite;
+
   @keyframes orbit {
-  0% {
-    transform: rotate(calc(var(--angle) * 1deg)) translateY(calc(var(--radius) * 1px)) rotate(calc(var(--angle) * -1deg));
+    0% {
+      transform: rotate(calc(var(--angle) * 1deg)) translateY(calc(var(--radius) * 1px)) rotate(calc(var(--angle) * -1deg));
     }
-  100% {
-    transform: rotate(calc(var(--angle) * 1deg + 360deg)) translateY(calc(var(--radius) * 1px)) rotate(calc((var(--angle) * -1deg) - 360deg));
+
+    100% {
+      transform: rotate(calc(var(--angle) * 1deg + 360deg)) translateY(calc(var(--radius) * 1px)) rotate(calc((var(--angle) * -1deg) - 360deg));
     }
   }
+
   --animate-meteor: meteor 5s linear infinite;
+
   @keyframes meteor {
-  0% {
-    transform: rotate(var(--angle)) translateX(0);
-    opacity: 1;
+    0% {
+      transform: rotate(var(--angle)) translateX(0);
+      opacity: 1;
     }
-  70% {
-    opacity: 1;
+
+    70% {
+      opacity: 1;
     }
-  100% {
-    transform: rotate(var(--angle)) translateX(-500px);
-    opacity: 0;
+
+    100% {
+      transform: rotate(var(--angle)) translateX(-500px);
+      opacity: 0;
     }
   }
+
   --animate-marquee: marquee var(--duration) infinite linear;
   --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+
   @keyframes marquee {
-  from {
-    transform: translateX(0);
+    from {
+      transform: translateX(0);
     }
-  to {
-    transform: translateX(calc(-100% - var(--gap)));
+
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
     }
   }
-  @keyframes marquee-vertical {
-  from {
-    transform: translateY(0);
-    }
-  to {
-    transform: translateY(calc(-100% - var(--gap)));
-    }
-  }}
 
-::view-transition-old(root), ::view-transition-new(root) {
-    animation: none;
-    mix-blend-mode: normal;
+  @keyframes marquee-vertical {
+    from {
+      transform: translateY(0);
+    }
+
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
+    }
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import apiClient from '../lib/api';
 import type { Account } from '../types';
 
@@ -20,7 +21,7 @@ export interface AccountReports {
     confirmedNotPaid?: {
       total: number;
       accounts: Array<{
-        contractNumber: string;
+        borrowerNumber: string;
         accountNumber: string;
         bankName: string;
         courseOfStudy: string;
@@ -56,7 +57,7 @@ export const accountService = {
 
   updateAccount: async (
     accountId: string,
-    data: Partial<Pick<Account, 'fullnames' | 'contractNumber' | 'courseOfStudy' | 'bankName' | 'accountNumber' | 'batchNumber' | 'graduating' | 'status'>>
+    data: Partial<Pick<Account, 'fullnames' | 'borrowerNumber' | 'courseOfStudy' | 'bankName' | 'accountNumber' | 'batchNumber' | 'graduating' | 'status'>>
   ) => {
     const response = await apiClient.put<{ account: Account }>(`/accounts/${accountId}`, data);
     return response.data.account;
@@ -67,7 +68,7 @@ export const accountService = {
       confirmed: boolean;
       message: string;
       record?: {
-        contractNumber: string;
+        borrowerNumber: string;
         accountNumber: string;
         bankName: string;
         status: string;
@@ -80,7 +81,7 @@ export const accountService = {
 
   // Confirm account against the current student's institution.
   confirmAccount: async (confirmationData: {
-    contractNumber?: string;
+    borrowerNumber?: string;
     bankName?: string;
     accountNumber?: string;
     graduating?: boolean;
@@ -114,6 +115,16 @@ export const accountService = {
     return response.data.data;
   },
 
+  validateContract: async () => {
+    const response = await apiClient.get<{
+      valid: boolean;
+      reason?: string;
+      message?: string;
+      borrowerNumber?: string;
+    }>('/accounts/validate-contract');
+    return response.data;
+  },
+
   getReports: async (params?: { institutionId?: string }) => {
     const response = await apiClient.get<AccountReports>('/reports/accounts', { params });
     return response.data;
@@ -143,5 +154,22 @@ export const accountService = {
   financeResolveIssue: async (studentId: string) => {
     const response = await apiClient.post('/accounts/finance-resolve', { studentId });
     return response.data;
+  },
+
+  exportAccounts: async (params: {
+    format: 'csv' | 'xlsx';
+    search?: string;
+    status?: string;
+    batchNumber?: string;
+    startDate?: string;
+    endDate?: string;
+    institutionId?: string;
+    limit?: number;
+  }) => {
+    const response = await apiClient.get('/accounts/export', {
+      params,
+      responseType: 'blob',
+    });
+    return response.data as Blob;
   },
 };

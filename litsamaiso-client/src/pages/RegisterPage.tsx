@@ -13,6 +13,7 @@ const RegisterPage: React.FC = () => {
     password: '',
     confirmPassword: '',
     studentId: '',
+    borrowerNumber: '',
   });
 
   const handleChange = (
@@ -35,12 +36,23 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
+    if (!formData.borrowerNumber.trim()) {
+      toast.error("Enter your NMDS borrower's number");
+      return;
+    }
+
+    if (!/^\d{12}$/.test(formData.borrowerNumber.trim())) {
+      toast.error('Borrower number must be exactly 12 digits');
+      return;
+    }
+
     try {
       await register({
         email: formData.email,
         password: formData.password,
         role,
         studentId: formData.studentId || undefined,
+        borrowerNumber: formData.borrowerNumber || undefined,
       });
 
       toast.success('Account created successfully! Please sign in.');
@@ -119,6 +131,17 @@ const RegisterPage: React.FC = () => {
                 value={formData.studentId}
                 onChange={handleChange}
                 placeholder="e.g. 2230694"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">NMDS Borrower's Number</label>
+              <input
+                name="borrowerNumber"
+                value={formData.borrowerNumber}
+                onChange={handleChange}
+                placeholder="e.g. 202211001706"
                 required
               />
             </div>
