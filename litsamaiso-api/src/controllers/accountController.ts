@@ -63,10 +63,12 @@ export const listAccounts = async (req: Request, res: Response) => {
     const limit = getAccountListLimit(params.limit);
     const q = getAccountListFilter(user, params);
 
-    const accounts = await FinancialClearance.find(q).limit(limit).lean();
+    const [accounts, batchesDocs] = await Promise.all([
+      FinancialClearance.find(q).limit(limit).lean(),
+      FinancialClearance.distinct("batchNumber", q),
+    ]);
 
-    // compute batches list
-    const batches = Array.from(new Set((accounts || []).map((a: any) => a.batchNumber))).sort((a, b) => a - b);
+    const batches = (batchesDocs || []).filter((b: any) => b != null).sort((a: any, b: any) => a - b);
 
     res.json({ accounts, batches });
   } catch (err: any) {
@@ -750,7 +752,7 @@ export const updateAccount = async (req: Request, res: Response) => {
 
     // find account scoped to institution (AppAdmin may provide institution filter via query)
     const q: any = { _id: id };
-    if (!((user.role && (user.role as any).name) || "").toLowerCase().includes("appadmin")) {
+    if (String((user.role && (user.role as any).name) || "").toLowerCase() !== "appadmin") {
       q.institution = instId;
     }
 

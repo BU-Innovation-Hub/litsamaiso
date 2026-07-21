@@ -6,6 +6,9 @@ export interface InstitutionUsersResponse {
   users: User[];
   roleCounts: Array<{ role: string; count: number }>;
   total: number;
+  page?: number;
+  limit?: number;
+  pages?: number;
 }
 
 export const institutionService = {
@@ -70,7 +73,7 @@ export const institutionService = {
 
   getInstitutionUsers: async (
     institutionId: string,
-    params?: { search?: string; role?: string },
+    params?: { search?: string; role?: string; page?: number; limit?: number },
   ) => {
     const response = await apiClient.get<InstitutionUsersResponse>(
       `/institutions/${institutionId}/users`,

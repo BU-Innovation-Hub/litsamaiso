@@ -264,9 +264,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   const user = await User.findOne({ email })
     .select("+password")
     .populate("role", "name")
-    .populate("institution", "name email");
+    .populate("institution", "name email locked lockedReason");
   if (!user) {
     res.status(401).json({ message: "Invalid credentials" });
+    return;
+  }
+
+  if ((user.institution as any)?.locked) {
+    res.status(403).json({
+      message: "Your institution account has been locked",
+      locked: true,
+      lockedReason: (user.institution as any).lockedReason || undefined,
+    });
     return;
   }
 
@@ -365,16 +374,9 @@ export const resetPassword = async (
   }
 
   user.password = await bcrypt.hash(password, 10);
+  user.passwordResetTokenHash = undefined as any;
+  user.passwordResetTokenExpiresAt = undefined as any;
   await user.save();
-  await User.updateOne(
-    { _id: user._id },
-    {
-      $unset: {
-        passwordResetTokenHash: 1,
-        passwordResetTokenExpiresAt: 1,
-      },
-    },
-  );
 
   res.json({ message: "Password reset successful" });
 };
