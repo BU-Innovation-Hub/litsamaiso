@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { authService } from '../services/authService';
+import passwordResetBanner from '../assets/password-reset-banner.webp';
 
 const ForgotPasswordPage: React.FC = () => {
   const navigate = useNavigate();
@@ -26,6 +27,30 @@ const ForgotPasswordPage: React.FC = () => {
   return (
     <div className="auth-bg">
       <div className="auth-card">
+        <div className="auth-left">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${passwordResetBanner})` }}
+          />
+          <div className="auth-left-content">
+            <span className="small-title">Password Reset</span>
+            <div className="hidden md:block">
+              <h2>
+                Forgot
+                <br />
+                Your
+                <br />
+                Password?
+              </h2>
+              <p>
+                No worries! Enter your email and we'll send
+                <br />
+                you a link to reset your password.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="auth-right">
           <div className="logo mb-5 mt-5 md:mt-0">
             <img src="/logo-1.png" alt="Logo" width={35} height={35} />

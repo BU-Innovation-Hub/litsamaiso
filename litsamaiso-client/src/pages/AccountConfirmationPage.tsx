@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, FileImage, Loader, RefreshCcw } from 'lucide-react';
+import { CheckCircle, Loader, RefreshCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { toast } from 'sonner';
 import { accountService } from '../services/accountService';
@@ -17,11 +17,18 @@ type ExtractedDetails = {
   confidence: number;
 };
 
+const BANKS = [
+  'First National Bank',
+  'Standard Lesotho Bank',
+  'Nedbank',
+  'Lesotho PostBank',
+] as const;
+
 const BANK_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
   { name: 'Standard Lesotho Bank', pattern: /\bstandard\s+lesotho\s+bank\b|\bstandard\s+bank\b|\bsbl\b|www\.standardbank\./i },
   { name: 'First National Bank', pattern: /\bfirst\s+national\s+bank\b|\bfnb\b|@fnb\.|www\.fnb\./i },
-  { name: 'Lesotho Post Bank', pattern: /\blesotho\s+post\s+bank\b|\bpost\s*bank\b|\bpostbank\b/i },
-  { name: 'Nedbank Lesotho', pattern: /\bnedbank\s+lesotho\b|\bnedbank\b|www\.nedbank\./i },
+  { name: 'Lesotho PostBank', pattern: /\blesotho\s+post\s+bank\b|\bpost\s*bank\b|\bpostbank\b/i },
+  { name: 'Nedbank', pattern: /\bnedbank\s+lesotho\b|\bnedbank\b|www\.nedbank\./i },
 ];
 
 const parseBankProofText = (rawText: string): ExtractedDetails => {
@@ -140,6 +147,10 @@ const AccountConfirmationPage: React.FC = () => {
           return;
         }
         setContractValid(true);
+        setFormData((prev) => ({
+          ...prev,
+          accountNumber: contractResult.accountNumber || prev.accountNumber,
+        }));
 
         const response = await accountService.getConfirmationStatus();
         setIsConfirmed(response.confirmed);
@@ -151,7 +162,7 @@ const AccountConfirmationPage: React.FC = () => {
     };
 
     void initialize();
-  }, []);
+  }, [setUser]);
 
   useEffect(() => {
     return () => {
@@ -159,8 +170,9 @@ const AccountConfirmationPage: React.FC = () => {
     };
   }, [previewUrl]);
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, checked, type } = event.target;
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = event.target;
+    const checked = type === 'checkbox' ? (event as React.ChangeEvent<HTMLInputElement>).target.checked : undefined;
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -383,21 +395,21 @@ const AccountConfirmationPage: React.FC = () => {
                   </div>
                 )}
 
-                <div className="rounded-lg border border-dashed border-gray-300 bg-white/70 p-4 cursor-pointer">
+                {/* <div className="rounded-lg border border-dashed border-gray-300 bg-white/70 p-4 cursor-pointer">
                   <label className="mb-3 block text-sm font-medium">Upload Bank Confirmation</label>
                   <div className="flex items-center gap-3">
-                    <FileImage className="text-active" size={24} />
+                    <FileImage className="text-active" size={24} /> */}
                     <input
-                      type="file"
+                      type="hidden"
                       accept="image/*"
                       onChange={handleFileSelect}
-                      className="block w-full text-sm"
+                      className="w-full text-sm hidden"
                     />
-                  </div>
+                  {/* </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     A clear screenshot or photo helps extract the bank name and account number.
                   </p>
-                </div>
+                </div> */}
 
                 {isExtracting && (
                   <div className="flex items-center gap-2 rounded-md bg-white/70 p-3 text-sm text-muted-foreground">
@@ -442,14 +454,18 @@ const AccountConfirmationPage: React.FC = () => {
 
                 <div>
                   <label className="mb-2 block text-sm font-medium">Bank Name</label>
-                  <input
+                  <select
                     name="bankName"
                     value={formData.bankName}
                     onChange={handleChange}
                     required
                     className="w-full rounded-md border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-active"
-                    placeholder="e.g. FNB"
-                  />
+                  >
+                    <option value="" disabled>Select your bank</option>
+                    {BANKS.map((bank) => (
+                      <option key={bank} value={bank}>{bank}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
