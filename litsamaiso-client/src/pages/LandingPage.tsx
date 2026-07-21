@@ -611,17 +611,6 @@ const LandingPage = () => {
               support@litsamaiso.com
             </a>
           </div>
-          <div className="flex flex-wrap gap-3">
-            {footerLinks.map((item) => (
-              <a
-                key={item}
-                href="#hero"
-                className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-500 transition hover:bg-gray-200 hover:text-gray-700"
-              >
-                {item}
-              </a>
-            ))}
-          </div>
         </div>
       </footer>
     </div>
