@@ -39,8 +39,8 @@ export const ExplainerVideo = ({
       </h2>
 
       <div className="mx-auto max-w-6xl px-5 md:px-8">
-        <div className="relative rounded-[2rem] bg-linear-to-b from-white to-gray-100 p-2 shadow-[0_28px_80px_-40px_rgba(2,6,24,0.55)] ring-1 ring-gray-200/80 sm:p-3">
-          <div className="relative aspect-video overflow-hidden rounded-[1.5rem] bg-primary-clr">
+        <div className="relative rounded-4xl bg-linear-to-b from-white to-gray-100 p-2 shadow-[0_28px_80px_-40px_rgba(2,6,24,0.55)] ring-1 ring-gray-200/80 sm:p-3">
+          <div className="relative aspect-video overflow-hidden rounded-3xl bg-primary-clr">
             {isPlaying ? (
               <iframe
                 title={title}
