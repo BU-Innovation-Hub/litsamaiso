@@ -99,6 +99,17 @@ export const authService = {
     return storedUser ? JSON.parse(storedUser) : null;
   },
 
+  getProfile: async (): Promise<{ data: User }> => {
+    const response = await apiClient.get('/profile');
+    let user = response.data?.data || response.data?.user || response.data;
+    user = {
+      ...user,
+      role: normalizeRole(user.role),
+      institution: normalizeInstitution(user.institution),
+    };
+    return { data: user };
+  },
+
   isAuthenticated: (): boolean => {
     return !!localStorage.getItem('authToken');
   },

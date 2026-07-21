@@ -5,6 +5,7 @@ import { CheckCircle, FileImage, Loader, RefreshCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { toast } from 'sonner';
 import { accountService } from '../services/accountService';
+import { authService } from '../services/authService';
 import apiClient from '../lib/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { useAuth } from '../hooks/useAuth';
@@ -52,7 +53,7 @@ const parseBankProofText = (rawText: string): ExtractedDetails => {
 };
 
 const AccountConfirmationPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [statusError, setStatusError] = useState('');
@@ -66,7 +67,7 @@ const AccountConfirmationPage: React.FC = () => {
   const [extracted, setExtracted] = useState<ExtractedDetails | null>(null);
   const [reviewAccepted, setReviewAccepted] = useState(false);
   const [formData, setFormData] = useState({
-    borrowerNumber: '',
+    borrowerNumber: user?.borrowerNumber || '',
     bankName: '',
     accountNumber: '',
     graduating: false,
@@ -119,6 +120,17 @@ const AccountConfirmationPage: React.FC = () => {
   useEffect(() => {
     const initialize = async () => {
       try {
+        const profileResult = await authService.getProfile();
+        const profile = profileResult.data;
+        if (profile) {
+          localStorage.setItem('user', JSON.stringify(profile));
+          setUser(profile);
+          setFormData((prev) => ({
+            ...prev,
+            borrowerNumber: profile.borrowerNumber || '',
+          }));
+        }
+
         const contractResult = await accountService.validateContract();
         if (!contractResult.valid) {
           setContractValid(false);
@@ -224,7 +236,7 @@ const AccountConfirmationPage: React.FC = () => {
       return;
     }
 
-    if (extracted && !reviewAccepted) {
+    if (extracted && !reviewAccepted && formData.bankName === extracted.bankName && formData.accountNumber === extracted.accountNumber) {
       toast.error('Review and accept or edit the extracted details first');
       return;
     }
@@ -433,9 +445,9 @@ const AccountConfirmationPage: React.FC = () => {
                   <input
                     name="bankName"
                     value={formData.bankName}
-                    readOnly
+                    onChange={handleChange}
                     required
-                    className="w-full rounded-md border border-border bg-gray-100 px-4 py-2 text-muted-foreground"
+                    className="w-full rounded-md border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-active"
                     placeholder="e.g. FNB"
                   />
                 </div>
@@ -445,9 +457,9 @@ const AccountConfirmationPage: React.FC = () => {
                   <input
                     name="accountNumber"
                     value={formData.accountNumber}
-                    readOnly
+                    onChange={handleChange}
                     required
-                    className="w-full rounded-md border border-border bg-gray-100 px-4 py-2 text-muted-foreground"
+                    className="w-full rounded-md border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-active"
                     placeholder="Bank account number"
                   />
                 </div>
@@ -465,7 +477,7 @@ const AccountConfirmationPage: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || isExtracting || !reviewAccepted}
+                  disabled={isSubmitting || isExtracting || (!reviewAccepted && extracted !== null && formData.bankName === extracted.bankName && formData.accountNumber === extracted.accountNumber)}
                   className="flex w-full items-center justify-center gap-2 rounded-md bg-button py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSubmitting && <Loader size={18} className="animate-spin" />}

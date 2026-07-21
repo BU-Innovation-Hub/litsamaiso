@@ -1,6 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
+let genAI: GoogleGenerativeAI | null = null;
+
+function getGenAI(): GoogleGenerativeAI {
+  if (!genAI) {
+    genAI = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || "");
+  }
+  return genAI;
+}
 
 export interface ExtractionCandidate {
   number: string;
@@ -65,7 +72,7 @@ export async function validateWithGemini(
   bankName: string | null,
 ): Promise<GeminiExtractionResult> {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
     const candidatesInfo = candidates
       .slice(0, 10)
@@ -75,20 +82,20 @@ export async function validateWithGemini(
       })
       .join("\n");
 
-    const prompt = `You are a financial document analysis expert. Analyze this bank statement to identify the account number.
+    const prompt = `You are a financial document analysis expert. Analyze this bank statement to identify the account number and bank name.
 
 ## Task
-Extract the account number from the bank statement. Use these guidelines:
+Extract the account number and bank name from the bank statement. Use these guidelines:
 - South African account numbers are typically 11 digits
 - Format: 3-digit branch code + 8-digit account number
-- Common banks: FNB, Standard Bank, Stanbic, ABSA, Nedbank
+- Bank name appears in the header/logo area (e.g. FNB, Standard Bank, ABSA, Nedbank, Standard Lesotho Bank, Lesotho Post Bank)
 - Account number labels may appear as: "Account No.", "A/c", "Smart Account", "My Account", "Account #"
 
 ## OCR Extracted Text:
 ${ocrExtractedText}
 
-## Detected Bank:
-${bankName || "Unknown"}
+## Detected Bank (from OCR):
+${bankName || "Unknown — verify from the image"}
 
 ## Candidate Numbers (extracted from OCR):
 ${candidatesInfo}
@@ -96,6 +103,7 @@ ${candidatesInfo}
 ## Your Response (JSON format):
 {
   "accountNumber": "the most likely account number or null",
+  "bankName": "the bank name as it appears on the statement or null",
   "confidence": 0-100,
   "selectedCandidateReason": "why you chose this candidate or why you extracted fresh",
   "allCandidatesRanked": [
@@ -110,7 +118,8 @@ ${candidatesInfo}
 - Confidence should reflect how sure you are this is the account number
 - If no candidates match SA format, extract the most likely number from the image directly
 - Return null for accountNumber if completely unable to determine
-- Validate against SA banking standards: 11-digit format, known branch codes`;
+- Validate against SA banking standards: 11-digit format, known branch codes
+- Identify the bank name from the image even if OCR text was unclear`;
 
     const result = await model.generateContent([
       {
@@ -155,6 +164,8 @@ ${candidatesInfo}
       };
     }
 
+    const geminiBankName = parsedResponse.bankName || bankName;
+
     let finalConfidence = parsedResponse.confidence || 0;
     if (parsedResponse.accountNumber) {
       const validation = validateSAAccountFormat(parsedResponse.accountNumber);
@@ -163,7 +174,7 @@ ${candidatesInfo}
 
     return {
       accountNumber: parsedResponse.accountNumber || null,
-      bankName,
+      bankName: geminiBankName,
       confidence: Math.round(finalConfidence),
       candidates: (parsedResponse.allCandidatesRanked || [])
         .slice(0, 3)
