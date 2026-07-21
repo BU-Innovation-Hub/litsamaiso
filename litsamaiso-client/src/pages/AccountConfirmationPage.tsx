@@ -17,14 +17,10 @@ type ExtractedDetails = {
 };
 
 const BANK_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
+  { name: 'Standard Lesotho Bank', pattern: /\bstandard\s+lesotho\s+bank\b|\bstandard\s+bank\b|\bsbl\b|www\.standardbank\./i },
   { name: 'First National Bank', pattern: /\bfirst\s+national\s+bank\b|\bfnb\b|@fnb\.|www\.fnb\./i },
-  { name: 'Standard Bank', pattern: /\bstandard\s+bank\b|\bsbl\b|www\.standardbank\./i },
-  { name: 'Stanbic', pattern: /\bstanbic\b|www\.stanbic\./i },
-  { name: 'ABSA', pattern: /\babsa\b/i },
-  { name: 'Post Bank', pattern: /\bpost\s*bank\b|\bpostbank\b/i },
-  { name: 'Nedbank', pattern: /\bnedbank\b|www\.nedbank\./i },
-  { name: 'Bank Gaborone', pattern: /\bbank\s+gaborone\b/i },
-  { name: 'Access Bank', pattern: /\baccess\s*bank\b/i },
+  { name: 'Lesotho Post Bank', pattern: /\blesotho\s+post\s+bank\b|\bpost\s*bank\b|\bpostbank\b/i },
+  { name: 'Nedbank Lesotho', pattern: /\bnedbank\s+lesotho\b|\bnedbank\b|www\.nedbank\./i },
 ];
 
 const parseBankProofText = (rawText: string): ExtractedDetails => {
@@ -181,7 +177,9 @@ const AccountConfirmationPage: React.FC = () => {
     try {
       const result = await Tesseract.recognize(file, 'eng', {
         logger: undefined,
-      });
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1',
+      } as any);
       const text = result.data.text || '';
       const details = parseBankProofText(text);
       setExtracted(details);
@@ -192,8 +190,7 @@ const AccountConfirmationPage: React.FC = () => {
       } else {
         toast.message('OCR finished, but some bank details could not be read. Please retry upload.');
       }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error) {
+    } catch {
       toast.error('Could not read the image. Please retry with a clearer bank confirmation image.');
     } finally {
       setIsExtracting(false);
