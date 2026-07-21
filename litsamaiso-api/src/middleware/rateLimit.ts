@@ -18,12 +18,22 @@ export const createRateLimit = (options: {
     // If no existing record or the reset time has passed, start a new window
     if (!existing || existing.resetAt <= now) {
       hits.set(key, { count: 1, resetAt: now + options.windowMs });
+      res.setHeader("RateLimit-Limit", String(options.max));
+      res.setHeader("RateLimit-Remaining", String(options.max - 1));
+      res.setHeader("RateLimit-Reset", String(Math.ceil(options.windowMs / 1000)));
       next();
       return;
     }
+
+    const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
+    res.setHeader("RateLimit-Limit", String(options.max));
+    res.setHeader(
+      "RateLimit-Remaining",
+      String(Math.max(options.max - existing.count - 1, 0)),
+    );
+    res.setHeader("RateLimit-Reset", String(retryAfter));
     // If the request count exceeds the maximum allowed, respond with 429 Too Many Requests
     if (existing.count >= options.max) {
-      const retryAfter = Math.ceil((existing.resetAt - now) / 1000);
       res.setHeader("Retry-After", String(retryAfter));
       res.status(429).json({ message: "Too many requests" });
       return;
