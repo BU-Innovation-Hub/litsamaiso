@@ -144,14 +144,6 @@ const teamMembers = [
   },
 ];
 
-const footerLinks = [
-  "Platform",
-  "Confirmations",
-  "Institutions",
-  "Support",
-  "Security",
-];
-
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0 },
