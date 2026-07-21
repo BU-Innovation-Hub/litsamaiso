@@ -129,6 +129,11 @@ export const listElectionsHandler = async (req: Request, res: Response) => {
       (user?.role && (user.role as any).name) || user?.role || "",
     ).toLowerCase() === "student";
 
+    const { page, limit } = req.query as any;
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const lim = Math.max(Math.min(parseInt(limit) || 10000, 10000), 1);
+    const skip = (pageNum - 1) * lim;
+
     const filter: Record<string, unknown> = {
       institution: user.institution,
       deletedAt: null,
@@ -139,8 +144,12 @@ export const listElectionsHandler = async (req: Request, res: Response) => {
       filter.archived = false;
     }
 
-    const elections = await Election.find(filter).sort({ createdAt: -1 }).lean();
-    res.json({ elections });
+    const [elections, total] = await Promise.all([
+      Election.find(filter).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+      Election.countDocuments(filter),
+    ]);
+
+    res.json({ elections, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
   } catch (err: any) {
     handleError(res, err);
   }

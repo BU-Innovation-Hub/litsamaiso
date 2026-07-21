@@ -136,7 +136,7 @@ const buildAccountFilter = (user: any, params: AccountQueryParams): Record<strin
 
 export const getAccountListFilter = buildAccountFilter;
 
-const parseAccountLimit = (value: unknown, fallback = 200, max = 2000): number => {
+const parseAccountLimit = (value: unknown, fallback = 2000, max = 10000): number => {
   const parsed = Number.parseInt(String(value || fallback), 10);
   return Math.min(Number.isFinite(parsed) && parsed > 0 ? parsed : fallback, max);
 };

@@ -84,7 +84,7 @@ export const exportAuditLogs = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const logs = await AuditLog.find().sort({ createdAt: -1 }).lean();
+    const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(50000).lean();
     const ejson = logs.map((log) => toEJSON(log));
     const text = JSON.stringify(ejson, null, 2);
     res.setHeader("Content-Type", "text/plain");
