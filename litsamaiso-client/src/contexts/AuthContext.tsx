@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { User } from '../types';
 import { authService } from '../services/authService';
 import { AuthContext } from './authContextValue';
+import posthog from 'posthog-js';
 
 const getStoredUser = (): User | null => {
   const storedUser = localStorage.getItem('user');
@@ -21,6 +22,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [user, setUser] = useState<User | null>(() => getStoredUser());
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (user) {
+      posthog.identify(user.id, {
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      });
+    }
+    // Only run on mount to identify user restored from localStorage
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const login = async (
     email: string,
     password: string,
@@ -35,6 +48,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         rememberMe,
       });
       setUser(response.user);
+      posthog.identify(response.user.id, {
+        email: response.user.email,
+        name: response.user.name,
+        role: response.user.role,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -46,6 +64,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const response = await authService.register(data);
       if (response.token) {
         setUser(response.user);
+        posthog.identify(response.user.id, {
+          email: response.user.email,
+          name: response.user.name,
+          role: response.user.role,
+        });
       }
     } finally {
       setIsLoading(false);
@@ -57,6 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       await authService.logout();
       setUser(null);
+      posthog.reset();
     } finally {
       setIsLoading(false);
     }
