@@ -250,18 +250,23 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const login = async (req: Request, res: Response): Promise<void> => {
-  const { email, password, rememberMe } = req.body as {
+  const { email, studentId, password, rememberMe } = req.body as {
     email?: string;
+    studentId?: string;
     password?: string;
     rememberMe?: boolean;
   };
 
-  if (!email || !password) {
-    res.status(400).json({ message: "email and password are required" });
+  const identifier = email || studentId;
+  if (!identifier || !password) {
+    res.status(400).json({ message: "email or studentId and password are required" });
     return;
   }
 
-  const user = await User.findOne({ email })
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+  const user = await User.findOne(
+    isEmail ? { email: identifier } : { studentId: identifier },
+  )
     .select("+password")
     .populate("role", "name")
     .populate("institution", "name email locked lockedReason");

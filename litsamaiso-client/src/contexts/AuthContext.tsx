@@ -35,15 +35,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   const login = async (
-    email: string,
+    identifier: string,
     password: string,
     rememberMe?: boolean
   ) => {
     setIsLoading(true);
     try {
+      const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
       const response = await authService.login({
-        email,
-        studentId: email,
+        email: isEmail ? identifier : '',
+        studentId: isEmail ? undefined : identifier,
         password,
         rememberMe,
       });
