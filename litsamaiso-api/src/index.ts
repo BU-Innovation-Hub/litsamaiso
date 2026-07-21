@@ -33,6 +33,20 @@ import { initAgenda } from "./scheduler/agenda.js";
 
 const app = express();
 
+const parseTrustProxy = (value: string | undefined): boolean | number | string => {
+  if (!value) {
+    return process.env.NODE_ENV === "production" ? 1 : false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+
+  const numericValue = Number(normalized);
+  return Number.isInteger(numericValue) ? numericValue : value;
+};
+
+app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 app.set("etag", false);
 app.use(cors());
 // Allow larger JSON payloads (base64 images for AI validation)
