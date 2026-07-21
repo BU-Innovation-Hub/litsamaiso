@@ -129,6 +129,7 @@ export const accountService = {
       reason?: string;
       message?: string;
       borrowerNumber?: string;
+      accountNumber?: string;
     }>('/accounts/validate-contract');
     return response.data;
   },

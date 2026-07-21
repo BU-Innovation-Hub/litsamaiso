@@ -317,7 +317,7 @@ export const validateBorrowerNumber = async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ valid: true, borrowerNumber: userRecord.borrowerNumber });
+    res.json({ valid: true, borrowerNumber: userRecord.borrowerNumber, accountNumber: account.accountNumber });
   } catch (err: any) {
     console.error("validateBorrowerNumber error:", err);
     res.status(500).json({ valid: false, message: err.message || String(err) });

@@ -147,6 +147,10 @@ const AccountConfirmationPage: React.FC = () => {
           return;
         }
         setContractValid(true);
+        setFormData((prev) => ({
+          ...prev,
+          accountNumber: contractResult.accountNumber || prev.accountNumber,
+        }));
 
         const response = await accountService.getConfirmationStatus();
         setIsConfirmed(response.confirmed);
