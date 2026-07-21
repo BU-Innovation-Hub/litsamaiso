@@ -253,7 +253,7 @@ const DashboardPage: React.FC = () => {
         nextConfirmation,
       ] = await Promise.all([
         load(canViewElections, () => electionService.getElections(), [] as Election[]),
-        load(canViewUsers, () => userService.getUsers({ limit: 100 }), [] as User[]),
+        load(canViewUsers, () => userService.getUsers({ limit: 100 }).then((res) => res.users), [] as User[]),
         load(canViewInstitutions, () => institutionService.getInstitutions(), [] as Institution[]),
         load(canViewReports, () => accountService.getReports(), null as AccountReports | null),
         load(canViewReports, () => accountService.listAccounts({ limit: 6 }).then((res) => res.accounts), [] as Account[]),
