@@ -12,6 +12,7 @@ import {
   loadPayedStudents,
   updateAccount,
   exportAccountRecords,
+  assignBranchCodesAction,
 } from "../controllers/accountController.js";
 
 const router = Router();
@@ -41,6 +42,13 @@ router.post(
   requireRole("Student"),
   upload.single("document"),
   resolveAccountIssue,
+);
+
+router.post(
+  "/assign-branch-codes",
+  requireAuth,
+  requireRole(["AppAdmin", "Finance"]),
+  assignBranchCodesAction,
 );
 
 router.post(

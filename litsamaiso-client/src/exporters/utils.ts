@@ -1,3 +1,5 @@
+import * as XLSX from 'xlsx';
+
 export type AnyObject = Record<string, any>;
 
 export const isArrayOfObjects = (data: unknown): data is AnyObject[] => {
@@ -47,6 +49,48 @@ export const flattenValue = (v: unknown): string => {
     return JSON.stringify(v);
   } catch (_) {
     return String(v);
+  }
+};
+
+const TEXT_COLUMN_PATTERNS = [
+  /^borrower/i,
+  /^account\s*(?:number|no|#|num)/i,
+  /^branch\s*code/i,
+  /^student\s*id/i,
+  /^batch\s*number/i,
+];
+
+export const forceTextColumns = (ws: XLSX.WorkSheet): void => {
+  const ref = ws["!ref"];
+  if (!ref) return;
+  const range = XLSX.utils.decode_range(ref);
+
+  const colIndices: number[] = [];
+  if (range.s.r === 0) {
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const addr = XLSX.utils.encode_cell({ r: 0, c: C });
+      const cell = ws[addr];
+      if (cell && cell.v) {
+        const headerName = String(cell.v);
+        if (TEXT_COLUMN_PATTERNS.some((p) => p.test(headerName))) {
+          colIndices.push(C);
+        }
+      }
+    }
+  }
+
+  if (colIndices.length === 0) return;
+
+  for (let R = range.s.r + 1; R <= range.e.r; R++) {
+    for (const C of colIndices) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = ws[addr];
+      if (cell) {
+        cell.t = "s";
+        cell.v = String(cell.v ?? "");
+        cell.z = "@";
+      }
+    }
   }
 };
 
