@@ -4,6 +4,7 @@ import {
   loadPayedStudentsFromExcel,
   accountConfirmation,
   notifyFinanceUsersAboutIssue,
+  assignBranchCodesForExport,
   exportAccounts,
   getAccountListFilter,
   getAccountListLimit,
@@ -99,6 +100,34 @@ export const exportAccountRecords = async (req: Request, res: Response) => {
     res.send(result.buffer);
   } catch (err: any) {
     console.error("[exportAccountRecords] Error:", err);
+    res.status(500).json({ message: err.message || String(err) });
+  }
+};
+
+export const assignBranchCodesAction = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const result = await assignBranchCodesForExport(user, req.query as any);
+
+    await recordAudit({
+      action: "account.assignBranchCodes",
+      actorId: user._id?.toString(),
+      actorEmail: user.email,
+      actorRole: (user.role && (user.role as any).name) || undefined,
+      targetCollection: "FinancialClearance",
+      details: {
+        total: result.total,
+        assigned: result.assigned,
+        skipped: result.skipped,
+      },
+    });
+
+    res.json({
+      message: `Branch codes assigned: ${result.assigned} updated, ${result.skipped} skipped out of ${result.total} total`,
+      result,
+    });
+  } catch (err: any) {
+    console.error("[assignBranchCodesAction] Error:", err);
     res.status(500).json({ message: err.message || String(err) });
   }
 };
@@ -362,7 +391,7 @@ export const getConfirmationStatus = async (req: Request, res: Response) => {
 
     const confirmed = String(account.status || "").toLowerCase() === "confirmed" && account.confirmedBy && String((account as any).confirmedBy) === String(student._id);
 
-    res.json({ confirmed, status: account.status, confirmationDate: account.confirmationDate });
+    res.json({ confirmed, status: account.status, confirmationDate: account.confirmationDate, branchCode: account.branchCode });
   } catch (err: any) {
     console.error("getConfirmationStatus error:", err);
     res.status(500).json({ message: err.message || String(err) });

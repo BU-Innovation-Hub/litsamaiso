@@ -6,12 +6,17 @@ import {
   createBranchCode,
   updateBranchCode,
   deleteBranchCode,
+  getMissingBanks,
+  createMissingBanks,
 } from "../controllers/branchCodeController.js";
 
 const router = Router();
 
 router.use(requireAuth);
 router.use(requireRole(["AppAdmin", "Finance"]));
+
+router.get("/missing-banks", getMissingBanks);
+router.post("/create-missing", createMissingBanks);
 
 router.get("/", getBranchCodes);
 router.get("/:id", getBranchCodeById);

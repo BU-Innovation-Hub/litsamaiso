@@ -1,10 +1,11 @@
 import * as XLSX from 'xlsx';
-import { normalizeToRows, defaultFilename } from './utils';
+import { normalizeToRows, defaultFilename, forceTextColumns } from './utils';
 
 export const exportXlsx = async ({ data, meta, filename }: { data: unknown; meta?: any; filename?: string }) => {
   const { columns, rows } = normalizeToRows(data);
   const wsData = [columns, ...rows.map((r: any) => columns.map((c) => r[c] ?? ''))];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
+  forceTextColumns(ws);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Report');
   const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });

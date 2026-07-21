@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { GitBranch, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { GitBranch, Pencil, Plus, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { branchCodeService } from '../services/branchCodeService';
 import { institutionService } from '../services/institutionService';
@@ -25,6 +25,11 @@ const BranchCodesPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<BranchCode | null>(null);
+
+  const [showMissingModal, setShowMissingModal] = useState(false);
+  const [missingBanks, setMissingBanks] = useState<string[]>([]);
+  const [loadingMissing, setLoadingMissing] = useState(false);
+  const [creatingMissing, setCreatingMissing] = useState(false);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -115,6 +120,34 @@ const BranchCodesPage: React.FC = () => {
     }
   };
 
+  const openMissingModal = async () => {
+    setShowMissingModal(true);
+    setLoadingMissing(true);
+    try {
+      const result = await branchCodeService.getMissingBanks();
+      setMissingBanks(result || []);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to find missing banks'));
+      setShowMissingModal(false);
+    } finally {
+      setLoadingMissing(false);
+    }
+  };
+
+  const handleCreateMissingBanks = async () => {
+    setCreatingMissing(true);
+    try {
+      const result = await branchCodeService.createMissingBanks();
+      toast.success(result.message);
+      setShowMissingModal(false);
+      await loadItems();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to create missing branch codes'));
+    } finally {
+      setCreatingMissing(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -192,14 +225,24 @@ const BranchCodesPage: React.FC = () => {
                 className="w-full rounded-md border border-gray-300 py-2 pl-10 pr-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
-            <button
-              type="button"
-              onClick={openCreateModal}
-              className="inline-flex items-center gap-2 rounded-md bg-primary-clr px-3 py-2 font-semibold text-white hover:bg-active transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Create Branch Code
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={openMissingModal}
+                className="inline-flex items-center gap-2 rounded-md border border-primary-clr px-3 py-2 font-semibold text-primary-clr hover:bg-gray-50 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Find Missing Banks
+              </button>
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className="inline-flex items-center gap-2 rounded-md bg-primary-clr px-3 py-2 font-semibold text-white hover:bg-active transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Create Branch Code
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -332,6 +375,52 @@ const BranchCodesPage: React.FC = () => {
               >
                 {saving ? 'Saving...' : editingId ? 'Update' : 'Create'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMissingModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Find Missing Banks</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              The following banks appear in Financial Clearance records but have no branch code mapping yet.
+            </p>
+            <div className="mt-5 max-h-80 overflow-y-auto">
+              {loadingMissing ? (
+                <p className="text-center text-gray-500 py-6">Loading...</p>
+              ) : missingBanks.length === 0 ? (
+                <p className="text-center text-gray-500 py-6 text-sm">All banks already have branch code mappings.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {missingBanks.map((bank) => (
+                    <li key={bank} className="flex items-center gap-3 rounded-md border bg-gray-50 px-4 py-2 text-sm font-medium text-gray-800">
+                      <span className="h-2 w-2 rounded-full bg-amber-400 shrink-0" />
+                      {bank}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowMissingModal(false)}
+                className="rounded-md border px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+              {missingBanks.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleCreateMissingBanks}
+                  disabled={creatingMissing}
+                  className="rounded-md bg-primary-clr px-4 py-2 font-semibold text-white hover:bg-active transition-colors disabled:opacity-50"
+                >
+                  {creatingMissing ? 'Creating...' : `Create ${missingBanks.length} Missing`}
+                </button>
+              )}
             </div>
           </div>
         </div>
