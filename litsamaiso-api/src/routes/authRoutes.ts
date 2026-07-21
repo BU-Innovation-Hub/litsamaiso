@@ -24,7 +24,7 @@ const registerRateLimit = createRateLimit({
 });
 const loginRateLimit = createRateLimit({
 	windowMs: 15 * 60 * 1000,
-	max: getRateLimitMax("AUTH_LOGIN_RATE_LIMIT_MAX", 500),
+	max: getRateLimitMax("AUTH_LOGIN_RATE_LIMIT_MAX", 5000),
 	keyPrefix: "auth-login",
 });
 const resetRateLimit = createRateLimit({
