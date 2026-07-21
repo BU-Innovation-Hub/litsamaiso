@@ -28,6 +28,7 @@ import {
   ScrollVelocityRow,
 } from "@/components/ui/scroll-based-velocity";
 import { cn } from "@/lib/utils";
+import bentoMockup from "@/assets/bento-mockup.jpg";
 
 const heroVideoUrl =
   "https://res.cloudinary.com/joelics-arts/video/upload/v1781684213/litsamaiso/landing-page-video_agw7fr.mp4";
@@ -297,7 +298,7 @@ const LandingPage = () => {
             width={96}
             height={96}
             squares={[18, 12]}
-            className="opacity-[0.06]"
+            className="opacity-[0.20]"
             squaresClassName="stroke-gray-300"
           />
           <div className="relative mx-auto max-w-7xl px-5 md:px-8">
@@ -612,32 +613,11 @@ const LandingPage = () => {
 const CapabilityVisual = ({ type }: { type: string }) => {
   if (type === "dashboard") {
     return (
-      <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-100 p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-500">
-            Review queue
-          </span>
-          <span className="rounded-full bg-active-clr/20 px-2 py-1 text-xs text-gray-600">
-            Live
-          </span>
-        </div>
-        <div className="grid gap-2 md:grid-cols-3">
-          {["Confirmed", "Pending", "Issues"].map((label, index) => (
-            <div key={label} className="rounded-xl bg-white p-3">
-              <div className="h-2 w-12 rounded-full bg-gray-200" />
-              <div
-                className={cn(
-                  "mt-4 h-10 rounded-lg",
-                  index === 0 && "bg-active-clr/70",
-                  index === 1 && "bg-stroke-clr/35",
-                  index === 2 && "bg-orange-200/55",
-                )}
-              />
-              <p className="mt-3 text-xs text-gray-500">{label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <img
+        src={bentoMockup}
+        alt="Confirmation command center dashboard"
+        className="-mx-6 -mb-6 mt-auto w-[90%] max-w-none object-cover"
+      />
     );
   }
 
