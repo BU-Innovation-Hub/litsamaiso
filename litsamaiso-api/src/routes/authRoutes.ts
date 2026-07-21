@@ -19,12 +19,12 @@ const getRateLimitMax = (envName: string, fallback: number): number => {
 const upload = multer({ storage: multer.memoryStorage() });
 const registerRateLimit = createRateLimit({
 	windowMs: 15 * 60 * 1000,
-	max: getRateLimitMax("AUTH_REGISTER_RATE_LIMIT_MAX", 300),
+	max: getRateLimitMax("AUTH_REGISTER_RATE_LIMIT_MAX", 5000),
 	keyPrefix: "auth-register",
 });
 const loginRateLimit = createRateLimit({
 	windowMs: 15 * 60 * 1000,
-	max: getRateLimitMax("AUTH_LOGIN_RATE_LIMIT_MAX", 100),
+	max: getRateLimitMax("AUTH_LOGIN_RATE_LIMIT_MAX", 5000),
 	keyPrefix: "auth-login",
 });
 const resetRateLimit = createRateLimit({
