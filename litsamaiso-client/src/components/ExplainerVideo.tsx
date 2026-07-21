@@ -4,7 +4,7 @@ import posterImage from "@/assets/vid-poster.webp";
 import { cn } from "@/lib/utils";
 
 const defaultEmbedUrl =
-  "https://player.cloudinary.com/embed/?cloud_name=joelics-arts&public_id=litsamaiso%2FLitsamaiso_Explainer_kqzdsg";
+  "https://player.cloudinary.com/embed/?cloud_name=joelics-arts&public_id=litsamaiso%2FLitsamaiso_Explainer_Cut_2_cfecpf";
 
 type ExplainerVideoProps = {
   className?: string;
