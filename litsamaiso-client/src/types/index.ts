@@ -7,6 +7,7 @@ export interface User {
   role: Role;
   institution?: Institution;
   studentId?: string;
+  borrowerNumber?: string;
   studentCardUrl?: string;
   faceDescriptor?: number[];
   faceImageUrl?: string;

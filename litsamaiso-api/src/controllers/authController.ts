@@ -287,6 +287,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       institution: user.institution,
       studentId: user.studentId,
+      borrowerNumber: user.borrowerNumber,
       studentCardUrl: user.studentCardUrl,
       faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,

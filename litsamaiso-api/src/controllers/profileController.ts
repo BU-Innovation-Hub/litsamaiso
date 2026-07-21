@@ -10,6 +10,7 @@ const serializeProfile = (user: any) => ({
   name: user.name || "",
   email: user.email,
   studentId: user.studentId || "",
+  borrowerNumber: user.borrowerNumber || "",
   studentCardUrl: user.studentCardUrl || "",
   faceImageUrl: user.faceImageUrl || "",
   role: getRoleName(user.role),
