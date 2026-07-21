@@ -8,6 +8,8 @@ import mongoose from "mongoose";
 import { randomUUID } from "crypto";
 
 import { connectDatabase } from "./config/database.js";
+import { getPosthogClient, shutdownPosthog } from "./services/posthogService.js";
+import { setupExpressRequestContext, setupExpressErrorHandler } from "posthog-node";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
@@ -32,6 +34,9 @@ import { initAgenda } from "./scheduler/agenda.js";
 
 
 const app = express();
+
+const posthog = getPosthogClient();
+setupExpressRequestContext(posthog, app);
 
 const parseTrustProxy = (value: string | undefined): boolean | number | string => {
   if (!value) {
@@ -159,6 +164,8 @@ app.get("/health", (req: Request, res: Response) => {
   });
 });
 
+setupExpressErrorHandler(posthog, app);
+
 // Central error logger
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   const requestId = (req as any).requestId || "unknown";
@@ -184,3 +191,13 @@ const startServer = async (): Promise<void> => {
 };
 
 void startServer();
+
+process.on("SIGTERM", async () => {
+  await shutdownPosthog();
+  process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+  await shutdownPosthog();
+  process.exit(0);
+});

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { PostHogErrorBoundary } from '@posthog/react';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute, PublicRoute, RoleRoute } from './components/ProtectedRoute';
 import { Header } from './components/Header';
@@ -56,6 +57,7 @@ const ProtectedLayout = () => {
 
 function App() {
   return (
+    <PostHogErrorBoundary fallback={<div className="flex items-center justify-center min-h-screen text-destructive">Something went wrong. Please try again later.</div>}>
     <BrowserRouter>
       <AuthProvider>
         <Toaster richColors position="top-right" />
@@ -111,6 +113,7 @@ function App() {
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </PostHogErrorBoundary>
   );
 }
 
