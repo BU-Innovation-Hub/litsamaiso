@@ -236,11 +236,24 @@ export const confirmAccount = async (req: Request, res: Response) => {
 
     // accountConfirmation may return a special result when it created an Issue or when proof is required
     if ((result as any).issueCreated) {
-      res.status(201).json({ message: "Issue created for finance review", issue: (result as any).issue });
+      res.status(409).json({
+        message: (result as any).message || "Issue created for finance review",
+        issueCreated: true,
+        issue: (result as any).issue,
+        redirectTo: (result as any).redirectTo || "/issues",
+        attemptCount: (result as any).attemptCount,
+        maxAttempts: (result as any).maxAttempts,
+      });
       return;
     }
     if ((result as any).needsProof) {
-      res.status(400).json({ message: (result as any).message || "Account details do not match. Please upload proof and try again.", needsProof: true });
+      res.status(400).json({
+        message: (result as any).message || "Account details do not match. Please try again.",
+        needsProof: true,
+        status: (result as any).status || "mismatch",
+        attemptCount: (result as any).attemptCount,
+        maxAttempts: (result as any).maxAttempts,
+      });
       return;
     }
 

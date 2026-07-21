@@ -25,6 +25,7 @@ import institutionRoutes from "./routes/institutionRoutes.js";
 import adminIssueRoutes from "./routes/adminIssueRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import auditLogRoutes from "./routes/auditLogRoutes.js";
+import branchCodeRoutes from "./routes/branchCodeRoutes.js";
 import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
@@ -32,6 +33,20 @@ import { initAgenda } from "./scheduler/agenda.js";
 
 const app = express();
 
+const parseTrustProxy = (value: string | undefined): boolean | number | string => {
+  if (!value) {
+    return process.env.NODE_ENV === "production" ? 1 : false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+
+  const numericValue = Number(normalized);
+  return Number.isInteger(numericValue) ? numericValue : value;
+};
+
+app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 app.set("etag", false);
 app.use(cors());
 // Allow larger JSON payloads (base64 images for AI validation)
@@ -115,6 +130,7 @@ app.use("/upload", uploadRoutes);
 app.use("/issues", issueRoutes);
 app.use("/admin/issues", adminIssueRoutes);
 app.use("/audit-logs", auditLogRoutes);
+app.use("/branch-codes", branchCodeRoutes);
 app.use("/institutions", institutionRoutes);
 
 app.get("/", (req: Request, res: Response) => {

@@ -180,7 +180,6 @@ ${candidatesInfo}
     throw error;
   }
 }
-
 export function extractAccountCandidates(text: string): string[] {
   const normalized = text.replace(/[^\x20-\x7E\n]/g, " ");
 

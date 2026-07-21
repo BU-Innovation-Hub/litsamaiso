@@ -25,6 +25,7 @@ import UsersPage from './pages/UsersPage';
 import ElectionsManagementPage from './pages/ElectionsManagementPage';
 import InstitutionsPage from './pages/InstitutionsPage';
 import AuditLogsPage from './pages/AuditLogsPage';
+import BranchCodesPage from './pages/BranchCodesPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
 
@@ -99,6 +100,9 @@ function App() {
               </Route>
               <Route element={<RoleRoute allowedRoles={['AppAdmin']} />}>
                 <Route path="/audit-logs" element={<AuditLogsPage />} />
+              </Route>
+              <Route element={<RoleRoute allowedRoles={roleAccess.branchCodes} />}>
+                <Route path="/branch-codes" element={<BranchCodesPage />} />
               </Route>
             </Route>
           </Route>

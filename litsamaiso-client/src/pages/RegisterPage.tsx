@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage } from '../utils/apiError';
+import PasswordInput from '../components/ui/PasswordInput';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -13,7 +14,6 @@ const RegisterPage: React.FC = () => {
     password: '',
     confirmPassword: '',
     studentId: '',
-    borrowerNumber: '',
   });
 
   const handleChange = (
@@ -36,23 +36,12 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
-    if (!formData.borrowerNumber.trim()) {
-      toast.error("Enter your NMDS borrower's number");
-      return;
-    }
-
-    if (!/^\d{12}$/.test(formData.borrowerNumber.trim())) {
-      toast.error('Borrower number must be exactly 12 digits');
-      return;
-    }
-
     try {
       await register({
         email: formData.email,
         password: formData.password,
         role,
         studentId: formData.studentId || undefined,
-        borrowerNumber: formData.borrowerNumber || undefined,
       });
 
       toast.success('Account created successfully! Please sign in.');
@@ -103,15 +92,7 @@ const RegisterPage: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Register As</label>
-              <input
-                type="text"
-                value="Student"
-                disabled
-              />
-            </div>
-
+            
             <div className="space-y-2">
               <label className="text-sm font-medium">Email Address</label>
               <input
@@ -136,21 +117,9 @@ const RegisterPage: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">NMDS Borrower's Number</label>
-              <input
-                name="borrowerNumber"
-                value={formData.borrowerNumber}
-                onChange={handleChange}
-                placeholder="e.g. 202211001706"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
               <label className="text-sm font-medium">Password</label>
-              <input
+              <PasswordInput
                 name="password"
-                type="password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="Enter your password"
@@ -160,9 +129,8 @@ const RegisterPage: React.FC = () => {
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Confirm Password</label>
-              <input
+              <PasswordInput
                 name="confirmPassword"
-                type="password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 placeholder="Confirm your password"

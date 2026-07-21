@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
+import { ExplainerVideo } from "@/components/ExplainerVideo";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
@@ -252,7 +253,7 @@ const LandingPage = () => {
           </div>
         </nav>
 
-        <div className="relative z-10 flex justify-center items-center min-h-[calc(100vh-96px)] w-full pb-16 pt-10 md:px-8">
+        <div className="relative z-10 flex justify-center items-center min-h-[calc(100vh-96px)] w-full px-4 pb-16 pt-10 md:px-8">
           <motion.div
             className="mx-auto max-w-4xl text-center"
             initial="hidden"
@@ -260,11 +261,6 @@ const LandingPage = () => {
             variants={fadeUp}
             transition={{ duration: 0.7, ease: "easeOut" }}
           >
-            <div className="mx-auto mb-7 inline-flex sm:hidden items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-active-clr shadow-[0_0_22px_rgba(83,91,192,0.9)]" />
-              Student services, funding confirmations, and governance in one
-              place
-            </div>
 
             <h1 className="mx-auto max-w-4xl text-5xl font-semibold leading-[1.02] text-primary-clr md:text-7xl">
               Make academic support feel connected, and accountable.
@@ -285,7 +281,7 @@ const LandingPage = () => {
                 <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" />
               </Link>
               <a
-                href="#capabilities"
+                href="#video"
                 className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-7 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 sm:w-auto"
               >
                 Explore platform
@@ -297,6 +293,10 @@ const LandingPage = () => {
       </section>
 
       <main>
+        <section id="video">
+          <ExplainerVideo />
+        </section>
+
         <section
           id="capabilities"
           className="relative overflow-hidden py-24 md:py-32"
@@ -507,13 +507,13 @@ const LandingPage = () => {
                   specialists building a platform institutions can trust.
                 </p>
               </div>
-              <Link
-                to="/login"
+              <a
+                href="mailto:support@litsamaiso.com"
                 className="inline-flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:bg-gray-50"
               >
                 Work with us
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -576,7 +576,7 @@ const LandingPage = () => {
                   to="/login"
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary-clr px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90"
                 >
-                  Launch workspace
+                  Launch platform
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
@@ -604,17 +604,12 @@ const LandingPage = () => {
               Academic support, confirmations, and student operations made
               clearer for every team involved.
             </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {footerLinks.map((item) => (
-              <a
-                key={item}
-                href="#hero"
-                className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-500 transition hover:bg-gray-200 hover:text-gray-700"
-              >
-                {item}
-              </a>
-            ))}
+            <a
+              href="mailto:support@litsamaiso.com"
+              className="mt-3 inline-flex text-sm font-medium text-primary-clr transition hover:text-active"
+            >
+              support@litsamaiso.com
+            </a>
           </div>
         </div>
       </footer>

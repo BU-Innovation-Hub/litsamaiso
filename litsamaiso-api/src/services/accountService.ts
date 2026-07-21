@@ -6,6 +6,7 @@ import { Institution } from "../models/Institution.js";
 import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 import { Student } from "../models/Student.js";
+import { lookupBranchCode } from "./branchCodeService.js";
 import type { Types } from "mongoose";
 import { getEmailBranding, sendEmail } from "../utils/email.js";
 import React from "react";
@@ -495,6 +496,13 @@ interface AccountConfirmationResult {
   status: string;
   alreadyConfirmed: boolean;
   graduating?: boolean;
+  needsProof?: boolean;
+  issueCreated?: boolean;
+  issue?: unknown;
+  message?: string;
+  redirectTo?: string;
+  attemptCount?: number;
+  maxAttempts?: number;
 }
 
 const escapeRegex = (value: string): string =>
@@ -673,19 +681,26 @@ export const accountConfirmation = async (
     if (!accountMatches) reasons.push("accountNumberMismatch");
     if (!bankMatches) reasons.push("bankNameMismatch");
 
-    // Create or update Issue for mismatches
-    // If student provided proof URLs or a document, or they've already tried once,
-    // create/update an Issue and notify finance. Otherwise, increment the student's
-    // confirmationAttempts and ask them to upload proof and try again.
+    // Create/update an Issue only on the second failed confirmation attempt.
+    // Uploading proof should enrich the issue payload, not skip the retry window.
     const existingIssue = await Issue.findOne({ studentId: input.studentId });
+    const maxAttempts = 2;
+    const nextAttempts = Number((student as any).confirmationAttempts || 0) + 1;
 
-    const hasProof = (Array.isArray(input.proofUrls) && input.proofUrls.length > 0) || Boolean(input.documentBase64);
+    (student as any).confirmationAttempts = nextAttempts;
+    await (student as any).save();
 
-    if (!hasProof && ( !(student as any).confirmationAttempts || (student as any).confirmationAttempts < 1 )) {
-      // Give student a chance to upload proof first
-      (student as any).confirmationAttempts = ((student as any).confirmationAttempts || 0) + 1;
-      await (student as any).save();
-      return { accountId: accountByBorrowerNo._id, confirmationDate: new Date(), status: 'mismatch', alreadyConfirmed: false, needsProof: true, message: 'Account details do not match. Please upload a clearer bank confirmation and try again.' } as any;
+    if (nextAttempts < maxAttempts) {
+      return {
+        accountId: accountByBorrowerNo._id,
+        confirmationDate: new Date(),
+        status: "mismatch",
+        alreadyConfirmed: false,
+        needsProof: true,
+        attemptCount: nextAttempts,
+        maxAttempts,
+        message: "Account details do not match. Please check the bank name and account number, then try again.",
+      };
     }
 
     // Build issue payload
@@ -698,6 +713,7 @@ export const accountConfirmation = async (
       recordedAccountNumber: accountByBorrowerNo.accountNumber,
       reasons,
       status: 'submitted',
+      attempts: nextAttempts,
     };
 
     if (Array.isArray(input.proofUrls) && input.proofUrls.length) issuePayload.proofUrls = input.proofUrls;
@@ -714,7 +730,9 @@ export const accountConfirmation = async (
 
     let issue: any = null;
     if (existingIssue) {
-      issue = await Issue.findOneAndUpdate({ studentId: input.studentId }, { $set: issuePayload, $inc: { attempts: 1 } }, { new: true, runValidators: true });
+      const issueUpdatePayload = { ...issuePayload };
+      delete issueUpdatePayload.attempts;
+      issue = await Issue.findOneAndUpdate({ studentId: input.studentId }, { $set: issueUpdatePayload, $inc: { attempts: 1 } }, { new: true, runValidators: true });
       await notifyFinanceUsersAboutIssue({
         institutionId: input.institutionId,
         studentId: input.studentId,
@@ -743,7 +761,18 @@ export const accountConfirmation = async (
     (student as any).confirmationAttempts = 0;
     await (student as any).save();
 
-    return { issueCreated: true, issue } as any;
+    return {
+      accountId: accountByBorrowerNo._id,
+      confirmationDate: new Date(),
+      status: "mismatch",
+      alreadyConfirmed: false,
+      issueCreated: true,
+      issue,
+      attemptCount: nextAttempts,
+      maxAttempts,
+      redirectTo: "/issues",
+      message: "Account details do not match after two attempts. An issue has been created for finance review.",
+    };
   }
 
   // Step 4: Account details match - confirm
@@ -774,6 +803,30 @@ export const accountConfirmation = async (
 
   if (shouldSave) {
     await accountByBorrowerNo.save();
+  }
+
+  if ((student as any).confirmationAttempts) {
+    (student as any).confirmationAttempts = 0;
+    await (student as any).save();
+  }
+
+  // Assign branch code based on bank name
+  if (!accountByBorrowerNo.branchCode) {
+    try {
+      const branchEntry = await lookupBranchCode(
+        accountByBorrowerNo.bankName,
+        input.institutionId,
+      );
+      if (branchEntry) {
+        accountByBorrowerNo.branchCode = branchEntry.branchCode;
+        await accountByBorrowerNo.save();
+      }
+    } catch (lookupErr) {
+      console.warn(
+        `[accountConfirmation] Branch code lookup failed for bankName=${accountByBorrowerNo.bankName}:`,
+        lookupErr,
+      );
+    }
   }
 
   const result: AccountConfirmationResult = {

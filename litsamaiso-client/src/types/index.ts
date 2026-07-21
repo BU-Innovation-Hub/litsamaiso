@@ -54,7 +54,6 @@ export interface RegisterRequest {
   institutionName?: string;
   institutionEmail?: string;
   studentId?: string;
-  borrowerNumber?: string;
   faceImageBase64?: string;
   faceDescriptor?: number[];
   faceImageUrl?: string;
@@ -197,6 +196,17 @@ export interface Issue {
   extractedValue: string;
   correctedValue?: string;
   status: 'reported' | 'resolved';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Branch Code Types
+export interface BranchCode {
+  _id: string;
+  bankName: string;
+  branchCode: string;
+  description?: string;
+  institution: string | Institution;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -7,6 +7,7 @@ import type { Role, User, Institution } from '../types';
 import { getApiErrorMessage } from '../utils/apiError';
 import { getInstitutionName, getRoleName } from '../utils/userDisplay';
 import { useAuth } from '../hooks/useAuth';
+import PasswordInput from '../components/ui/PasswordInput';
 
 const getUserId = (user: User) => user.id || user._id || '';
 
@@ -395,8 +396,7 @@ const UsersPage: React.FC = () => {
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={newUserForm.password}
                   onChange={(e) => setNewUserForm((prev) => ({ ...prev, password: e.target.value }))}
                   className="w-full rounded-md border border-gray-300 px-3 py-2"
@@ -461,8 +461,7 @@ const UsersPage: React.FC = () => {
             <div className="mt-5 space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">New password</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={passwordForm.password}
                   onChange={(event) =>
                     setPasswordForm((prev) => ({ ...prev, password: event.target.value }))
@@ -472,8 +471,7 @@ const UsersPage: React.FC = () => {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">Confirm password</label>
-                <input
-                  type="password"
+                <PasswordInput
                   value={passwordForm.confirmPassword}
                   onChange={(event) =>
                     setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }))
