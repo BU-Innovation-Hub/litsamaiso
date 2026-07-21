@@ -581,7 +581,8 @@ export const assignBranchCodesForExport = async (
   }
 
   const matchInMemory = (bankName: string): string | undefined => {
-    const normalized = bankName.trim();
+    // const normalized = bankName.trim();
+    const normalized = String(bankName || "").trim();
     if (!normalized) return;
 
     const lower = normalized.toLowerCase();
@@ -609,17 +610,21 @@ export const assignBranchCodesForExport = async (
     }
   };
 
-  let assigned = 0;
-
+  const ops = [];
   for (const account of accounts) {
     if (account.branchCode) continue;
     const code = matchInMemory(account.bankName);
     if (code) {
-      account.branchCode = code;
-      await account.save();
-      assigned++;
+      ops.push({
+        updateOne: {
+          filter: { _id: account._id },
+          update: { $set: { branchCode: code } },
+        },
+      });
     }
   }
+  if (ops.length) await FinancialClearance.bulkWrite(ops);
+  const assigned = ops.length;
 
   return {
     total: accounts.length,
