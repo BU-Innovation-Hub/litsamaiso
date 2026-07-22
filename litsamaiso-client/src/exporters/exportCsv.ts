@@ -1,11 +1,12 @@
 import * as XLSX from 'xlsx';
-import { normalizeToRows, defaultFilename } from './utils';
+import { normalizeToRows, defaultFilename, forceTextColumns } from './utils';
 
 export const exportCsv = async ({ data, meta, filename }: { data: unknown; meta?: any; filename?: string }) => {
   const { columns, rows } = normalizeToRows(data);
   // create worksheet
   const wsData = [columns, ...rows.map((r: any) => columns.map((c) => r[c] ?? ''))];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
+  forceTextColumns(ws);
   const csv = XLSX.utils.sheet_to_csv(ws);
   const name = filename || defaultFilename(meta?.title || meta?.reportKey || 'report', 'csv');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

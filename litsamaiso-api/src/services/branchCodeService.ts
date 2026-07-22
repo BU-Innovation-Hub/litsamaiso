@@ -1,4 +1,5 @@
 import { BranchCode } from "../models/BranchCode.js";
+import { FinancialClearance } from "../models/FinancialClearance.js";
 import type { Types } from "mongoose";
 
 interface LookupResult {
@@ -52,3 +53,56 @@ export const lookupBranchCode = async (
 
 const escapeRegex = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const getMissingBankNames = async (
+  institutionId: string,
+): Promise<string[]> => {
+  const accountBanks = await FinancialClearance.distinct("bankName", {
+    institution: institutionId,
+    bankName: { $ne: "", $exists: true },
+  });
+
+  const existing = await BranchCode.find({ institution: institutionId })
+    .select("bankName")
+    .lean();
+
+  const existingLower = new Set(
+    existing.map((bc) => bc.bankName.toLowerCase().trim()),
+  );
+
+  const missing = accountBanks.filter((name) => {
+    const trimmed = String(name || "").trim();
+    return trimmed !== "" && !existingLower.has(trimmed.toLowerCase());
+  });
+
+  return missing.sort();
+};
+
+export const createMissingBranchCodes = async (
+  institutionId: string,
+  placeholderCode?: string,
+): Promise<{ created: number; bankNames: string[] }> => {
+  const missing = await getMissingBankNames(institutionId);
+  const code = placeholderCode || "PENDING";
+  const createdNames: string[] = [];
+
+  for (const bankName of missing) {
+    try {
+      await BranchCode.create({
+        bankName: bankName.trim(),
+        branchCode: code,
+        institution: institutionId,
+      });
+      createdNames.push(bankName);
+    } catch (err: any) {
+      if (err.code !== 11000) {
+        console.warn(
+          `[createMissingBranchCodes] Failed to create branch code for bankName=${bankName}:`,
+          err.message || String(err),
+        );
+      }
+    }
+  }
+
+  return { created: createdNames.length, bankNames: createdNames };
+};

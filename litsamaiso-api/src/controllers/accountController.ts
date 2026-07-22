@@ -4,6 +4,7 @@ import {
   loadPayedStudentsFromExcel,
   accountConfirmation,
   notifyFinanceUsersAboutIssue,
+  assignBranchCodesForExport,
   exportAccounts,
   getAccountListFilter,
   getAccountListLimit,
@@ -62,11 +63,16 @@ export const listAccounts = async (req: Request, res: Response) => {
     const params = (req.query || {}) as any;
     const limit = getAccountListLimit(params.limit);
     const q = getAccountListFilter(user, params);
+    const batchOptionsFilter = getAccountListFilter(user, {
+      institutionId: params.institutionId,
+    });
 
-    const accounts = await FinancialClearance.find(q).limit(limit).lean();
+    const [accounts, batchesDocs] = await Promise.all([
+      FinancialClearance.find(q).limit(limit).lean(),
+      FinancialClearance.distinct("batchNumber", batchOptionsFilter),
+    ]);
 
-    // compute batches list
-    const batches = Array.from(new Set((accounts || []).map((a: any) => a.batchNumber))).sort((a, b) => a - b);
+    const batches = (batchesDocs || []).filter((b: any) => b != null).sort((a: any, b: any) => a - b);
 
     res.json({ accounts, batches });
   } catch (err: any) {
@@ -97,6 +103,34 @@ export const exportAccountRecords = async (req: Request, res: Response) => {
     res.send(result.buffer);
   } catch (err: any) {
     console.error("[exportAccountRecords] Error:", err);
+    res.status(500).json({ message: err.message || String(err) });
+  }
+};
+
+export const assignBranchCodesAction = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const result = await assignBranchCodesForExport(user, req.query as any);
+
+    await recordAudit({
+      action: "account.assignBranchCodes",
+      actorId: user._id?.toString(),
+      actorEmail: user.email,
+      actorRole: (user.role && (user.role as any).name) || undefined,
+      targetCollection: "FinancialClearance",
+      details: {
+        total: result.total,
+        assigned: result.assigned,
+        skipped: result.skipped,
+      },
+    });
+
+    res.json({
+      message: `Branch codes assigned: ${result.assigned} updated, ${result.skipped} skipped out of ${result.total} total`,
+      result,
+    });
+  } catch (err: any) {
+    console.error("[assignBranchCodesAction] Error:", err);
     res.status(500).json({ message: err.message || String(err) });
   }
 };
@@ -317,7 +351,7 @@ export const validateBorrowerNumber = async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ valid: true, borrowerNumber: userRecord.borrowerNumber });
+    res.json({ valid: true, borrowerNumber: userRecord.borrowerNumber, accountNumber: account.accountNumber });
   } catch (err: any) {
     console.error("validateBorrowerNumber error:", err);
     res.status(500).json({ valid: false, message: err.message || String(err) });
@@ -326,16 +360,23 @@ export const validateBorrowerNumber = async (req: Request, res: Response) => {
 
 export const getConfirmationStatus = async (req: Request, res: Response) => {
   try {
+    const startedAt = Date.now();
     const user = (req as any).user;
     const instId = user.institution;
 
     if (!user.studentId) {
+      console.log(
+        `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=missing-student-id durationMs=${Date.now() - startedAt}`,
+      );
       res.status(400).json({ message: "Student identifier (studentId) is required" });
       return;
     }
 
     const student = await Student.findOne({ institution: instId, studentId: user.studentId }).lean();
     if (!student) {
+      console.log(
+        `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=student-not-found durationMs=${Date.now() - startedAt}`,
+      );
       res.status(404).json({ message: "Student record not found" });
       return;
     }
@@ -354,13 +395,19 @@ export const getConfirmationStatus = async (req: Request, res: Response) => {
     }
 
     if (!account) {
+      console.log(
+        `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=no-account durationMs=${Date.now() - startedAt}`,
+      );
       res.json({ confirmed: false });
       return;
     }
 
     const confirmed = String(account.status || "").toLowerCase() === "confirmed" && account.confirmedBy && String((account as any).confirmedBy) === String(student._id);
 
-    res.json({ confirmed, status: account.status, confirmationDate: account.confirmationDate });
+    console.log(
+      `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=ok confirmed=${Boolean(confirmed)} durationMs=${Date.now() - startedAt}`,
+    );
+    res.json({ confirmed, status: account.status, confirmationDate: account.confirmationDate, branchCode: account.branchCode });
   } catch (err: any) {
     console.error("getConfirmationStatus error:", err);
     res.status(500).json({ message: err.message || String(err) });
@@ -750,7 +797,7 @@ export const updateAccount = async (req: Request, res: Response) => {
 
     // find account scoped to institution (AppAdmin may provide institution filter via query)
     const q: any = { _id: id };
-    if (!((user.role && (user.role as any).name) || "").toLowerCase().includes("appadmin")) {
+    if (String((user.role && (user.role as any).name) || "").toLowerCase() !== "appadmin") {
       q.institution = instId;
     }
 

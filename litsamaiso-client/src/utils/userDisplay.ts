@@ -36,3 +36,17 @@ export const getUserInitials = (name: string) =>
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+const STORAGE_STRIP_FIELDS = new Set([
+  'faceDescriptor',
+  'faceImageUrl',
+]);
+
+export const sanitizeUserForStorage = (user: User | null): User | null => {
+  if (!user) return null;
+  const sanitized = { ...user };
+  for (const key of STORAGE_STRIP_FIELDS) {
+    delete (sanitized as Record<string, unknown>)[key];
+  }
+  return sanitized;
+};

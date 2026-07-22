@@ -75,17 +75,20 @@ export const listUsers = async (req: Request, res: Response): Promise<void> => {
   }
 
   const pageNum = Math.max(parseInt(page) || 1, 1);
-  const lim = Math.max(Math.min(parseInt(limit) || 100, 1000), 1);
+  const lim = Math.max(Math.min(parseInt(limit) || 10000, 10000), 1);
   const skip = (pageNum - 1) * lim;
 
-  const users = await User.find(query)
-    .select("email role institution studentId faceImageUrl name")
-    .populate("role", "name")
-    .populate("institution", "name email")
-    .skip(skip)
-    .limit(lim);
+  const [users, total] = await Promise.all([
+    User.find(query)
+      .select("email role institution studentId faceImageUrl name")
+      .populate("role", "name")
+      .populate("institution", "name email")
+      .skip(skip)
+      .limit(lim),
+    User.countDocuments(query),
+  ]);
 
-  res.json({ users });
+  res.json({ users, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
 };
 
 export const getUser = async (req: Request, res: Response): Promise<void> => {
@@ -93,7 +96,7 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
   const currentUser = (req as any).user;
 
   const user = await User.findById(id)
-    .select("email role institution studentId faceImageUrl")
+    .select("email role institution studentId faceImageUrl name")
     .populate("role", "name")
     .populate("institution", "name email");
   if (!user) {
@@ -195,15 +198,13 @@ export const updateUser = async (
 
   await user.save();
 
-  res.json({
-    message: "User updated",
-    user: {
-      id: user._id,
-      email: user.email,
-      role: user.role,
-      institution: user.institution,
-    },
-  });
+  const updatedUser = await User.findById(user._id)
+    .select("email role institution studentId faceImageUrl name borrowerNumber studentCardUrl")
+    .populate("role", "name")
+    .populate("institution", "name email")
+    .lean();
+
+  res.json({ message: "User updated", user: updatedUser });
 };
 
 export const deleteUser = async (

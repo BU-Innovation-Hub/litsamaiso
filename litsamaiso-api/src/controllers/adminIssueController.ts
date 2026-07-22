@@ -10,6 +10,9 @@ export const listAdminIssues = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
     const params = req.query || {} as any;
+    const pageNum = Math.max(parseInt(params.page as string) || 1, 1);
+    const lim = Math.max(Math.min(parseInt(params.limit as string) || 10000, 10000), 1);
+    const skip = (pageNum - 1) * lim;
 
     // restrict to issues submitted for students in this institution
     const studentDocs = await Student.find({ institution: user.institution }).select("studentId name email").lean();
@@ -26,7 +29,10 @@ export const listAdminIssues = async (req: Request, res: Response) => {
       ];
     }
 
-    const issues = await Issue.find(q).sort({ createdAt: -1 }).lean();
+    const [issues, total] = await Promise.all([
+      Issue.find(q).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+      Issue.countDocuments(q),
+    ]);
 
     // attach account and student info
     const studentMap: Record<string, any> = {};
@@ -41,7 +47,7 @@ export const listAdminIssues = async (req: Request, res: Response) => {
       }),
     );
 
-    res.json({ data: results });
+    res.json({ data: results, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
   } catch (err: any) {
     console.error("[adminIssue] list error:", err);
     res.status(500).json({ error: err.message || String(err) });
@@ -89,8 +95,8 @@ export const approveIssue = async (req: Request, res: Response) => {
     const borrowerNumber = String(issue.borrowerNumber || student.borrowerNumber || "").trim();
     if (!borrowerNumber) return res.status(400).json({ error: "Issue missing borrowerNumber" });
 
-    const correctedBank = String(issue.correctedBankName || issue.bankName || "").trim();
-    const correctedAccount = String(issue.correctedAccountNumber || issue.accountNumber || "").trim();
+    const correctedBank = String(issue.correctedBankName || "").trim();
+    const correctedAccount = String(issue.correctedAccountNumber || "").trim();
     if (!correctedBank || !correctedAccount) return res.status(400).json({ error: "Issue has no corrected bank/account to apply" });
 
     const account = await FinancialClearance.findOne({ borrowerNumber, institution: user.institution });

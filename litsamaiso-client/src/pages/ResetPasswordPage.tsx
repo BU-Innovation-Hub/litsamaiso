@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { authService } from '../services/authService';
 import PasswordInput from '../components/ui/PasswordInput';
+import passwordResetBanner from '../assets/password-reset-banner.webp';
 
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
@@ -16,7 +17,6 @@ const ResetPasswordPage: React.FC = () => {
 
   useEffect(() => {
     if (!token || !email) {
-      // If no token/email in query, redirect to forgot page
       navigate('/forgot-password');
     }
   }, [token, email, navigate]);
@@ -42,6 +42,30 @@ const ResetPasswordPage: React.FC = () => {
   return (
     <div className="auth-bg">
       <div className="auth-card">
+        <div className="auth-left">
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ backgroundImage: `url(${passwordResetBanner})` }}
+          />
+          <div className="auth-left-content">
+            <span className="small-title">Set New Password</span>
+            <div className="hidden md:block">
+              <h2>
+                Choose a
+                <br />
+                New
+                <br />
+                Password
+              </h2>
+              <p>
+                Create a strong password that you don't
+                <br />
+                use for other accounts to stay secure.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="auth-right">
           <div className="logo mb-5 mt-5 md:mt-0">
             <img src="/logo-1.png" alt="Logo" width={35} height={35} />

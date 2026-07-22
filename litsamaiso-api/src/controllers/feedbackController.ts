@@ -38,7 +38,15 @@ export const submitFeedback = async (req: Request, res: Response) => {
 
 export const listFeedback = async (req: Request, res: Response) => {
   try {
-    const feedbacks = await Feedback.find().sort({ createdAt: -1 }).lean();
+    const { page, limit } = req.query as any;
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const lim = Math.max(Math.min(parseInt(limit) || 10000, 10000), 1);
+    const skip = (pageNum - 1) * lim;
+
+    const [feedbacks, total] = await Promise.all([
+      Feedback.find().sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
+      Feedback.countDocuments(),
+    ]);
 
     const user = (req as any).user;
     await recordAudit({
@@ -47,10 +55,10 @@ export const listFeedback = async (req: Request, res: Response) => {
       actorEmail: user?.email,
       actorRole: (user && (user.role as any)?.name) || undefined,
       targetCollection: "Feedback",
-      details: { count: feedbacks.length },
+      details: { count: total },
     });
 
-    res.json({ feedbacks });
+    res.json({ feedbacks, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
   } catch (err: any) {
     await recordAudit({
       action: "feedback.view.failed",

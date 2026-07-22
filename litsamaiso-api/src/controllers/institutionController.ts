@@ -17,8 +17,17 @@ export const listInstitutions = async (
   res: Response,
 ): Promise<void> => {
   try {
-    const institutions = await Institution.find().select("name email locked lockedReason");
-    res.json({ institutions });
+    const { page, limit } = req.query as any;
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const lim = Math.max(Math.min(parseInt(limit) || 10000, 10000), 1);
+    const skip = (pageNum - 1) * lim;
+
+    const [institutions, total] = await Promise.all([
+      Institution.find().select("name email locked lockedReason").skip(skip).limit(lim),
+      Institution.countDocuments(),
+    ]);
+
+    res.json({ institutions, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
   } catch (err: any) {
     res.status(500).json({ message: err.message || "Failed to list institutions" });
   }
@@ -133,7 +142,7 @@ export const updateInstitution = async (req: Request, res: Response): Promise<vo
 export const getInstitutionUsers = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { search, role } = req.query as any;
+    const { search, role, page, limit } = req.query as any;
 
     const institution = await Institution.findById(id).select("name email locked lockedReason");
     if (!institution) {
@@ -174,12 +183,20 @@ export const getInstitutionUsers = async (req: Request, res: Response): Promise<
       q.$or = [{ email: regex }, { studentId: regex }];
     }
 
-    const users = await User.find(q)
-      .select("email role institution studentId faceImageUrl")
-      .populate("role", "name")
-      .populate("institution", "name email");
+    const pageNum = Math.max(parseInt(page) || 1, 1);
+    const lim = Math.max(Math.min(parseInt(limit) || 10000, 10000), 1);
+    const skip = (pageNum - 1) * lim;
 
-    const total = users.length;
+    const [users, total] = await Promise.all([
+      User.find(q)
+        .select("email role institution studentId faceImageUrl name")
+        .populate("role", "name")
+        .populate("institution", "name email")
+        .skip(skip)
+        .limit(lim),
+      User.countDocuments(q),
+    ]);
+
     const roleCountsMap: Record<string, number> = {};
     for (const u of users) {
       const rname = (u.role && (u.role as any).name) || String(u.role || "");
@@ -187,7 +204,7 @@ export const getInstitutionUsers = async (req: Request, res: Response): Promise<
     }
     const roleCounts = Object.keys(roleCountsMap).map((r) => ({ role: r, count: roleCountsMap[r] }));
 
-    res.json({ institution, users, roleCounts, total });
+    res.json({ institution, users, roleCounts, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
   } catch (err: any) {
     res.status(500).json({ message: err.message || "Failed to load institution users" });
   }

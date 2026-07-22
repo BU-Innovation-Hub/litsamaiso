@@ -63,12 +63,19 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     faceImageUrl?: string;
   };
 
-  if (!email || !password || !role) {
+  const normalizedEmail =
+    typeof email === "string" ? email.trim().toLowerCase() : "";
+  const normalizedInstitutionEmail =
+    typeof institutionEmail === "string"
+      ? institutionEmail.trim().toLowerCase()
+      : "";
+
+  if (!normalizedEmail || !password || !role) {
     res.status(400).json({ message: "email, password, and role are required" });
     return;
   }
 
-  const existingUser = await User.findOne({ email });
+  const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
     res.status(409).json({ message: "Email already exists" });
     return;
@@ -89,7 +96,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   const roleName = String(roleDoc.name || "").toLowerCase();
   if (roleName === "institutionadmin") {
-    if (!institutionName || !institutionEmail) {
+    if (!institutionName || !normalizedInstitutionEmail) {
       res.status(400).json({
         message:
           "institutionName and institutionEmail are required for InstitutionAdmin",
@@ -98,7 +105,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
 
     const existingInstitution = await Institution.findOne({
-      email: institutionEmail,
+      email: normalizedInstitutionEmail,
     });
     if (existingInstitution) {
       res.status(409).json({ message: "Institution email already exists" });
@@ -107,7 +114,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     institution = await Institution.create({
       name: institutionName,
-      email: institutionEmail,
+      email: normalizedInstitutionEmail,
     });
   } else {
     // If the registrant is a Student and provided a studentId, determine the institution from that record
@@ -159,7 +166,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       // ensure email matches the record
       if (
         String(studentRecord.email).toLowerCase() !==
-        String(email).toLowerCase()
+        normalizedEmail
       ) {
         res.status(400).json({
           message: "Email and the studentId must belong to the same person",
@@ -176,7 +183,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       // no studentId -> institution must have been provided and validated earlier
       const studentByEmail = await Student.findOne({
         institution: institution._id,
-        email,
+        email: normalizedEmail,
       }).lean();
       if (!studentByEmail) {
         res.status(400).json({
@@ -205,7 +212,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     faceDescriptor?: number[];
     faceImageUrl?: string;
   } = {
-    email,
+    email: normalizedEmail,
     password: hashedPassword,
     role: roleDoc._id,
     institution: institution._id,
@@ -250,23 +257,42 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 };
 
 export const login = async (req: Request, res: Response): Promise<void> => {
-  const { email, password, rememberMe } = req.body as {
+  const { email, studentId, password, rememberMe } = req.body as {
     email?: string;
+    studentId?: string;
     password?: string;
     rememberMe?: boolean;
   };
 
-  if (!email || !password) {
-    res.status(400).json({ message: "email and password are required" });
+  const normalizedEmail =
+    typeof email === "string" ? email.trim().toLowerCase() : "";
+  const normalizedStudentId =
+    typeof studentId === "string" ? studentId.trim() : "";
+
+  const identifier = normalizedEmail || normalizedStudentId;
+  if (!identifier || !password) {
+    res.status(400).json({ message: "email or studentId and password are required" });
     return;
   }
 
-  const user = await User.findOne({ email })
+  const isEmail = Boolean(normalizedEmail);
+  const user = await User.findOne(
+    isEmail ? { email: normalizedEmail } : { studentId: normalizedStudentId },
+  )
     .select("+password")
     .populate("role", "name")
-    .populate("institution", "name email");
+    .populate("institution", "name email locked lockedReason");
   if (!user) {
     res.status(401).json({ message: "Invalid credentials" });
+    return;
+  }
+
+  if ((user.institution as any)?.locked) {
+    res.status(403).json({
+      message: "Your institution account has been locked",
+      locked: true,
+      lockedReason: (user.institution as any).lockedReason || undefined,
+    });
     return;
   }
 
@@ -287,6 +313,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       role: user.role,
       institution: user.institution,
       studentId: user.studentId,
+      borrowerNumber: user.borrowerNumber,
       studentCardUrl: user.studentCardUrl,
       faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,
@@ -299,13 +326,15 @@ export const requestPasswordReset = async (
   res: Response,
 ): Promise<void> => {
   const { email } = req.body as { email?: string };
+  const normalizedEmail =
+    typeof email === "string" ? email.trim().toLowerCase() : "";
 
-  if (!email) {
+  if (!normalizedEmail) {
     res.status(400).json({ message: "email is required" });
     return;
   }
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ email: normalizedEmail });
   if (user) {
     const rawToken = randomBytes(32).toString("hex");
     const tokenHash = hashResetToken(rawToken);
@@ -319,11 +348,11 @@ export const requestPasswordReset = async (
     const origin = req.get("origin")?.replace(/\/$/, "") || "";
     const resetBase = baseUrl || origin;
     const resetLink = resetBase
-      ? `${resetBase}/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`
+      ? `${resetBase}/reset-password?token=${rawToken}&email=${encodeURIComponent(normalizedEmail)}`
       : rawToken;
 
     await sendPasswordResetEmail({
-      to: email,
+      to: normalizedEmail,
       resetLink,
     });
   }
@@ -343,8 +372,10 @@ export const resetPassword = async (
     token?: string;
     password?: string;
   };
+  const normalizedEmail =
+    typeof email === "string" ? email.trim().toLowerCase() : "";
 
-  if (!email || !token || !password) {
+  if (!normalizedEmail || !token || !password) {
     res
       .status(400)
       .json({ message: "email, token, and password are required" });
@@ -353,7 +384,7 @@ export const resetPassword = async (
 
   const tokenHash = hashResetToken(token);
   const user = await User.findOne({
-    email,
+    email: normalizedEmail,
     passwordResetTokenHash: tokenHash,
     passwordResetTokenExpiresAt: { $gt: new Date() },
   }).select("+passwordResetTokenHash +passwordResetTokenExpiresAt");
@@ -364,16 +395,9 @@ export const resetPassword = async (
   }
 
   user.password = await bcrypt.hash(password, 10);
+  user.passwordResetTokenHash = undefined as any;
+  user.passwordResetTokenExpiresAt = undefined as any;
   await user.save();
-  await User.updateOne(
-    { _id: user._id },
-    {
-      $unset: {
-        passwordResetTokenHash: 1,
-        passwordResetTokenExpiresAt: 1,
-      },
-    },
-  );
 
   res.json({ message: "Password reset successful" });
 };

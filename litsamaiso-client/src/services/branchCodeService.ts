@@ -27,4 +27,14 @@ export const branchCodeService = {
     const response = await apiClient.delete<{ message: string }>(`/branch-codes/${encodeURIComponent(id)}`);
     return response.data;
   },
+
+  getMissingBanks: async () => {
+    const response = await apiClient.get<{ data: string[] }>('/branch-codes/missing-banks');
+    return response.data.data;
+  },
+
+  createMissingBanks: async () => {
+    const response = await apiClient.post<{ message: string; result: { created: number; bankNames: string[] } }>('/branch-codes/create-missing');
+    return response.data;
+  },
 };

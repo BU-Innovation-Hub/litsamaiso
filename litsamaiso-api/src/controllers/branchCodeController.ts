@@ -1,6 +1,10 @@
 import type { Request, Response } from "express";
 import { BranchCode } from "../models/BranchCode.js";
 import { recordAudit } from "../utils/auditLog.js";
+import {
+  getMissingBankNames,
+  createMissingBranchCodes,
+} from "../services/branchCodeService.js";
 
 const getUserInstitution = (req: Request): string => {
   const user = (req as any).user;
@@ -69,9 +73,9 @@ export const getBranchCodeById = async (req: Request, res: Response) => {
 };
 
 export const createBranchCode = async (req: Request, res: Response) => {
+  const { bankName, branchCode, description } = req.body || {};
+  const institutionId = getUserInstitution(req);
   try {
-    const { bankName, branchCode, description } = req.body || {};
-    const institutionId = getUserInstitution(req);
 
     if (!bankName || !String(bankName).trim()) {
       res.status(400).json({ message: "bankName is required" });
@@ -110,7 +114,14 @@ export const createBranchCode = async (req: Request, res: Response) => {
     res.status(201).json({ message: "BranchCode created", data: entry });
   } catch (err: any) {
     if (err.code === 11000) {
-      res.status(409).json({ message: "A branch code for this bank already exists in this institution" });
+      const conflictBank = String(bankName || "").trim();
+      console.error(
+        `[createBranchCode] 409 Duplicate key for institution=${institutionId}, bankName="${conflictBank}"`,
+      );
+      res.status(409).json({
+        message: `A branch code for "${conflictBank}" already exists in this institution`,
+        conflictBank,
+      });
       return;
     }
     console.error("[createBranchCode] Error:", err);
@@ -119,15 +130,16 @@ export const createBranchCode = async (req: Request, res: Response) => {
 };
 
 export const updateBranchCode = async (req: Request, res: Response) => {
+  const id = String(req.params.id || "").trim();
+  const { bankName, branchCode, description } = req.body || {};
+  const setObj: any = {};
+  const institutionId = getUserInstitution(req);
   try {
-    const id = String(req.params.id || "").trim();
     if (!id) {
       res.status(400).json({ message: "BranchCode id is required" });
       return;
     }
 
-    const { bankName, branchCode, description } = req.body || {};
-    const setObj: any = {};
     if (bankName !== undefined) setObj.bankName = String(bankName).trim();
     if (branchCode !== undefined) setObj.branchCode = String(branchCode).trim();
     if (description !== undefined) setObj.description = description ? String(description).trim() : undefined;
@@ -137,7 +149,6 @@ export const updateBranchCode = async (req: Request, res: Response) => {
       return;
     }
 
-    const institutionId = getUserInstitution(req);
     const q: any = { _id: id };
     const roleName = ((req as any).user?.role && ((req as any).user.role as any).name || "").toLowerCase();
     if (roleName !== "appadmin") {
@@ -169,7 +180,14 @@ export const updateBranchCode = async (req: Request, res: Response) => {
     res.json({ message: "BranchCode updated", data: entry });
   } catch (err: any) {
     if (err.code === 11000) {
-      res.status(409).json({ message: "A branch code for this bank already exists in this institution" });
+      const conflictBank = String(setObj.bankName || "").trim();
+      console.error(
+        `[updateBranchCode] 409 Duplicate key for institution=${institutionId}, bankName="${conflictBank}"`,
+      );
+      res.status(409).json({
+        message: `A branch code for "${conflictBank}" already exists in this institution`,
+        conflictBank,
+      });
       return;
     }
     console.error("[updateBranchCode] Error:", err);
@@ -212,6 +230,52 @@ export const deleteBranchCode = async (req: Request, res: Response) => {
     res.json({ message: "BranchCode deleted" });
   } catch (err: any) {
     console.error("[deleteBranchCode] Error:", err);
+    res.status(500).json({ message: err.message || String(err) });
+  }
+};
+
+export const getMissingBanks = async (req: Request, res: Response) => {
+  try {
+    const institutionId = getUserInstitution(req);
+    if (!institutionId) {
+      res.status(400).json({ message: "Institution is required" });
+      return;
+    }
+
+    const missing = await getMissingBankNames(institutionId);
+    res.json({ data: missing });
+  } catch (err: any) {
+    console.error("[getMissingBanks] Error:", err);
+    res.status(500).json({ message: err.message || String(err) });
+  }
+};
+
+export const createMissingBanks = async (req: Request, res: Response) => {
+  try {
+    const institutionId = getUserInstitution(req);
+    if (!institutionId) {
+      res.status(400).json({ message: "Institution is required" });
+      return;
+    }
+
+    const result = await createMissingBranchCodes(institutionId);
+
+    const user = (req as any).user;
+    await recordAudit({
+      action: "branchCode.createMissing",
+      actorId: user._id?.toString(),
+      actorEmail: user.email,
+      actorRole: (user.role && (user.role as any).name) || undefined,
+      targetCollection: "BranchCode",
+      details: { created: result.created, bankNames: result.bankNames },
+    });
+
+    res.status(result.created > 0 ? 201 : 200).json({
+      message: `${result.created} branch code(s) created with placeholder codes`,
+      result,
+    });
+  } catch (err: any) {
+    console.error("[createMissingBanks] Error:", err);
     res.status(500).json({ message: err.message || String(err) });
   }
 };
