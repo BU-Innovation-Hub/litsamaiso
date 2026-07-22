@@ -325,8 +325,18 @@ const LandingPage = () => {
                     variants={fadeUp}
                     transition={{ duration: 0.55, ease: "easeOut" }}
                   >
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(83,91,192,0.22),transparent_34%)] opacity-0 transition group-hover:opacity-100" />
-                    <div className="relative flex h-full flex-col gap-8">
+                    <div
+                      className={cn(
+                        "absolute inset-0 opacity-0 transition group-hover:opacity-100",
+                        card.title === "Role-aware access"
+                          ? "bg-[radial-gradient(circle_at_20%_10%,rgba(54,59,99,0.22),transparent_34%)]"
+                          : card.dark
+                            ? "bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.06),transparent_34%)]"
+                            : "bg-[radial-gradient(circle_at_20%_10%,rgba(83,91,192,0.22),transparent_34%)]"
+                      )}
+                    />
+                    <div className="relative flex h-full flex-col justify-between gap-8">
+
                       <div>
                         <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 text-primary-clr">
                           <Icon className="h-5 w-5" />
