@@ -332,7 +332,7 @@ const LandingPage = () => {
                     transition={{ duration: 0.55, ease: "easeOut" }}
                   >
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(83,91,192,0.22),transparent_34%)] opacity-0 transition group-hover:opacity-100" />
-                    <div className="relative flex h-full flex-col justify-between gap-8">
+                    <div className="relative flex h-full flex-col gap-8">
                       <div>
                         <span className={cn("flex h-11 w-11 items-center justify-center rounded-2xl border", card.dark ? "border-[#363B63] bg-[#252a3d] text-white" : "border-gray-200 bg-gray-100 text-primary-clr")}>
                           <Icon className="h-5 w-5" />
