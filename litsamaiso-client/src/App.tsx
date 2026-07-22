@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { PostHogErrorBoundary } from '@posthog/react';
@@ -10,25 +11,30 @@ import { isAdminDashboardRole } from './navigation';
 import { roleAccess } from './utils/roleAccess';
 import { getRoleName } from './utils/userDisplay';
 
-// Pages
-import LandingPage from './pages/LandingPage';
-import LoginPage from './pages/LoginPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import RegisterPage from './pages/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
-import ElectionsPage from './pages/ElectionsPage';
-import VotingPage from './pages/VotingPage';
-import AccountsPage from './pages/AccountsPage';
-import AccountConfirmationPage from './pages/AccountConfirmationPage';
-import IssuesPage from './pages/IssuesPage';
-import UsersPage from './pages/UsersPage';
-import ElectionsManagementPage from './pages/ElectionsManagementPage';
-import InstitutionsPage from './pages/InstitutionsPage';
-import AuditLogsPage from './pages/AuditLogsPage';
-import BranchCodesPage from './pages/BranchCodesPage';
-import NotFoundPage from './pages/NotFoundPage';
-import ProfilePage from './pages/ProfilePage';
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const ElectionsPage = lazy(() => import('./pages/ElectionsPage'));
+const VotingPage = lazy(() => import('./pages/VotingPage'));
+const AccountsPage = lazy(() => import('./pages/AccountsPage'));
+const AccountConfirmationPage = lazy(() => import('./pages/AccountConfirmationPage'));
+const IssuesPage = lazy(() => import('./pages/IssuesPage'));
+const UsersPage = lazy(() => import('./pages/UsersPage'));
+const ElectionsManagementPage = lazy(() => import('./pages/ElectionsManagementPage'));
+const InstitutionsPage = lazy(() => import('./pages/InstitutionsPage'));
+const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'));
+const BranchCodesPage = lazy(() => import('./pages/BranchCodesPage'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+
+const PageLoader = () => (
+  <div className="flex min-h-screen items-center justify-center">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-active-clr" />
+  </div>
+);
 
 import './index.css';
 
@@ -61,6 +67,7 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <Toaster richColors position="top-right" />
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
 
@@ -111,6 +118,7 @@ function App() {
           {/* Catch all - 404 */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
     </PostHogErrorBoundary>
