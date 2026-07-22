@@ -2,6 +2,7 @@ import { AxiosError } from 'axios';
 import apiClient from '../lib/api';
 import type { AuthResponse, LoginRequest, RegisterRequest } from '../types';
 import type { Institution, Role, User } from '../types';
+import { sanitizeUserForStorage } from '../utils/userDisplay';
 
 const normalizeRole = (role: User['role'] | string): Role => {
   if (typeof role === 'string') {
@@ -35,7 +36,7 @@ export const authService = {
     const data = normalizeAuthResponse(response.data);
     if (data.token) {
       localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(data.user)));
     }
     return data;
   },
@@ -58,7 +59,7 @@ export const authService = {
     const responseData = normalizeAuthResponse(response.data);
     if (responseData.token) {
       localStorage.setItem('authToken', responseData.token);
-      localStorage.setItem('user', JSON.stringify(responseData.user));
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(responseData.user)));
     }
     return responseData;
   },
