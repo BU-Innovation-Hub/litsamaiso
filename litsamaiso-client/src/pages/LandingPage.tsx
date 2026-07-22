@@ -267,7 +267,7 @@ const LandingPage = () => {
 
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
-                to="/login"
+                to="/register"
                 className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary-clr px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90 sm:w-auto"
               >
                 Get started
