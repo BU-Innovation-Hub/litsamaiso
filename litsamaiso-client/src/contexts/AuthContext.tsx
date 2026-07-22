@@ -1,17 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { User } from '../types';
 import { authService } from '../services/authService';
 import { AuthContext } from './authContextValue';
+import { onAuthExpired } from '../lib/api';
 import posthog from 'posthog-js';
 
-const getStoredUser = (): User | null => {
-  const storedUser = localStorage.getItem('user');
-  if (!storedUser) return null;
-
+const clearStoredAuth = () => {
   try {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  } catch {
+    // Storage can be unavailable on some mobile WebKit contexts.
+  }
+};
+
+const getStoredUser = (): User | null => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const storedUser = localStorage.getItem('user');
+    if (!token || !storedUser) {
+      clearStoredAuth();
+      return null;
+    }
+
     return JSON.parse(storedUser) as User;
   } catch {
-    localStorage.removeItem('user');
+    clearStoredAuth();
     return null;
   }
 };
@@ -19,8 +34,25 @@ const getStoredUser = (): User | null => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(() => getStoredUser());
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    return onAuthExpired(() => {
+      posthog.capture('auth_expired_redirect', {
+        path: location.pathname,
+        apiDiagnostics: window.__litsamaisoApiDiagnostics || [],
+      });
+      clearStoredAuth();
+      setUser(null);
+      posthog.reset();
+      if (location.pathname !== '/login') {
+        navigate('/login', { replace: true });
+      }
+    });
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     if (user) {

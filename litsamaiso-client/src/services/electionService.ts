@@ -11,8 +11,8 @@ const noCacheRequest = (params?: Record<string, unknown>) => ({
 
 export const electionService = {
   // Get all active elections for the current institution
-  getElections: async () => {
-    const response = await apiClient.get<{ elections: Election[] }>('/elections', noCacheRequest());
+  getElections: async (params?: { page?: number; limit?: number }) => {
+    const response = await apiClient.get<{ elections: Election[] }>('/elections', noCacheRequest(params));
     return response.data.elections;
   },
 

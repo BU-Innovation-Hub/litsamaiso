@@ -6,12 +6,20 @@ import type { PostHogConfig } from 'posthog-js'
 import './index.css'
 import App from './App.tsx'
 
+const isIOSWebKit = (() => {
+  if (typeof navigator === 'undefined') return false
+  const userAgent = navigator.userAgent || ''
+  const platform = navigator.platform || ''
+  return /iP(hone|ad|od)/.test(userAgent) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+})()
+
 const posthogOptions: Partial<PostHogConfig> = {
   api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
   defaults: '2026-05-30',
   capture_pageview: 'history_change',
   capture_exceptions: true,
-  enable_recording_console_log: true,
+  disable_session_recording: isIOSWebKit,
+  enable_recording_console_log: !isIOSWebKit,
   session_recording: {
     maskAllInputs: false,
     maskInputOptions: {

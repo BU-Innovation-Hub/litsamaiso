@@ -30,14 +30,31 @@ const normalizeAuthResponse = (data: AuthResponse): AuthResponse => ({
   },
 });
 
+const storeAuthSession = (data: AuthResponse) => {
+  if (!data.token) return;
+  try {
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(data.user)));
+  } catch (error) {
+    clearAuthSession();
+    throw error;
+  }
+};
+
+const clearAuthSession = () => {
+  try {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  } catch {
+    // Ignore storage cleanup failures; callers still update React auth state.
+  }
+};
+
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
     const data = normalizeAuthResponse(response.data);
-    if (data.token) {
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(data.user)));
-    }
+    storeAuthSession(data);
     return data;
   },
 
@@ -57,10 +74,7 @@ export const authService = {
 
     const response = await apiClient.post<AuthResponse>('/auth/register', payload);
     const responseData = normalizeAuthResponse(response.data);
-    if (responseData.token) {
-      localStorage.setItem('authToken', responseData.token);
-      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(responseData.user)));
-    }
+    storeAuthSession(responseData);
     return responseData;
   },
 
@@ -72,8 +86,7 @@ export const authService = {
         throw error;
       }
     } finally {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
+      clearAuthSession();
     }
   },
 
@@ -96,8 +109,9 @@ export const authService = {
   },
 
   getCurrentUser: async () => {
+    const token = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('user');
-    return storedUser ? JSON.parse(storedUser) : null;
+    return token && storedUser ? JSON.parse(storedUser) : null;
   },
 
   getProfile: async (): Promise<{ data: User }> => {
@@ -112,7 +126,7 @@ export const authService = {
   },
 
   isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('authToken');
+    return !!localStorage.getItem('authToken') && !!localStorage.getItem('user');
   },
 };
 

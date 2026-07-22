@@ -6,6 +6,7 @@ import { notifyFinanceUsersAboutIssue } from "../services/accountService.js";
 
 export const listIssuesForStudent = async (req: Request, res: Response) => {
   try {
+    const startedAt = Date.now();
     const user = (req as any).user;
     if (!user?.studentId) {
       res.status(400).json({ error: "Student ID is required" });
@@ -26,6 +27,9 @@ export const listIssuesForStudent = async (req: Request, res: Response) => {
     }
 
     const issues = await query.lean();
+    console.log(
+      `[student-dashboard] /issues user=${String(user._id)} returned=${issues.length} limit=${limit ?? "none"} durationMs=${Date.now() - startedAt}`,
+    );
     res.json({ issues });
   } catch (err: any) {
     console.error("Error fetching issues:", err);

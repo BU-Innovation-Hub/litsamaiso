@@ -357,16 +357,23 @@ export const validateBorrowerNumber = async (req: Request, res: Response) => {
 
 export const getConfirmationStatus = async (req: Request, res: Response) => {
   try {
+    const startedAt = Date.now();
     const user = (req as any).user;
     const instId = user.institution;
 
     if (!user.studentId) {
+      console.log(
+        `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=missing-student-id durationMs=${Date.now() - startedAt}`,
+      );
       res.status(400).json({ message: "Student identifier (studentId) is required" });
       return;
     }
 
     const student = await Student.findOne({ institution: instId, studentId: user.studentId }).lean();
     if (!student) {
+      console.log(
+        `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=student-not-found durationMs=${Date.now() - startedAt}`,
+      );
       res.status(404).json({ message: "Student record not found" });
       return;
     }
@@ -385,12 +392,18 @@ export const getConfirmationStatus = async (req: Request, res: Response) => {
     }
 
     if (!account) {
+      console.log(
+        `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=no-account durationMs=${Date.now() - startedAt}`,
+      );
       res.json({ confirmed: false });
       return;
     }
 
     const confirmed = String(account.status || "").toLowerCase() === "confirmed" && account.confirmedBy && String((account as any).confirmedBy) === String(student._id);
 
+    console.log(
+      `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=ok confirmed=${Boolean(confirmed)} durationMs=${Date.now() - startedAt}`,
+    );
     res.json({ confirmed, status: account.status, confirmationDate: account.confirmationDate, branchCode: account.branchCode });
   } catch (err: any) {
     console.error("getConfirmationStatus error:", err);
