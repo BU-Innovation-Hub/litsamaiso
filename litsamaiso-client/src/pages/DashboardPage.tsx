@@ -157,17 +157,15 @@ const ActionCard: React.FC<{ action: ActionItem }> = ({ action }) => {
   return (
     <Link
       to={action.to}
-      className={`group flex items-center justify-between gap-4 rounded-2xl border p-4 transition duration-300 ${
-        action.primary
-          ? 'border-primary-clr bg-primary-clr text-white shadow-lg shadow-slate-900/10 hover:-translate-y-0.5'
-          : 'border-slate-200 bg-white/80 text-primary-clr hover:-translate-y-0.5 hover:bg-white hover:shadow-md'
-      }`}
+      className={`group flex items-center justify-between gap-4 rounded-2xl border p-4 transition duration-300 ${action.primary
+        ? 'border-primary-clr bg-primary-clr text-white shadow-lg shadow-slate-900/10 hover:-translate-y-0.5'
+        : 'border-slate-200 bg-white/80 text-primary-clr hover:-translate-y-0.5 hover:bg-white hover:shadow-md'
+        }`}
     >
       <span className="flex min-w-0 items-center gap-3">
         <span
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${
-            action.primary ? 'bg-white/15 text-white' : 'bg-slate-100 text-active-clr'
-          }`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${action.primary ? 'bg-white/15 text-white' : 'bg-slate-100 text-active-clr'
+            }`}
         >
           <Icon className="h-5 w-5" aria-hidden="true" />
         </span>
@@ -305,8 +303,10 @@ const DashboardPage: React.FC = () => {
           value: confirmation?.confirmed ? 'Confirmed' : 'Pending',
           description: confirmation?.message || 'Account confirmation status',
           icon: confirmation?.confirmed ? BadgeCheck : Clock3,
-          tone: confirmation?.confirmed ? 'bg-gray-100 text-active-clr' : 'bg-gray-100 text-active-clr',
-          accent: confirmation?.confirmed ? 'from-emerald-500 to-active-clr' : 'from-amber-400 to-active-clr',
+          tone: confirmation?.confirmed ? "from-[#363B63]/80 to-[#363B63]/20"
+            : "from-[#4a659c]/80 to-[#4a659c]/20",
+          accent: confirmation?.confirmed ? "from-[#363B63]/80 to-[#363B63]/20"
+            : "from-[#4a659c]/80 to-[#4a659c]/20",
           progress: confirmation?.confirmed ? 100 : 45,
         },
         {
@@ -504,13 +504,13 @@ const DashboardPage: React.FC = () => {
         },
         ...(canViewElections
           ? [
-              {
-                label: 'Open elections',
-                description: 'View voting activity available to you',
-                to: '/elections',
-                icon: CalendarDays,
-              },
-            ]
+            {
+              label: 'Open elections',
+              description: 'View voting activity available to you',
+              to: '/elections',
+              icon: CalendarDays,
+            },
+          ]
           : []),
       ];
     }
@@ -661,9 +661,8 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div
-      className={`global-bg relative min-h-screen ${
-        isAdminShell ? 'px-4 py-6 sm:px-6 lg:px-8' : 'px-4 pb-10 pt-28 sm:px-6 lg:px-8'
-      }`}
+      className={`global-bg relative min-h-screen ${isAdminShell ? 'px-4 py-6 sm:px-6 lg:px-8' : 'px-4 pb-10 pt-28 sm:px-6 lg:px-8'
+        }`}
     >
       <div className="absolute inset-0 bg-white/78" aria-hidden="true" />
       <div
@@ -745,136 +744,136 @@ const DashboardPage: React.FC = () => {
         {roleName !== 'Student' && (
           <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.12fr_0.88fr]">
             <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm backdrop-blur sm:p-6">
-            <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase text-active-clr">Operational flow</p>
-                <h2 className="mt-2 text-xl font-bold text-primary-clr">
-                  {canViewReports ? 'Account status' : 'Workflow status'}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {canViewReports ? 'How student account work is progressing right now.' : 'Current activity available to your role.'}
-                </p>
+              <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-active-clr">Operational flow</p>
+                  <h2 className="mt-2 text-xl font-bold text-primary-clr">
+                    {canViewReports ? 'Account status' : 'Workflow status'}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {canViewReports ? 'How student account work is progressing right now.' : 'Current activity available to your role.'}
+                  </p>
+                </div>
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-active-clr">
+                  <ListChecks className="h-5 w-5" aria-hidden="true" />
+                </span>
               </div>
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-active-clr">
-                <ListChecks className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
 
-            <div className="mt-6">
-              {canViewReports && hasStatusBreakdown ? (
-                <div className="space-y-5">
-                  {accountReports?.reports.statusBreakdown?.map((item) => {
-                    const percent = totalStatusCount > 0 ? Math.round((item.count / totalStatusCount) * 100) : 0;
-                    return (
-                      <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-semibold text-primary-clr">{formatStatus(item.label)}</span>
-                          <span className="font-semibold text-slate-500">{item.count}</span>
+              <div className="mt-6">
+                {canViewReports && hasStatusBreakdown ? (
+                  <div className="space-y-5">
+                    {accountReports?.reports.statusBreakdown?.map((item) => {
+                      const percent = totalStatusCount > 0 ? Math.round((item.count / totalStatusCount) * 100) : 0;
+                      return (
+                        <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="font-semibold text-primary-clr">{formatStatus(item.label)}</span>
+                            <span className="font-semibold text-slate-500">{item.count}</span>
+                          </div>
+                          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
+                            <div className="h-full rounded-full bg-linear-to-r from-active-clr to-sky-500" style={{ width: `${percent}%` }} />
+                          </div>
+                          <p className="mt-2 text-xs text-slate-500">{percent}% of the current account list</p>
                         </div>
-                        <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
-                          <div className="h-full rounded-full bg-linear-to-r from-active-clr to-sky-500" style={{ width: `${percent}%` }} />
+                      );
+                    })}
+                  </div>
+                ) : canViewElections && elections.length > 0 ? (
+                  <div className="space-y-3">
+                    {elections.slice(0, 5).map((election) => (
+                      <div key={election._id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-primary-clr">{election.title}</p>
+                          <p className="text-sm text-slate-500">{formatStatus(election.status)}</p>
                         </div>
-                        <p className="mt-2 text-xs text-slate-500">{percent}% of the current account list</p>
+                        <Link
+                          to={roleName === 'SAAD' ? '/elections/manage' : '/elections'}
+                          className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-sm font-semibold text-active-clr shadow-sm transition hover:bg-slate-100"
+                        >
+                          Open
+                          <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Link>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : canViewElections && elections.length > 0 ? (
-                <div className="space-y-3">
-                  {elections.slice(0, 5).map((election) => (
-                    <div key={election._id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-primary-clr">{election.title}</p>
-                        <p className="text-sm text-slate-500">{formatStatus(election.status)}</p>
-                      </div>
-                      <Link
-                        to={roleName === 'SAAD' ? '/elections/manage' : '/elections'}
-                        className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-sm font-semibold text-active-clr shadow-sm transition hover:bg-slate-100"
-                      >
-                        Open
-                        <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-                      </Link>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  title="No status data to show"
-                  description="There is no activity to show in this section yet."
-                />
-              )}
-            </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No status data to show"
+                    description="There is no activity to show in this section yet."
+                  />
+                )}
+              </div>
             </div>
 
             <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm backdrop-blur sm:p-6">
-            <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase text-active-clr">Live work</p>
-                <h2 className="mt-2 text-xl font-bold text-primary-clr">
-                  {canViewAdminIssues ? 'Issue queue' : canViewStudentActions ? 'Your issues' : 'Recent activity'}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">Latest updates available to you.</p>
+              <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase text-active-clr">Live work</p>
+                  <h2 className="mt-2 text-xl font-bold text-primary-clr">
+                    {canViewAdminIssues ? 'Issue queue' : canViewStudentActions ? 'Your issues' : 'Recent activity'}
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">Latest updates available to you.</p>
+                </div>
+                <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-active-clr">
+                  <FileWarning className="h-5 w-5" aria-hidden="true" />
+                </span>
               </div>
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-active-clr">
-                <FileWarning className="h-5 w-5" aria-hidden="true" />
-              </span>
-            </div>
 
-            <div className="mt-6">
-              {(canViewAdminIssues || canViewStudentActions) && recentRecords.length > 0 ? (
-                <div className="space-y-3">
-                  {recentRecords.map((issue) => {
-                    const isPending = canViewAdminIssues && isPendingIssueStatus(issue.status);
-                    const rowContent = (
-                      <>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-semibold text-primary-clr">
-                          {issue.borrowerNumber || issue.studentId || 'Student issue'}
-                        </p>
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                          {formatStatus(issue.status)}
+              <div className="mt-6">
+                {(canViewAdminIssues || canViewStudentActions) && recentRecords.length > 0 ? (
+                  <div className="space-y-3">
+                    {recentRecords.map((issue) => {
+                      const isPending = canViewAdminIssues && isPendingIssueStatus(issue.status);
+                      const rowContent = (
+                        <>
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-semibold text-primary-clr">
+                              {issue.borrowerNumber || issue.studentId || 'Student issue'}
+                            </p>
+                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                              {formatStatus(issue.status)}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {[issue.bankName, formatDate(issue.createdAt)].filter(Boolean).join(' - ') || 'No additional details'}
+                          </p>
+                        </>
+                      );
+
+                      return (
+                        <div key={issue._id} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                          {isPending ? (
+                            <Link to="/accounts?tab=issues" className="block rounded-xl p-2 transition hover:bg-white">
+                              {rowContent}
+                            </Link>
+                          ) : (
+                            rowContent
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : !canViewAdminIssues && canViewReports && recentAccounts.length > 0 ? (
+                  <div className="space-y-3">
+                    {recentAccounts.map((account) => (
+                      <div key={account._id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-primary-clr">{account.fullnames}</p>
+                          <p className="text-sm text-slate-500">{account.borrowerNumber}</p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+                          {formatStatus(account.status)}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {[issue.bankName, formatDate(issue.createdAt)].filter(Boolean).join(' - ') || 'No additional details'}
-                      </p>
-                      </>
-                    );
-
-                    return (
-                      <div key={issue._id} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-                        {isPending ? (
-                          <Link to="/accounts?tab=issues" className="block rounded-xl p-2 transition hover:bg-white">
-                            {rowContent}
-                          </Link>
-                        ) : (
-                          rowContent
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : !canViewAdminIssues && canViewReports && recentAccounts.length > 0 ? (
-                <div className="space-y-3">
-                  {recentAccounts.map((account) => (
-                    <div key={account._id} className="flex items-center justify-between gap-4 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-primary-clr">{account.fullnames}</p>
-                        <p className="text-sm text-slate-500">{account.borrowerNumber}</p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                        {formatStatus(account.status)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState
-                  title="No recent activity"
-                  description="This section will update when there is recent activity to show."
-                />
-              )}
-            </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No recent activity"
+                    description="This section will update when there is recent activity to show."
+                  />
+                )}
+              </div>
             </div>
           </section>
         )}

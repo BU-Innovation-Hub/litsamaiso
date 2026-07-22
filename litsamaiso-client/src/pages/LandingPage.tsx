@@ -5,10 +5,12 @@ import {
   ChevronRight,
   ClipboardCheck,
   FileCheck2,
+  FileText,
   Landmark,
   LockKeyhole,
   MessageSquareText,
   Network,
+  Search,
   ShieldCheck,
   Sparkles,
   UploadCloud,
@@ -62,6 +64,7 @@ const capabilityCards = [
     icon: MessageSquareText,
     className: "lg:col-span-2",
     visual: "support",
+    dark: true,
   },
 ];
 
@@ -179,7 +182,9 @@ const SectionHeading = ({
     )}
   >
     <SectionLabel>{eyebrow}</SectionLabel>
-    <h2 className="text-3xl font-semibold text-primary-clr md:text-5xl">{title}</h2>
+    <div className="inline-block rounded-2xl bg-[#1c202f] px-6 py-4">
+      <h2 className="text-3xl font-semibold text-white md:text-5xl">{title}</h2>
+    </div>
     <p className="text-base leading-7 text-gray-600 md:text-lg">
       {description}
     </p>
@@ -204,10 +209,10 @@ const NavLink = ({
 const LandingPage = () => {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-gray-50">
-        <section
-          id="hero"
-          className="relative min-h-screen overflow-hidden border-b border-gray-200"
-        >
+      <section
+        id="hero"
+        className="relative min-h-screen overflow-hidden border-b border-gray-200"
+      >
         <video
           className="absolute inset-0 h-full w-full object-cover"
           src={heroVideoUrl}
@@ -323,7 +328,8 @@ const LandingPage = () => {
                   <motion.article
                     key={card.title}
                     className={cn(
-                      "group relative overflow-hidden rounded-3xl border border-gray-200 bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-gray-300 hover:shadow-md",
+                      "group relative overflow-hidden rounded-3xl border p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md",
+                      card.dark ? "border-[#2c3248] bg-[#1c202f]" : "border-gray-200 bg-white hover:border-gray-300",
                       card.className,
                     )}
                     initial="hidden"
@@ -337,18 +343,20 @@ const LandingPage = () => {
                         "absolute inset-0 opacity-0 transition group-hover:opacity-100",
                         card.title === "Role-aware access"
                           ? "bg-[radial-gradient(circle_at_20%_10%,rgba(54,59,99,0.22),transparent_34%)]"
-                          : "bg-[radial-gradient(circle_at_20%_10%,rgba(83,91,192,0.22),transparent_34%)]"
+                          : card.dark
+                            ? "bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.06),transparent_34%)]"
+                            : "bg-[radial-gradient(circle_at_20%_10%,rgba(83,91,192,0.22),transparent_34%)]"
                       )}
                     />
                     <div className="relative flex h-full flex-col justify-between gap-8">
                       <div>
-                        <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-gray-200 bg-gray-100 text-primary-clr">
+                        <span className={cn("flex h-11 w-11 items-center justify-center rounded-2xl border", card.dark ? "border-[#363B63] bg-[#252a3d] text-white" : "border-gray-200 bg-gray-100 text-primary-clr")}>
                           <Icon className="h-5 w-5" />
                         </span>
-                        <h3 className="mt-5 text-xl font-semibold text-primary-clr">
+                        <h3 className={cn("mt-5 text-xl font-semibold", card.dark ? "text-white" : "text-primary-clr")}>
                           {card.title}
                         </h3>
-                        <p className="mt-3 max-w-xl text-sm leading-6 text-gray-600">
+                        <p className={cn("mt-3 max-w-xl text-sm leading-6", card.dark ? "text-gray-300" : "text-gray-600")}>
                           {card.description}
                         </p>
                       </div>
@@ -618,17 +626,7 @@ const LandingPage = () => {
               support@litsamaiso.com
             </a>
           </div>
-          <div className="flex flex-wrap gap-3">
-            {footerLinks.map((item) => (
-              <a
-                key={item}
-                href="#hero"
-                className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-500 transition hover:bg-gray-200 hover:text-gray-700"
-              >
-                {item}
-              </a>
-            ))}
-          </div>
+
         </div>
       </footer>
     </div>
@@ -668,22 +666,49 @@ const CapabilityVisual = ({ type }: { type: string }) => {
   }
 
   if (type === "support") {
+    const supportItems = [
+      {
+        text: "Student submitted new statement",
+        icon: FileText,
+        wrapperClass: "border-[#363B63] bg-white",
+        iconClass: "bg-stroke-clr/3 text-[#4a659c]",
+        barClass: "bg-[#4a659c]/60",
+        textClass: "text-gray-900",
+      },
+      {
+        text: "Finance requested review",
+        icon: Search,
+        wrapperClass: "border-[#363B63] bg-white",
+        iconClass: "bg-stroke-clr/3 text-orange-500",
+        barClass: "bg-orange-500/40",
+        textClass: "text-gray-900",
+      },
+    ];
+
     return (
       <div className="space-y-3">
-        {["Student submitted new statement", "Finance requested review"].map(
-          (item) => (
+        {supportItems.map((item) => {
+          const ItemIcon = item.icon;
+          return (
             <div
-              key={item}
-              className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-100 p-3"
+              key={item.text}
+              className={cn(
+                "flex items-center gap-3 rounded-2xl border p-3 transition hover:scale-[1.02]",
+                item.wrapperClass
+              )}
             >
-              <div className="h-9 w-9 rounded-full bg-gray-200" />
+              <div className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full", item.iconClass)}>
+                <ItemIcon className="h-4 w-4" />
+              </div>
               <div>
-                <div className="h-2 w-36 rounded-full bg-gray-200" />
-                <p className="mt-2 text-xs text-gray-600">{item}</p>
+                <div className={cn("h-2 w-36 rounded-full", item.barClass)} />
+                <p className={cn("mt-2 text-xs font-medium", item.textClass)}>
+                  {item.text}
+                </p>
               </div>
             </div>
-          ),
-        )}
+          )
+        })}
       </div>
     );
   }
@@ -693,7 +718,12 @@ const CapabilityVisual = ({ type }: { type: string }) => {
       {[42, 66, 50, 84, 58, 72].map((height, index) => (
         <div
           key={`${height}-${index}`}
-          className="flex-1 rounded-t-xl bg-linear-to-t from-active-clr/20 to-active-clr/10"
+          className={cn(
+            "flex-1 rounded-t-xl bg-linear-to-t",
+            type === "roles"
+              ? "from-[#363B63]/80 to-[#363B63]/20"
+              : "from-[#4a659c]/80 to-[#4a659c]/20"
+          )}
           style={{ height: `${height}%` }}
         />
       ))}
@@ -702,12 +732,14 @@ const CapabilityVisual = ({ type }: { type: string }) => {
 };
 
 const EcosystemOrbit = () => (
-  <div className="absolute bottom-8 right-8 h-40 w-40 opacity-75">
-    <OrbitingCircles radius={58} duration={24} iconSize={28}>
-      <Landmark className="h-4 w-4 text-active-clr" />
-      <UsersRound className="h-4 w-4 text-active-clr" />
-      <ShieldCheck className="h-4 w-4 text-active-clr" />
-    </OrbitingCircles>
+  <div className="absolute bottom-4 right-4 h-48 w-48 opacity-75">
+    <div className="relative flex h-full w-full items-center justify-center">
+      <OrbitingCircles radius={58} duration={24} iconSize={28}>
+        <Landmark className="h-4 w-4 text-active-clr" />
+        <UsersRound className="h-4 w-4 text-active-clr" />
+        <ShieldCheck className="h-4 w-4 text-active-clr" />
+      </OrbitingCircles>
+    </div>
   </div>
 );
 
