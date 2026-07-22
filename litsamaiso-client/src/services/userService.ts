@@ -9,11 +9,17 @@ export const userService = {
     page?: number;
     limit?: number;
   }) => {
-    const response = await apiClient.get<{ users: User[] }>(
+    const response = await apiClient.get<{
+      users: User[];
+      total: number;
+      page: number;
+      limit: number;
+      pages: number;
+    }>(
       '/users',
       { params }
     );
-    return response.data.users;
+    return response.data;
   },
 
   // Get user by ID

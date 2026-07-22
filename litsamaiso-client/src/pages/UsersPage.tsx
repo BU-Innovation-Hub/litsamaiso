@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyRound, Search, Trash2, UserCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { userService } from '../services/userService';
@@ -9,6 +9,7 @@ import { getInstitutionName, getRoleName } from '../utils/userDisplay';
 import { useAuth } from '../hooks/useAuth';
 import PasswordInput from '../components/ui/PasswordInput';
 
+const PAGE_SIZE = 200;
 const getUserId = (user: User) => user.id || user._id || '';
 
 const UsersPage: React.FC = () => {
@@ -16,10 +17,14 @@ const UsersPage: React.FC = () => {
   const currentRole = getRoleName(currentUser);
   const isAppAdmin = currentRole === 'AppAdmin';
   const [users, setUsers] = useState<User[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<User | null>(null);
   const [passwordForm, setPasswordForm] = useState({
@@ -37,19 +42,28 @@ const UsersPage: React.FC = () => {
     studentId: '',
   });
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
+  const loadUsers = useCallback(async (page: number = 1, append: boolean = false) => {
+    if (page === 1) setLoading(true);
+    else setLoadingMore(true);
     try {
       const response = await userService.getUsers({
         search: search || undefined,
         role: roleFilter || undefined,
-        limit: 100,
+        page,
+        limit: PAGE_SIZE,
       });
-      setUsers(response || []);
+      if (append) {
+        setUsers((prev) => [...prev, ...(response.users || [])]);
+      } else {
+        setUsers(response.users || []);
+      }
+      setTotalUsers(response.total);
+      setCurrentPage(page);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Failed to fetch users'));
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [roleFilter, search]);
 
@@ -71,10 +85,25 @@ const UsersPage: React.FC = () => {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
-      void loadUsers();
+      void loadUsers(1, false);
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [loadUsers]);
+
+  const handleScroll = useCallback(() => {
+    const el = tableContainerRef.current;
+    if (!el || loading || loadingMore || users.length >= totalUsers) return;
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 200) {
+      void loadUsers(currentPage + 1, true);
+    }
+  }, [loading, loadingMore, users.length, totalUsers, currentPage, loadUsers]);
+
+  useEffect(() => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [handleScroll]);
 
   const openCreateModal = async () => {
     // prepare form defaults
@@ -193,7 +222,7 @@ const UsersPage: React.FC = () => {
               <Users className="h-8 w-8 text-active-clr" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{totalUsers}</p>
               </div>
             </div>
           </div>
@@ -247,7 +276,7 @@ const UsersPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div ref={tableContainerRef} className="overflow-x-auto" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
@@ -319,6 +348,11 @@ const UsersPage: React.FC = () => {
                       </tr>
                     );
                   })
+                )}
+                {loadingMore && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-4 text-center text-gray-500">Loading more users...</td>
+                  </tr>
                 )}
               </tbody>
             </table>

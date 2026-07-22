@@ -6,15 +6,30 @@ import { notifyFinanceUsersAboutIssue } from "../services/accountService.js";
 
 export const listIssuesForStudent = async (req: Request, res: Response) => {
   try {
+    const startedAt = Date.now();
     const user = (req as any).user;
     if (!user?.studentId) {
       res.status(400).json({ error: "Student ID is required" });
       return;
     }
-    const issues = await Issue.find({
+    const params = (req.query || {}) as { limit?: string };
+    const requestedLimit = params.limit ? Number.parseInt(params.limit, 10) : Number.NaN;
+    const hasLimit = Number.isFinite(requestedLimit);
+    const limit = hasLimit ? Math.max(Math.min(requestedLimit, 100), 1) : undefined;
+
+    let query = Issue.find({
       studentId: user.studentId,
       status: { $nin: ["approved", "resolved"] },
     }).sort({ createdAt: -1 });
+
+    if (typeof limit === "number") {
+      query = query.limit(limit);
+    }
+
+    const issues = await query.lean();
+    console.log(
+      `[student-dashboard] /issues user=${String(user._id)} returned=${issues.length} limit=${limit ?? "none"} durationMs=${Date.now() - startedAt}`,
+    );
     res.json({ issues });
   } catch (err: any) {
     console.error("Error fetching issues:", err);

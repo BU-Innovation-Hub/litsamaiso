@@ -1,10 +1,47 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Analytics } from '@vercel/analytics/react'
+import { PostHogProvider } from '@posthog/react'
+import type { PostHogConfig } from 'posthog-js'
 import './index.css'
 import App from './App.tsx'
 
+const isIOSWebKit = (() => {
+  if (typeof navigator === 'undefined') return false
+  const userAgent = navigator.userAgent || ''
+  const platform = navigator.platform || ''
+  return /iP(hone|ad|od)/.test(userAgent) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+})()
+
+const posthogOptions: Partial<PostHogConfig> = {
+  api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
+  defaults: '2026-05-30',
+  capture_pageview: 'history_change',
+  capture_exceptions: true,
+  disable_session_recording: isIOSWebKit,
+  enable_recording_console_log: !isIOSWebKit,
+  session_recording: {
+    maskAllInputs: false,
+    maskInputOptions: {
+      password: true,
+    },
+  },
+  logs: {
+    serviceName: 'litsamaiso-client',
+    environment: import.meta.env.MODE,
+    captureConsoleLogs: true,
+  },
+  tracing_headers: ['localhost:5000', 'litsamaiso-huu3.onrender.com'],
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <PostHogProvider
+      apiKey={import.meta.env.VITE_POSTHOG_PROJECT_TOKEN}
+      options={posthogOptions}
+    >
+      <App />
+    </PostHogProvider>
+    <Analytics />
   </StrictMode>,
 )

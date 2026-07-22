@@ -2,6 +2,7 @@ import { AxiosError } from 'axios';
 import apiClient from '../lib/api';
 import type { AuthResponse, LoginRequest, RegisterRequest } from '../types';
 import type { Institution, Role, User } from '../types';
+import { sanitizeUserForStorage } from '../utils/userDisplay';
 
 const normalizeRole = (role: User['role'] | string): Role => {
   if (typeof role === 'string') {
@@ -29,14 +30,31 @@ const normalizeAuthResponse = (data: AuthResponse): AuthResponse => ({
   },
 });
 
+const storeAuthSession = (data: AuthResponse) => {
+  if (!data.token) return;
+  try {
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(data.user)));
+  } catch (error) {
+    clearAuthSession();
+    throw error;
+  }
+};
+
+const clearAuthSession = () => {
+  try {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('user');
+  } catch {
+    // Ignore storage cleanup failures; callers still update React auth state.
+  }
+};
+
 export const authService = {
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
     const data = normalizeAuthResponse(response.data);
-    if (data.token) {
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-    }
+    storeAuthSession(data);
     return data;
   },
 
@@ -56,10 +74,7 @@ export const authService = {
 
     const response = await apiClient.post<AuthResponse>('/auth/register', payload);
     const responseData = normalizeAuthResponse(response.data);
-    if (responseData.token) {
-      localStorage.setItem('authToken', responseData.token);
-      localStorage.setItem('user', JSON.stringify(responseData.user));
-    }
+    storeAuthSession(responseData);
     return responseData;
   },
 
@@ -71,8 +86,7 @@ export const authService = {
         throw error;
       }
     } finally {
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
+      clearAuthSession();
     }
   },
 
@@ -95,12 +109,24 @@ export const authService = {
   },
 
   getCurrentUser: async () => {
+    const token = localStorage.getItem('authToken');
     const storedUser = localStorage.getItem('user');
-    return storedUser ? JSON.parse(storedUser) : null;
+    return token && storedUser ? JSON.parse(storedUser) : null;
+  },
+
+  getProfile: async (): Promise<{ data: User }> => {
+    const response = await apiClient.get('/profile');
+    let user = response.data?.data || response.data?.user || response.data;
+    user = {
+      ...user,
+      role: normalizeRole(user.role),
+      institution: normalizeInstitution(user.institution),
+    };
+    return { data: user };
   },
 
   isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('authToken');
+    return !!localStorage.getItem('authToken') && !!localStorage.getItem('user');
   },
 };
 

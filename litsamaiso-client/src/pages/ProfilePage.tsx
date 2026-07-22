@@ -3,6 +3,7 @@ import { CheckCircle, Hash, Loader2, Mail, Save, Upload, User } from 'lucide-rea
 import { toast } from 'sonner';
 import Button from '../components/ui/button';
 import { useAuth } from '../hooks/useAuth';
+import { sanitizeUserForStorage } from '../utils/userDisplay';
 import {
   mergeProfileIntoUser,
   profileService,
@@ -97,7 +98,7 @@ const ProfilePage: React.FC = () => {
       setProfile(updatedProfile);
       const updatedUser = mergeProfileIntoUser(user, updatedProfile);
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(updatedUser)));
       toast.success('Image uploaded and saved successfully');
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Failed to upload image'));
@@ -115,7 +116,7 @@ const ProfilePage: React.FC = () => {
       setProfile(updatedProfile);
       const updatedUser = mergeProfileIntoUser(user, updatedProfile);
       setUser(updatedUser);
-      localStorage.setItem('user', JSON.stringify(updatedUser));
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(updatedUser)));
       toast.success('Profile updated successfully');
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Failed to update profile'));

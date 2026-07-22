@@ -1,12 +1,12 @@
 import XLSX from "xlsx";
 import { Buffer } from "buffer";
 import { FinancialClearance } from "../models/FinancialClearance.js";
+import { BranchCode } from "../models/BranchCode.js";
 import { Issue } from "../models/Issue.js";
 import { Institution } from "../models/Institution.js";
 import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 import { Student } from "../models/Student.js";
-import { lookupBranchCode } from "./branchCodeService.js";
 import type { Types } from "mongoose";
 import { getEmailBranding, sendEmail } from "../utils/email.js";
 import React from "react";
@@ -47,6 +47,7 @@ const ACCOUNT_EXPORT_HEADERS = [
   "Account Number",
   "Student ID",
   "Status",
+  "Branch Code",
   "Graduating",
   "Batch Number",
   "Confirmation Date",
@@ -66,6 +67,7 @@ interface AccountQueryParams {
   endDate?: unknown;
   institutionId?: unknown;
   limit?: unknown;
+  branchCode?: unknown;
 }
 
 interface AccountExportResult {
@@ -123,6 +125,11 @@ const buildAccountFilter = (user: any, params: AccountQueryParams): Record<strin
     q.batchNumber = batchNumber;
   }
 
+  const branchCode = safeString(params.branchCode);
+  if (branchCode) {
+    q.branchCode = new RegExp(`^${escapeRegex(branchCode)}$`, "i");
+  }
+
   if (params.startDate || params.endDate) {
     q.confirmationDate = {};
     const startDate = safeString(params.startDate);
@@ -136,7 +143,7 @@ const buildAccountFilter = (user: any, params: AccountQueryParams): Record<strin
 
 export const getAccountListFilter = buildAccountFilter;
 
-const parseAccountLimit = (value: unknown, fallback = 200, max = 2000): number => {
+const parseAccountLimit = (value: unknown, fallback = 2000, max = 10000): number => {
   const parsed = Number.parseInt(String(value || fallback), 10);
   return Math.min(Number.isFinite(parsed) && parsed > 0 ? parsed : fallback, max);
 };
@@ -174,8 +181,9 @@ const buildExportRows = (accounts: any[]) =>
       "Account Number": safeString(account.accountNumber),
       "Student ID": safeString(confirmedBy.studentId),
       Status: safeString(account.status) || "pending",
+      "Branch Code": safeString(account.branchCode),
       Graduating: account.graduating ? "Yes" : "No",
-      "Batch Number": account.batchNumber ?? "",
+      "Batch Number": safeString(account.batchNumber),
       "Confirmation Date": toIsoString(account.confirmationDate),
       "Paid Date": toIsoString(paidDate),
       Signature: "",
@@ -184,11 +192,50 @@ const buildExportRows = (accounts: any[]) =>
     };
   });
 
+const FORCE_TEXT_COLUMNS = [
+  "Borrower Number",
+  "Account Number",
+  "Branch Code",
+  "Student ID",
+  "Batch Number",
+];
+
+const forceTextCells = (
+  ws: XLSX.WorkSheet,
+  headers: readonly string[],
+  columns: string[],
+): void => {
+  const ref = ws["!ref"];
+  if (!ref) return;
+  const range = XLSX.utils.decode_range(ref);
+
+  const colIndices: number[] = [];
+  for (const col of columns) {
+    const idx = headers.indexOf(col as never);
+    if (idx !== -1) colIndices.push(idx);
+  }
+  if (colIndices.length === 0) return;
+
+  for (let R = range.s.r + 1; R <= range.e.r; R++) {
+    for (const C of colIndices) {
+      const addr = XLSX.utils.encode_cell({ r: R, c: C });
+      const cell = ws[addr];
+      if (cell) {
+        cell.t = "s";
+        cell.v = String(cell.v ?? "");
+        cell.z = "@";
+      }
+    }
+  }
+};
+
 export const exportAccounts = async (params: {
   user: any;
   query: AccountQueryParams;
   format: AccountExportFormat;
 }): Promise<AccountExportResult> => {
+  await assignBranchCodesForExport(params.user, params.query);
+
   const filter = buildAccountFilter(params.user, params.query);
   const limit = parseAccountLimit(params.query.limit, 5000, 50000);
   const accounts = await FinancialClearance.find(filter)
@@ -201,6 +248,7 @@ export const exportAccounts = async (params: {
   const worksheet = XLSX.utils.json_to_sheet(rows, {
     header: [...ACCOUNT_EXPORT_HEADERS],
   });
+  forceTextCells(worksheet, ACCOUNT_EXPORT_HEADERS, [...FORCE_TEXT_COLUMNS]);
 
   const stamp = new Date().toISOString().slice(0, 10);
 
@@ -508,6 +556,83 @@ interface AccountConfirmationResult {
 const escapeRegex = (value: string): string =>
   value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+export const assignBranchCodesForExport = async (
+  user: any,
+  params: AccountQueryParams,
+): Promise<{ total: number; assigned: number; skipped: number }> => {
+  const filter = buildAccountFilter(user, params);
+  filter.status = "confirmed";
+
+  const accounts = await FinancialClearance.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(5000);
+
+  if (accounts.length === 0) {
+    return { total: 0, assigned: 0, skipped: 0 };
+  }
+
+  const institutionId = String((accounts[0] as any).institution || "");
+  const allBranchCodes = await BranchCode.find({
+    institution: institutionId,
+  }).lean();
+
+  if (allBranchCodes.length === 0) {
+    return { total: accounts.length, assigned: 0, skipped: accounts.length };
+  }
+
+  const matchInMemory = (bankName: string): string | undefined => {
+    // const normalized = bankName.trim();
+    const normalized = String(bankName || "").trim();
+    if (!normalized) return;
+
+    const lower = normalized.toLowerCase();
+
+    const exact = allBranchCodes.find(
+      (bc) => bc.bankName.toLowerCase() === lower,
+    );
+    if (exact) return exact.branchCode;
+
+    const firstWord = normalized.split(/\s+/)[0];
+    if (firstWord && firstWord.length >= 2) {
+      const fw = allBranchCodes.find(
+        (bc) =>
+          bc.bankName.toLowerCase().includes(firstWord.toLowerCase()),
+      );
+      if (fw) return fw.branchCode;
+    }
+
+    const sub = normalized.substring(0, 6);
+    if (sub.length >= 2) {
+      const sw = allBranchCodes.find(
+        (bc) => bc.bankName.toLowerCase().includes(sub.toLowerCase()),
+      );
+      if (sw) return sw.branchCode;
+    }
+  };
+
+  const ops = [];
+  for (const account of accounts) {
+    if (account.branchCode) continue;
+    const code = matchInMemory(account.bankName);
+    if (code) {
+      ops.push({
+        updateOne: {
+          filter: { _id: account._id },
+          update: { $set: { branchCode: code } },
+        },
+      });
+    }
+  }
+  if (ops.length) await FinancialClearance.bulkWrite(ops);
+  const assigned = ops.length;
+
+  return {
+    total: accounts.length,
+    assigned,
+    skipped: accounts.length - assigned,
+  };
+};
+
 export const notifyFinanceUsersAboutIssue = async (input: {
   institutionId: Types.ObjectId;
   studentId: string;
@@ -808,25 +933,6 @@ export const accountConfirmation = async (
   if ((student as any).confirmationAttempts) {
     (student as any).confirmationAttempts = 0;
     await (student as any).save();
-  }
-
-  // Assign branch code based on bank name
-  if (!accountByBorrowerNo.branchCode) {
-    try {
-      const branchEntry = await lookupBranchCode(
-        accountByBorrowerNo.bankName,
-        input.institutionId,
-      );
-      if (branchEntry) {
-        accountByBorrowerNo.branchCode = branchEntry.branchCode;
-        await accountByBorrowerNo.save();
-      }
-    } catch (lookupErr) {
-      console.warn(
-        `[accountConfirmation] Branch code lookup failed for bankName=${accountByBorrowerNo.bankName}:`,
-        lookupErr,
-      );
-    }
   }
 
   const result: AccountConfirmationResult = {

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import posthog from 'posthog-js';
 import {
   AlertCircle,
   ArrowRight,
@@ -229,6 +230,14 @@ const DashboardPage: React.FC = () => {
       setLoadError('');
 
       const errors: string[] = [];
+      const startedAt = Date.now();
+      const isStudentDashboard = roleName === 'Student';
+
+      if (isStudentDashboard) {
+        posthog.capture('student_dashboard_load_started', {
+          userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+        });
+      }
 
       const load = async <T,>(enabled: boolean, request: () => Promise<T>, fallback: T) => {
         if (!enabled) return fallback;
@@ -250,13 +259,13 @@ const DashboardPage: React.FC = () => {
         nextStudentIssues,
         nextConfirmation,
       ] = await Promise.all([
-        load(canViewElections, () => electionService.getElections(), [] as Election[]),
-        load(canViewUsers, () => userService.getUsers({ limit: 100 }), [] as User[]),
+        load(canViewElections, () => electionService.getElections({ limit: 10 }), [] as Election[]),
+        load(canViewUsers, () => userService.getUsers({ limit: 100 }).then((res) => res.users), [] as User[]),
         load(canViewInstitutions, () => institutionService.getInstitutions(), [] as Institution[]),
         load(canViewReports, () => accountService.getReports(), null as AccountReports | null),
         load(canViewReports, () => accountService.listAccounts({ limit: 6 }).then((res) => res.accounts), [] as Account[]),
         load(canViewAdminIssues, () => adminIssueService.listIssues() as Promise<AdminIssue[]>, [] as AdminIssue[]),
-        load(canViewStudentActions, () => issueService.listIssues() as Promise<StudentIssue[]>, [] as StudentIssue[]),
+        load(canViewStudentActions, () => issueService.listIssues({ limit: 5 }) as Promise<StudentIssue[]>, [] as StudentIssue[]),
         load(canViewStudentActions, () => accountService.getConfirmationStatus(), null as ConfirmationStatus | null),
       ]);
 
@@ -272,6 +281,16 @@ const DashboardPage: React.FC = () => {
       setConfirmation(nextConfirmation);
       setLoadError(errors.length > 0 ? 'Some dashboard data could not be loaded.' : '');
       setIsLoading(false);
+
+      if (isStudentDashboard) {
+        posthog.capture('student_dashboard_load_finished', {
+          durationMs: Date.now() - startedAt,
+          errors: errors.length,
+          elections: nextElections.length,
+          studentIssues: nextStudentIssues.length,
+          confirmationLoaded: Boolean(nextConfirmation),
+        });
+      }
     };
 
     void loadDashboard();
@@ -286,6 +305,7 @@ const DashboardPage: React.FC = () => {
     canViewReports,
     canViewStudentActions,
     canViewUsers,
+    roleName,
   ]);
 
   const accountSummary = accountReports?.reports.summary;
@@ -664,9 +684,9 @@ const DashboardPage: React.FC = () => {
       className={`global-bg relative min-h-screen ${isAdminShell ? 'px-4 py-6 sm:px-6 lg:px-8' : 'px-4 pb-10 pt-28 sm:px-6 lg:px-8'
         }`}
     >
-      <div className="absolute inset-0 bg-white/78" aria-hidden="true" />
+      <div className="absolute inset-0 bg-white/86 sm:bg-white/78" aria-hidden="true" />
       <div
-        className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(83,91,192,0.12),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(14,165,233,0.1),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.45)_0%,rgba(248,250,252,0.9)_55%,rgba(255,255,255,0.8)_100%)]"
+        className="absolute inset-0 bg-[radial-gradient(circle_at_12%_10%,rgba(83,91,192,0.08),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(14,165,233,0.07),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.5)_0%,rgba(248,250,252,0.92)_55%,rgba(255,255,255,0.82)_100%)] sm:bg-[radial-gradient(circle_at_12%_10%,rgba(83,91,192,0.12),transparent_28%),radial-gradient(circle_at_88%_8%,rgba(14,165,233,0.1),transparent_24%),linear-gradient(180deg,rgba(255,255,255,0.45)_0%,rgba(248,250,252,0.9)_55%,rgba(255,255,255,0.8)_100%)]"
         aria-hidden="true"
       />
       <div className="relative mx-auto max-w-7xl space-y-6">
