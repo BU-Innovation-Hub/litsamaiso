@@ -67,7 +67,7 @@ const LoginPage: React.FC = () => {
 
           <div className="auth-header">
             <h1 className="text-2xl font-semibold text-primary-clr">
-              Welcome Back to the Litsamaiso
+              Welcome Back to Litsamaiso
             </h1>
             <p className="mb-6 text-sm text-gray-500">
               Please fill all fields to gain access to the system.
@@ -98,16 +98,29 @@ const LoginPage: React.FC = () => {
               />
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-              <input
-                type="checkbox"
-                name="rememberMe"
-                checked={formData.rememberMe}
-                onChange={handleChange}
-                className="h-4 w-4 cursor-pointer"
-              />
-              Remember me for 30 days
-            </label>
+            <div className="flex items-baseline justify-between">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="rememberMe"
+                  checked={formData.rememberMe}
+                  onChange={handleChange}
+                  className="h-4 w-4 cursor-pointer"
+                />
+                Remember me
+              </label>
+
+              <div className="relative text-center text-sm">
+                <p className="">
+                  <Link
+                    className="font-bold text-primary-clr"
+                    to="/forgot-password"
+                  >
+                    Forgot password?
+                  </Link>
+                </p>
+              </div>
+            </div>
 
             {isLoading ? (
               <div className="flex w-full items-center justify-center rounded-md bg-button py-3">
@@ -122,17 +135,6 @@ const LoginPage: React.FC = () => {
               </button>
             )}
           </form>
-
-          <div className="relative mt-2 text-center text-sm">
-            <p className="absolute right-0">
-              <Link
-                className="font-bold text-primary-clr"
-                to="/forgot-password"
-              >
-                Forgot password?
-              </Link>
-            </p>
-          </div>
 
           <div className="mt-6 text-center text-sm">
             <p>
