@@ -8,6 +8,7 @@ import { accountService } from '../services/accountService';
 import { authService } from '../services/authService';
 import apiClient from '../lib/api';
 import { getApiErrorMessage } from '../utils/apiError';
+import { sanitizeUserForStorage } from '../utils/userDisplay';
 import { useAuth } from '../hooks/useAuth';
 import Globe from '../components/ui/Globe';
 
@@ -130,7 +131,7 @@ const AccountConfirmationPage: React.FC = () => {
         const profileResult = await authService.getProfile();
         const profile = profileResult.data;
         if (profile) {
-          localStorage.setItem('user', JSON.stringify(profile));
+          localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(profile)));
           setUser(profile);
           setFormData((prev) => ({
             ...prev,
