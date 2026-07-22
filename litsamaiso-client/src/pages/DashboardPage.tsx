@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import posthog from 'posthog-js';
 import {
   AlertCircle,
   ArrowRight,
@@ -231,6 +232,14 @@ const DashboardPage: React.FC = () => {
       setLoadError('');
 
       const errors: string[] = [];
+      const startedAt = Date.now();
+      const isStudentDashboard = roleName === 'Student';
+
+      if (isStudentDashboard) {
+        posthog.capture('student_dashboard_load_started', {
+          userAgent: typeof navigator === 'undefined' ? '' : navigator.userAgent,
+        });
+      }
 
       const load = async <T,>(enabled: boolean, request: () => Promise<T>, fallback: T) => {
         if (!enabled) return fallback;
@@ -252,7 +261,7 @@ const DashboardPage: React.FC = () => {
         nextStudentIssues,
         nextConfirmation,
       ] = await Promise.all([
-        load(canViewElections, () => electionService.getElections(), [] as Election[]),
+        load(canViewElections, () => electionService.getElections({ limit: 10 }), [] as Election[]),
         load(canViewUsers, () => userService.getUsers({ limit: 100 }).then((res) => res.users), [] as User[]),
         load(canViewInstitutions, () => institutionService.getInstitutions(), [] as Institution[]),
         load(canViewReports, () => accountService.getReports(), null as AccountReports | null),
@@ -274,6 +283,16 @@ const DashboardPage: React.FC = () => {
       setConfirmation(nextConfirmation);
       setLoadError(errors.length > 0 ? 'Some dashboard data could not be loaded.' : '');
       setIsLoading(false);
+
+      if (isStudentDashboard) {
+        posthog.capture('student_dashboard_load_finished', {
+          durationMs: Date.now() - startedAt,
+          errors: errors.length,
+          elections: nextElections.length,
+          studentIssues: nextStudentIssues.length,
+          confirmationLoaded: Boolean(nextConfirmation),
+        });
+      }
     };
 
     void loadDashboard();
@@ -288,6 +307,7 @@ const DashboardPage: React.FC = () => {
     canViewReports,
     canViewStudentActions,
     canViewUsers,
+    roleName,
   ]);
 
   const accountSummary = accountReports?.reports.summary;

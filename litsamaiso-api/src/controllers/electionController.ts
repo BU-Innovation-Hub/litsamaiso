@@ -124,6 +124,7 @@ export const deleteElectionHandler = async (req: Request, res: Response) => {
 // Handler function to list elections for the user's institution, with different visibility based on role
 export const listElectionsHandler = async (req: Request, res: Response) => {
   try {
+    const startedAt = Date.now();
     const user = (req as any).user;
     const isStudent = String(
       (user?.role && (user.role as any).name) || user?.role || "",
@@ -131,7 +132,9 @@ export const listElectionsHandler = async (req: Request, res: Response) => {
 
     const { page, limit } = req.query as any;
     const pageNum = Math.max(parseInt(page) || 1, 1);
-    const lim = Math.max(Math.min(parseInt(limit) || 10000, 10000), 1);
+    const fallbackLimit = isStudent ? 25 : 10000;
+    const maxLimit = isStudent ? 100 : 10000;
+    const lim = Math.max(Math.min(parseInt(limit) || fallbackLimit, maxLimit), 1);
     const skip = (pageNum - 1) * lim;
 
     const filter: Record<string, unknown> = {
@@ -148,6 +151,12 @@ export const listElectionsHandler = async (req: Request, res: Response) => {
       Election.find(filter).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
       Election.countDocuments(filter),
     ]);
+
+    if (isStudent) {
+      console.log(
+        `[student-dashboard] /elections user=${String(user._id)} returned=${elections.length} total=${total} limit=${lim} durationMs=${Date.now() - startedAt}`,
+      );
+    }
 
     res.json({ elections, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
   } catch (err: any) {

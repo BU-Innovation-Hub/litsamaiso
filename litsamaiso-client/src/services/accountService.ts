@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { AxiosProgressEvent } from 'axios';
+import { AxiosError, type AxiosProgressEvent } from 'axios';
 import apiClient from '../lib/api';
 import type { Account } from '../types';
 
@@ -65,19 +65,32 @@ export const accountService = {
   },
 
   getConfirmationStatus: async () => {
-    const response = await apiClient.get<{
-      confirmed: boolean;
-      message: string;
-      record?: {
-        borrowerNumber: string;
-        accountNumber: string;
-        bankName: string;
-        status: string;
-        confirmationDate?: string;
-        graduating?: boolean;
+    try {
+      const response = await apiClient.get<{
+        confirmed: boolean;
+        message?: string;
+        record?: {
+          borrowerNumber: string;
+          accountNumber: string;
+          bankName: string;
+          status: string;
+          confirmationDate?: string;
+          graduating?: boolean;
+        };
+      }>('/accounts/confirmation-status');
+      return {
+        ...response.data,
+        message: response.data.message || 'Account confirmation status',
       };
-    }>('/accounts/confirmation-status');
-    return response.data;
+    } catch (error) {
+      if (error instanceof AxiosError && [400, 404].includes(error.response?.status ?? 0)) {
+        return {
+          confirmed: false,
+          message: error.response?.data?.message || 'Your account is not ready for confirmation yet',
+        };
+      }
+      throw error;
+    }
   },
 
   // Confirm account against the current student's institution.
