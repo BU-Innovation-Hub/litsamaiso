@@ -30,6 +30,7 @@ import {
   ScrollVelocityRow,
 } from "@/components/ui/scroll-based-velocity";
 import { cn } from "@/lib/utils";
+import bentoMockup from "@/assets/bento-mockup.jpg";
 
 const heroVideoUrl =
   "https://res.cloudinary.com/joelics-arts/video/upload/v1781684213/litsamaiso/landing-page-video_agw7fr.mp4";
@@ -145,14 +146,6 @@ const teamMembers = [
       "Guides rollouts, training, and adoption so every office has a shared way forward.",
     image: "/team/belo.webp",
   },
-];
-
-const footerLinks = [
-  "Platform",
-  "Confirmations",
-  "Institutions",
-  "Support",
-  "Security",
 ];
 
 const fadeUp = {
@@ -279,7 +272,7 @@ const LandingPage = () => {
 
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
-                to="/login"
+                to="/register"
                 className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary-clr px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90 sm:w-auto"
               >
                 Get started
@@ -310,7 +303,7 @@ const LandingPage = () => {
             width={96}
             height={96}
             squares={[18, 12]}
-            className="opacity-[0.06]"
+            className="opacity-[0.20]"
             squaresClassName="stroke-gray-300"
           />
           <div className="relative mx-auto max-w-7xl px-5 md:px-8">
@@ -338,16 +331,7 @@ const LandingPage = () => {
                     variants={fadeUp}
                     transition={{ duration: 0.55, ease: "easeOut" }}
                   >
-                    <div
-                      className={cn(
-                        "absolute inset-0 opacity-0 transition group-hover:opacity-100",
-                        card.title === "Role-aware access"
-                          ? "bg-[radial-gradient(circle_at_20%_10%,rgba(54,59,99,0.22),transparent_34%)]"
-                          : card.dark
-                            ? "bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.06),transparent_34%)]"
-                            : "bg-[radial-gradient(circle_at_20%_10%,rgba(83,91,192,0.22),transparent_34%)]"
-                      )}
-                    />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(83,91,192,0.22),transparent_34%)] opacity-0 transition group-hover:opacity-100" />
                     <div className="relative flex h-full flex-col justify-between gap-8">
                       <div>
                         <span className={cn("flex h-11 w-11 items-center justify-center rounded-2xl border", card.dark ? "border-[#363B63] bg-[#252a3d] text-white" : "border-gray-200 bg-gray-100 text-primary-clr")}>
@@ -626,7 +610,6 @@ const LandingPage = () => {
               support@litsamaiso.com
             </a>
           </div>
-
         </div>
       </footer>
     </div>
@@ -636,31 +619,12 @@ const LandingPage = () => {
 const CapabilityVisual = ({ type }: { type: string }) => {
   if (type === "dashboard") {
     return (
-      <div className="grid gap-3 rounded-2xl border border-gray-200 bg-gray-100 p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-500">
-            Review queue
-          </span>
-          <span className="rounded-full bg-active-clr/20 px-2 py-1 text-xs text-gray-600">
-            Live
-          </span>
-        </div>
-        <div className="grid gap-2 md:grid-cols-3">
-          {["Confirmed", "Pending", "Issues"].map((label, index) => (
-            <div key={label} className="rounded-xl bg-white p-3">
-              <div className="h-2 w-12 rounded-full bg-gray-200" />
-              <div
-                className={cn(
-                  "mt-4 h-10 rounded-lg",
-                  index === 0 && "bg-active-clr/70",
-                  index === 1 && "bg-stroke-clr/35",
-                  index === 2 && "bg-orange-200/55",
-                )}
-              />
-              <p className="mt-3 text-xs text-gray-500">{label}</p>
-            </div>
-          ))}
-        </div>
+      <div className="my-auto flex items-center justify-center">
+        <img
+          src={bentoMockup}
+          alt="Confirmation command center dashboard"
+          className="-mx-6 -mb-6 w-[calc(100%+3rem)] max-w-none object-cover"
+        />
       </div>
     );
   }
