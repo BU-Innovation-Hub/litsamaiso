@@ -63,10 +63,13 @@ export const listAccounts = async (req: Request, res: Response) => {
     const params = (req.query || {}) as any;
     const limit = getAccountListLimit(params.limit);
     const q = getAccountListFilter(user, params);
+    const batchOptionsFilter = getAccountListFilter(user, {
+      institutionId: params.institutionId,
+    });
 
     const [accounts, batchesDocs] = await Promise.all([
       FinancialClearance.find(q).limit(limit).lean(),
-      FinancialClearance.distinct("batchNumber", q),
+      FinancialClearance.distinct("batchNumber", batchOptionsFilter),
     ]);
 
     const batches = (batchesDocs || []).filter((b: any) => b != null).sort((a: any, b: any) => a - b);
