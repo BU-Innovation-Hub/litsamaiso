@@ -1,8 +1,8 @@
 import apiClient from '../lib/api';
 
 export const issueService = {
-  listIssues: async () => {
-    const response = await apiClient.get<{ issues: any[] }>('/issues');
+  listIssues: async (params?: { limit?: number }) => {
+    const response = await apiClient.get<{ issues: any[] }>('/issues', { params });
     return response.data.issues;
   },
   createIssue: async (payload: { borrowerNumber: string; bankName: string; accountNumber: string; proofUrls?: string[]; notes?: string }) => {
