@@ -36,6 +36,10 @@ const getPasswordResetBaseUrl = (): string => {
   return "";
 };
 
+const sendAuthFailure = (res: Response, statusCode: number): void => {
+  res.status(statusCode).json({ message: "Authentication failed" });
+};
+
 export const register = async (req: Request, res: Response): Promise<void> => {
   const {
     email,
@@ -77,18 +81,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
-    res.status(409).json({ message: "Email already exists" });
+    sendAuthFailure(res, 409);
     return;
   }
 
   // Find role case-insensitively to avoid mismatches like "Student" vs "student"
   const roleDoc = await Role.findOne({ name: new RegExp(`^${role}$`, "i") });
   if (!roleDoc) {
-    const available = await Role.find().select("name -_id").lean();
-    const names = available.map((r: any) => r.name).join(", ");
-    res
-      .status(400)
-      .json({ message: `Role not found. Available roles: ${names}` });
+    sendAuthFailure(res, 400);
     return;
   }
 
@@ -108,7 +108,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email: normalizedInstitutionEmail,
     });
     if (existingInstitution) {
-      res.status(409).json({ message: "Institution email already exists" });
+      sendAuthFailure(res, 409);
       return;
     }
 
@@ -121,27 +121,24 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     if (roleName === "student" && studentId) {
       const studentRecord = await Student.findOne({ studentId }).lean();
       if (!studentRecord) {
-        res.status(400).json({
-          message:
-            "Make sure you are registered first by your Institution Admin in the System",
-        });
+        sendAuthFailure(res, 400);
         return;
       }
 
       institution = await Institution.findById(studentRecord.institution);
       if (!institution) {
-        res.status(400).json({ message: "Institution not found" });
+        sendAuthFailure(res, 400);
         return;
       }
     } else {
       if (!institutionId) {
-        res.status(400).json({ message: "institutionId is required" });
+        sendAuthFailure(res, 400);
         return;
       }
 
       institution = await Institution.findById(institutionId);
       if (!institution) {
-        res.status(400).json({ message: "Institution not found" });
+        sendAuthFailure(res, 400);
         return;
       }
     }
@@ -156,10 +153,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       // studentId provided -> find the student record globally and use its institution
       const studentRecord = await Student.findOne({ studentId }).lean();
       if (!studentRecord) {
-        res.status(400).json({
-          message:
-            "Make sure you are registered first by your Institution Admin in the System",
-        });
+        sendAuthFailure(res, 400);
         return;
       }
 
@@ -168,9 +162,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         String(studentRecord.email).toLowerCase() !==
         normalizedEmail
       ) {
-        res.status(400).json({
-          message: "Email and the studentId must belong to the same person",
-        });
+        sendAuthFailure(res, 400);
         return;
       }
 
@@ -186,10 +178,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         email: normalizedEmail,
       }).lean();
       if (!studentByEmail) {
-        res.status(400).json({
-          message:
-            "Make sure you are registered first by your Institution Admin in the System",
-        });
+        sendAuthFailure(res, 400);
         return;
       }
 
@@ -283,22 +272,18 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     .populate("role", "name")
     .populate("institution", "name email locked lockedReason");
   if (!user) {
-    res.status(401).json({ message: "Invalid credentials" });
+    sendAuthFailure(res, 401);
     return;
   }
 
   if ((user.institution as any)?.locked) {
-    res.status(403).json({
-      message: "Your institution account has been locked",
-      locked: true,
-      lockedReason: (user.institution as any).lockedReason || undefined,
-    });
+    sendAuthFailure(res, 403);
     return;
   }
 
   const passwordMatches = await bcrypt.compare(password, user.password);
   if (!passwordMatches) {
-    res.status(401).json({ message: "Invalid credentials" });
+    sendAuthFailure(res, 401);
     return;
   }
 
