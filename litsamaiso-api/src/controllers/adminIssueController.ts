@@ -20,9 +20,14 @@ export const listAdminIssues = async (req: Request, res: Response) => {
 
     const q: any = { studentId: { $in: studentIds } };
     if (params.status) {
-      q.status = String(params.status);
+      const requestedStatus = String(params.status).toLowerCase();
+      if (requestedStatus === "reviewed") {
+        q.status = { $in: ["resolved", "rejected", "approved"] };
+      } else {
+        q.status = requestedStatus;
+      }
     } else {
-      q.status = "submitted";
+      q.status = { $in: ["submitted", "resolved", "rejected", "approved"] };
     }
     if (params.search) {
       const s = String(params.search).trim();
