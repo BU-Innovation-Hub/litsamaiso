@@ -127,7 +127,7 @@ const teamMembers = [
     role: "Technical Lead",
     description:
       "Turns complex funding and governance rules into dependable, quiet infrastructure.",
-    image: "/team/poloko.webp",
+    image: "",
   },
   {
     name: "Bokang Mahlaka",
