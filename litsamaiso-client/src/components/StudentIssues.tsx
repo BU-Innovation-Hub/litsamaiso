@@ -292,7 +292,32 @@ export default function StudentIssues() {
 
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Upload proof images</label>
-                  <input type="file" multiple accept="image/*" disabled={isUpdatingIssue} onChange={(e) => setEditProofFiles(e.target.files)} className="w-full disabled:cursor-not-allowed disabled:opacity-60" required />
+                  <div className={`border-2 border-dashed rounded-lg p-4 transition ${isUpdatingIssue ? 'border-gray-200 bg-gray-50' : 'border-primary-clr/40 bg-primary-clr/5 hover:border-primary-clr'}`}>
+                    <input
+                      id="issue-proof-upload"
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      disabled={isUpdatingIssue}
+                      onChange={(e) => setEditProofFiles(e.target.files)}
+                      className="hidden"
+                      required
+                    />
+                    <label htmlFor="issue-proof-upload" className={`flex flex-col items-center justify-center cursor-pointer rounded-md px-4 py-6 text-center ${isUpdatingIssue ? 'cursor-not-allowed opacity-60' : ''}`}>
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
+                        <svg className="h-6 w-6 text-primary-clr" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                          <path d="M12 16V4" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M7 8l5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-semibold text-primary-clr">Choose proof images</span>
+                      <span className="mt-1 text-sm text-gray-500">PNG, JPG, or JPEG up to your upload limit</span>
+                      <span className="mt-3 inline-flex items-center rounded-full border border-primary-clr/20 bg-white px-3 py-1 text-xs font-medium text-primary-clr">
+                        {editProofFiles && editProofFiles.length > 0 ? `${editProofFiles.length} file${editProofFiles.length > 1 ? 's' : ''} selected` : 'No files selected yet'}
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
