@@ -483,6 +483,11 @@ const AccountsPage: React.FC = () => {
     return text || '-';
   };
 
+  const displayComparableValue = (value: unknown) => {
+    const text = String(value || '').trim();
+    return text ? text.toLowerCase() : '-';
+  };
+
   const normalizeComparable = (value: unknown) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
 
   const hasChanged = (original: unknown, proposed: unknown) => {
@@ -685,7 +690,7 @@ const AccountsPage: React.FC = () => {
                                     <div className="line-clamp-2">{problemSummary}</div>
                                   </td>
                                   <td className="px-4 py-4 text-sm text-slate-700">
-                                    <p className="font-medium text-slate-950">{displayValue(proposedBankName)}</p>
+                                    <p className="font-medium text-slate-950">{displayComparableValue(proposedBankName)}</p>
                                     <p className="text-slate-500">{displayValue(proposedAccountNumber)}</p>
                                   </td>
                                   <td className="whitespace-nowrap px-4 py-4 text-sm text-slate-600">
@@ -812,7 +817,7 @@ const AccountsPage: React.FC = () => {
                       <dl className="space-y-3">
                         <div>
                           <dt className="text-xs uppercase text-slate-500">Bank name in system</dt>
-                          <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(selectedIssueCurrentBankName)}</dd>
+                          <dd className="mt-1 text-sm font-medium text-slate-950">{displayComparableValue(selectedIssueCurrentBankName)}</dd>
                         </div>
                         <div>
                           <dt className="text-xs uppercase text-slate-500">Account number in system</dt>
@@ -843,7 +848,7 @@ const AccountsPage: React.FC = () => {
                             Correct bank name
                             {selectedIssueBankChanged && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">changed</span>}
                           </dt>
-                          <dd className="mt-1 text-sm font-medium text-slate-950">{displayValue(selectedIssueProposedBankName)}</dd>
+                          <dd className="mt-1 text-sm font-medium text-slate-950">{displayComparableValue(selectedIssueProposedBankName)}</dd>
                         </div>
                         <div>
                           <dt className="flex items-center gap-2 text-xs uppercase text-slate-500">

@@ -645,9 +645,10 @@ export const financeResolveAccountIssue = async (
       return;
     }
 
-    const correctedBankName = String(issue.correctedBankName || "").trim();
+    // const correctedBankName = String(issue.correctedBankName || "").trim();
+    const correctedBankName = String(issue.correctedBankName || issue.bankName || "").trim();
     const correctedAccountNumber = String(
-      issue.correctedAccountNumber || "",
+      issue.correctedAccountNumber || issue.accountNumber || "",
     ).trim();
 
     if (!correctedBankName || !correctedAccountNumber) {

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Loader, X } from 'lucide-react';
 import Button from './ui/button';
@@ -30,22 +31,26 @@ interface Account {
   confirmationDate?: string;
 }
 
+const getDefaultEditForm = () => ({
+  fullnames: '',
+  borrowerNumber: '',
+  courseOfStudy: '',
+  bankName: '',
+  accountNumber: '',
+  studentId: '',
+  status: 'pending' as string,
+});
+
 export default function StudentIssues() {
+  const location = useLocation();
   const [issues, setIssues] = useState<IIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingIssue, setEditingIssue] = useState<IIssue | null>(null);
-  const [editForm, setEditForm] = useState({
-    fullnames: '',
-    borrowerNumber: '',
-    courseOfStudy: '',
-    bankName: '',
-    accountNumber: '',
-    studentId: '',
-    status: 'pending' as string,
-  });
+  const [editForm, setEditForm] = useState(getDefaultEditForm);
+  const hasAutoOpenedIssueModalRef = useRef(false);
   const [editNotes, setEditNotes] = useState<string>('');
   const [editProofFiles, setEditProofFiles] = useState<FileList | null>(null);
   const [isUpdatingIssue, setIsUpdatingIssue] = useState(false);
@@ -110,7 +115,7 @@ export default function StudentIssues() {
     };
   }, []);
 
-  const openEditModal = (issue: IIssue, account?: Account | undefined) => {
+  const openEditModal = useCallback((issue: IIssue, account?: Account | undefined) => {
     setEditingIssue(issue);
     // account parameter used to populate the edit form; we don't store it in state
     setEditForm({
@@ -125,7 +130,35 @@ export default function StudentIssues() {
     setEditNotes(issue.notes || '');
     setEditProofFiles(null);
     setShowEditModal(true);
-  };
+  }, []);
+
+  useEffect(() => {
+    const shouldAutoOpenIssueModal = Boolean((location.state as { issueLogged?: boolean } | null)?.issueLogged);
+
+    if (!shouldAutoOpenIssueModal || hasAutoOpenedIssueModalRef.current || loading || issues.length === 0 || showEditModal) {
+      return;
+    }
+
+    const issueToOpen = issues[0];
+    if (!issueToOpen) return;
+
+    hasAutoOpenedIssueModalRef.current = true;
+
+    const timeoutId = window.setTimeout(() => {
+      const matchingAccount = accounts.find((acc) => acc.borrowerNumber === issueToOpen.borrowerNumber);
+      openEditModal(issueToOpen as IIssue, matchingAccount);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [accounts, issues, loading, location.state, openEditModal, showEditModal]);
+
+  const resetEditModal = useCallback(() => {
+    setShowEditModal(false);
+    setEditingIssue(null);
+    setEditProofFiles(null);
+    setEditNotes('');
+    setEditForm(getDefaultEditForm());
+  }, []);
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -156,8 +189,7 @@ export default function StudentIssues() {
 
       await issueService.updateIssue(editingIssue._id || '', payload);
       toast.success('Issue updated successfully');
-      setShowEditModal(false);
-      setEditingIssue(null);
+      resetEditModal();
       // editing account is not stored in state
       await fetchAccounts();
       await fetchIssues();
@@ -224,13 +256,17 @@ export default function StudentIssues() {
 
       {/* Edit Account Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-semibold">Edit Account Record</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={(event) => event.stopPropagation()}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-semibold">Edit Account Record</h3>
+                <p className="text-sm text-gray-600 mt-1">Please update your bank details and submit the issue for review to continue.</p>
+              </div>
               <button
+                type="button"
                 disabled={isUpdatingIssue}
-                onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }}
+                aria-label="Close issue form"
                 className="text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <X className="w-5 h-5" />
@@ -250,18 +286,45 @@ export default function StudentIssues() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional notes (optional)</label>
-                  <textarea value={editNotes} disabled={isUpdatingIssue} onChange={(e) => setEditNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" rows={3} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional notes</label>
+                  <textarea value={editNotes} disabled={isUpdatingIssue} onChange={(e) => setEditNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" rows={3} required />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Upload proof images (optional)</label>
-                  <input type="file" multiple accept="image/*" disabled={isUpdatingIssue} onChange={(e) => setEditProofFiles(e.target.files)} className="w-full disabled:cursor-not-allowed disabled:opacity-60" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Upload proof images</label>
+                  <div className={`border-2 border-dashed rounded-lg p-4 transition ${isUpdatingIssue ? 'border-gray-200 bg-gray-50' : 'border-primary-clr/40 bg-primary-clr/5 hover:border-primary-clr'}`}>
+                    <input
+                      id="issue-proof-upload"
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      disabled={isUpdatingIssue}
+                      onChange={(e) => setEditProofFiles(e.target.files)}
+                      className="hidden"
+                      required
+                    />
+                    <label htmlFor="issue-proof-upload" className={`flex flex-col items-center justify-center cursor-pointer rounded-md px-4 py-6 text-center ${isUpdatingIssue ? 'cursor-not-allowed opacity-60' : ''}`}>
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-sm">
+                        <svg className="h-6 w-6 text-primary-clr" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                          <path d="M12 16V4" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M7 8l5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </div>
+                      <span className="text-sm font-semibold text-primary-clr">Choose proof images</span>
+                      <span className="mt-1 text-sm text-gray-500">PNG, JPG, or JPEG up to your upload limit</span>
+                      <span className="mt-3 inline-flex items-center rounded-full border border-primary-clr/20 bg-white px-3 py-1 text-xs font-medium text-primary-clr">
+                        {editProofFiles && editProofFiles.length > 0 ? `${editProofFiles.length} file${editProofFiles.length > 1 ? 's' : ''} selected` : 'No files selected yet'}
+                      </span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-                <div className="flex justify-end space-x-3 pt-4">
-                <Button type="button" variant="outline" disabled={isUpdatingIssue} onClick={() => { setShowEditModal(false); setEditingIssue(null); setEditProofFiles(null); }}>Cancel</Button>
+              <div className="flex justify-end space-x-3 pt-4">
+                <Button type="button" variant="outline" disabled={true} className="disabled:cursor-not-allowed disabled:opacity-60">
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={isUpdatingIssue} className="inline-flex items-center gap-2 bg-primary-clr hover:bg-black disabled:cursor-not-allowed disabled:opacity-60">
                   {isUpdatingIssue && <Loader className="h-4 w-4 animate-spin" />}
                   {isUpdatingIssue ? 'Sending...' : 'Send for review'}

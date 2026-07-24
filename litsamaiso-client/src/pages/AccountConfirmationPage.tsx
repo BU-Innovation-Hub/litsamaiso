@@ -40,6 +40,7 @@ const BANK_NAME_ALIASES: Record<string, BankValue> = {
   'lesotho post bank': 'lpb',
   'post bank': 'lpb',
   postbank: 'lpb',
+  'lpb': "lpb"
 };
 
 const normalizeBankValue = (bankName: string): string => {

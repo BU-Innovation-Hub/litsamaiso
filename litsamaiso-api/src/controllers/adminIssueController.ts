@@ -19,7 +19,16 @@ export const listAdminIssues = async (req: Request, res: Response) => {
     const studentIds = (studentDocs || []).map((s) => s.studentId).filter(Boolean);
 
     const q: any = { studentId: { $in: studentIds } };
-    if (params.status) q.status = String(params.status);
+    if (params.status) {
+      const requestedStatus = String(params.status).toLowerCase();
+      if (requestedStatus === "reviewed") {
+        q.status = { $in: ["resolved", "rejected", "approved"] };
+      } else {
+        q.status = requestedStatus;
+      }
+    } else {
+      q.status = { $in: ["submitted", "resolved", "rejected", "approved"] };
+    }
     if (params.search) {
       const s = String(params.search).trim();
       q.$or = [
@@ -95,8 +104,8 @@ export const approveIssue = async (req: Request, res: Response) => {
     const borrowerNumber = String(issue.borrowerNumber || student.borrowerNumber || "").trim();
     if (!borrowerNumber) return res.status(400).json({ error: "Issue missing borrowerNumber" });
 
-    const correctedBank = String(issue.correctedBankName || "").trim();
-    const correctedAccount = String(issue.correctedAccountNumber || "").trim();
+    const correctedBank = String(issue.correctedBankName || issue.bankName || "").trim();
+    const correctedAccount = String(issue.correctedAccountNumber || issue.accountNumber || "").trim();
     if (!correctedBank || !correctedAccount) return res.status(400).json({ error: "Issue has no corrected bank/account to apply" });
 
     const account = await FinancialClearance.findOne({ borrowerNumber, institution: user.institution });
