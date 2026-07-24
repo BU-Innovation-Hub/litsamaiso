@@ -256,7 +256,7 @@ const LandingPage = () => {
           >
 
             <h1 className="mx-auto max-w-4xl text-5xl font-semibold leading-[1.02] text-primary-clr md:text-7xl">
-              Testing.
+              Make academic support feel connected, and accountable
             </h1>
 
             <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-gray-600 md:text-xl">
