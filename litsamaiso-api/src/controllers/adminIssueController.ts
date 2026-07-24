@@ -95,8 +95,6 @@ export const approveIssue = async (req: Request, res: Response) => {
     const borrowerNumber = String(issue.borrowerNumber || student.borrowerNumber || "").trim();
     if (!borrowerNumber) return res.status(400).json({ error: "Issue missing borrowerNumber" });
 
-    // const correctedBank = String(issue.correctedBankName || "").trim();
-    // const correctedAccount = String(issue.correctedAccountNumber || "").trim();
     const correctedBank = String(issue.correctedBankName || issue.bankName || "").trim();
     const correctedAccount = String(issue.correctedAccountNumber || issue.accountNumber || "").trim();
     if (!correctedBank || !correctedAccount) return res.status(400).json({ error: "Issue has no corrected bank/account to apply" });
