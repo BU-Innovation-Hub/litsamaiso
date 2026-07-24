@@ -250,13 +250,13 @@ export default function StudentIssues() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional notes (optional)</label>
-                  <textarea value={editNotes} disabled={isUpdatingIssue} onChange={(e) => setEditNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" rows={3} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional notes</label>
+                  <textarea value={editNotes} disabled={isUpdatingIssue} onChange={(e) => setEditNotes(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" rows={3} required />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Upload proof images (optional)</label>
-                  <input type="file" multiple accept="image/*" disabled={isUpdatingIssue} onChange={(e) => setEditProofFiles(e.target.files)} className="w-full disabled:cursor-not-allowed disabled:opacity-60" />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Upload proof images</label>
+                  <input type="file" multiple accept="image/*" disabled={isUpdatingIssue} onChange={(e) => setEditProofFiles(e.target.files)} className="w-full disabled:cursor-not-allowed disabled:opacity-60" required />
                 </div>
               </div>
 
