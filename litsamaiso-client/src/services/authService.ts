@@ -72,10 +72,17 @@ export const authService = {
     if (data.faceImageBase64) payload.faceImageBase64 = data.faceImageBase64;
     if (Array.isArray(data.faceDescriptor)) payload.faceDescriptor = data.faceDescriptor;
 
-    const response = await apiClient.post<AuthResponse>('/auth/register', payload);
-    const responseData = normalizeAuthResponse(response.data);
-    storeAuthSession(responseData);
-    return responseData;
+    const response = await apiClient.post<{ message: string }>('/auth/register', payload);
+    return {
+      token: '',
+      message: response.data.message,
+      user: {
+        id: '',
+        email: data.email,
+        role: { _id: 'student', name: 'Student' } as Role,
+        institution: undefined,
+      } as User,
+    };
   },
 
   logout: async (): Promise<void> => {

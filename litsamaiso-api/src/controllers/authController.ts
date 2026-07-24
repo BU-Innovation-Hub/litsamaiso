@@ -9,6 +9,13 @@ import { Institution } from "../models/Institution.js";
 import { Student } from "../models/Student.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { createHash, randomBytes } from "crypto";
+import {
+  getFriendlyRegistrationErrorMessage,
+  getPublicRegistrationError,
+  isPrivilegedRole,
+  isPublicRegistrationAllowed,
+  normalizeRoleName,
+} from "./registrationPolicy.js";
 
 const signToken = (userId: string, rememberMe: boolean): string => {
   const secret = process.env.JWT_SECRET;
@@ -71,35 +78,35 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       : "";
 
   if (!normalizedEmail || !password || !role) {
-    res.status(400).json({ message: "email, password, and role are required" });
+    res.status(400).json({ message: getFriendlyRegistrationErrorMessage("missingFields") });
     return;
   }
 
   const existingUser = await User.findOne({ email: normalizedEmail });
   if (existingUser) {
-    res.status(409).json({ message: "Email already exists" });
+    res.status(409).json({ message: getFriendlyRegistrationErrorMessage("emailTaken") });
     return;
   }
 
   // Find role case-insensitively to avoid mismatches like "Student" vs "student"
   const roleDoc = await Role.findOne({ name: new RegExp(`^${role}$`, "i") });
   if (!roleDoc) {
-    const available = await Role.find().select("name -_id").lean();
-    const names = available.map((r: any) => r.name).join(", ");
-    res
-      .status(400)
-      .json({ message: `Role not found. Available roles: ${names}` });
+    res.status(400).json({ message: getFriendlyRegistrationErrorMessage("unsupportedRole") });
+    return;
+  }
+
+  const roleName = normalizeRoleName(String(roleDoc.name || ""));
+  if (isPrivilegedRole(roleName) && !isPublicRegistrationAllowed(roleName)) {
+    const error = getPublicRegistrationError(roleName);
+    res.status(error.status).json({ message: error.message });
     return;
   }
 
   let institution = null;
-
-  const roleName = String(roleDoc.name || "").toLowerCase();
   if (roleName === "institutionadmin") {
     if (!institutionName || !normalizedInstitutionEmail) {
       res.status(400).json({
-        message:
-          "institutionName and institutionEmail are required for InstitutionAdmin",
+        message: getFriendlyRegistrationErrorMessage("institutionDetailsRequired"),
       });
       return;
     }
@@ -108,7 +115,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       email: normalizedInstitutionEmail,
     });
     if (existingInstitution) {
-      res.status(409).json({ message: "Institution email already exists" });
+      res.status(409).json({ message: getFriendlyRegistrationErrorMessage("emailTaken") });
       return;
     }
 
@@ -122,26 +129,25 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       const studentRecord = await Student.findOne({ studentId }).lean();
       if (!studentRecord) {
         res.status(400).json({
-          message:
-            "Make sure you are registered first by your Institution Admin in the System",
+          message: getFriendlyRegistrationErrorMessage("studentNotFound"),
         });
         return;
       }
 
       institution = await Institution.findById(studentRecord.institution);
       if (!institution) {
-        res.status(400).json({ message: "Institution not found" });
+        res.status(400).json({ message: getFriendlyRegistrationErrorMessage("institutionUnavailable") });
         return;
       }
     } else {
       if (!institutionId) {
-        res.status(400).json({ message: "institutionId is required" });
+        res.status(400).json({ message: getFriendlyRegistrationErrorMessage("institutionUnavailable") });
         return;
       }
 
       institution = await Institution.findById(institutionId);
       if (!institution) {
-        res.status(400).json({ message: "Institution not found" });
+        res.status(400).json({ message: getFriendlyRegistrationErrorMessage("institutionUnavailable") });
         return;
       }
     }
@@ -157,8 +163,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       const studentRecord = await Student.findOne({ studentId }).lean();
       if (!studentRecord) {
         res.status(400).json({
-          message:
-            "Make sure you are registered first by your Institution Admin in the System",
+          message: getFriendlyRegistrationErrorMessage("studentNotFound"),
         });
         return;
       }
@@ -169,7 +174,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         normalizedEmail
       ) {
         res.status(400).json({
-          message: "Email and the studentId must belong to the same person",
+          message: getFriendlyRegistrationErrorMessage("studentMismatch"),
         });
         return;
       }
@@ -187,8 +192,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       }).lean();
       if (!studentByEmail) {
         res.status(400).json({
-          message:
-            "Make sure you are registered first by your Institution Admin in the System",
+          message: getFriendlyRegistrationErrorMessage("studentNotFound"),
         });
         return;
       }
@@ -242,17 +246,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   res.status(201).json({
     message: "User registered",
-    user: {
-      id: user._id,
-      email: user.email,
-      role: roleDoc.name,
-      institution: institution._id,
-      studentId: user.studentId,
-      borrowerNumber: user.borrowerNumber,
-      studentCardUrl: user.studentCardUrl,
-      faceDescriptor: user.faceDescriptor,
-      faceImageUrl: user.faceImageUrl,
-    },
   });
 };
 
