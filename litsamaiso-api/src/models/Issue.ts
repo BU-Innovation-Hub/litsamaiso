@@ -16,7 +16,7 @@ export interface IssueDocument {
   proofUrls?: string[];
   notes?: string;
   attempts?: number;
-  status?: "submitted" | "reported" | "resolved" | "rejected" | "approved";
+  status?: "draft" | "submitted" | "reported" | "resolved" | "rejected" | "approved";
   approvedBy?: any;
   approvedAt?: Date;
   rejectedBy?: any;
@@ -42,9 +42,9 @@ const issueSchema = new Schema<IssueDocument>(
     attempts: { type: Number, default: 0 },
     status: {
       type: String,
-      enum: ["submitted", "reported", "resolved", "rejected", "approved"],
+      enum: ["draft", "submitted", "reported", "resolved", "rejected", "approved"],
       trim: true,
-      default: "submitted",
+      default: "draft",
     },
     approvedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     approvedAt: { type: Date },

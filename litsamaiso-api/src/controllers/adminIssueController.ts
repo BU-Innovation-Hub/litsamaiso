@@ -19,7 +19,11 @@ export const listAdminIssues = async (req: Request, res: Response) => {
     const studentIds = (studentDocs || []).map((s) => s.studentId).filter(Boolean);
 
     const q: any = { studentId: { $in: studentIds } };
-    if (params.status) q.status = String(params.status);
+    if (params.status) {
+      q.status = String(params.status);
+    } else {
+      q.status = "submitted";
+    }
     if (params.search) {
       const s = String(params.search).trim();
       q.$or = [

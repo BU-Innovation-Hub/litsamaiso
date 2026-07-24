@@ -837,7 +837,7 @@ export const accountConfirmation = async (
       recordedBankName: accountByBorrowerNo.bankName,
       recordedAccountNumber: accountByBorrowerNo.accountNumber,
       reasons,
-      status: 'submitted',
+      status: 'draft',
       attempts: nextAttempts,
     };
 
@@ -858,28 +858,8 @@ export const accountConfirmation = async (
       const issueUpdatePayload = { ...issuePayload };
       delete issueUpdatePayload.attempts;
       issue = await Issue.findOneAndUpdate({ studentId: input.studentId }, { $set: issueUpdatePayload, $inc: { attempts: 1 } }, { new: true, runValidators: true });
-      await notifyFinanceUsersAboutIssue({
-        institutionId: input.institutionId,
-        studentId: input.studentId,
-        studentEmail: input.studentEmail || student.email,
-        borrowerNumber,
-        bankName,
-        accountNumber,
-        reasons,
-        notificationType: 'updated',
-      });
     } else {
       issue = await Issue.create(issuePayload);
-      await notifyFinanceUsersAboutIssue({
-        institutionId: input.institutionId,
-        studentId: input.studentId,
-        studentEmail: input.studentEmail || student.email,
-        borrowerNumber,
-        bankName,
-        accountNumber,
-        reasons,
-        notificationType: 'created',
-      });
     }
 
     // reset student's confirmation attempts after creating an issue
