@@ -9,6 +9,12 @@ import { Institution } from "../models/Institution.js";
 import { Student } from "../models/Student.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { createHash, randomBytes } from "crypto";
+import {
+  getPublicRegistrationError,
+  isPrivilegedRole,
+  isPublicRegistrationAllowed,
+  normalizeRoleName,
+} from "./registrationPolicy.js";
 
 const signToken = (userId: string, rememberMe: boolean): string => {
   const secret = process.env.JWT_SECRET;
@@ -92,9 +98,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  let institution = null;
+  const roleName = normalizeRoleName(String(roleDoc.name || ""));
+  if (isPrivilegedRole(roleName) && !isPublicRegistrationAllowed(roleName)) {
+    const error = getPublicRegistrationError(roleName);
+    res.status(error.status).json({ message: error.message });
+    return;
+  }
 
-  const roleName = String(roleDoc.name || "").toLowerCase();
+  let institution = null;
   if (roleName === "institutionadmin") {
     if (!institutionName || !normalizedInstitutionEmail) {
       res.status(400).json({
