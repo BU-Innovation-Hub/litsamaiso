@@ -127,7 +127,7 @@ const teamMembers = [
     role: "Technical Lead",
     description:
       "Turns complex funding and governance rules into dependable, quiet infrastructure.",
-    image: "",
+    image: "/team/poloko-img.jpg",
   },
   {
     name: "Bokang Mahlaka",
@@ -256,7 +256,7 @@ const LandingPage = () => {
           >
 
             <h1 className="mx-auto max-w-4xl text-5xl font-semibold leading-[1.02] text-primary-clr md:text-7xl">
-              Make academic support feel connected, and accountable.
+              Testing.
             </h1>
 
             <p className="mx-auto mt-7 max-w-2xl text-lg leading-8 text-gray-600 md:text-xl">
