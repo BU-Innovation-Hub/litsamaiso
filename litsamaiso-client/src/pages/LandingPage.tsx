@@ -119,28 +119,28 @@ const teamMembers = [
     name: "Kananelo Joel",
     role: "Product Manager",
     description:
-      "Shapes the student-service experience around clarity, trust, and institutional accountability.",
+      "Leads product vision, strategy, and development to deliver a reliable platform that improves student services and institutional efficiency.",
     image: "/team/joel.webp",
   },
   {
     name: "Poloko Nkolanyane",
     role: "Technical Lead",
     description:
-      "Turns complex funding and governance rules into dependable, quiet infrastructure.",
+      "Drives architecture, technical decisions, and engineering practices to build a dependable platform and service workflows.",
     image: "/team/poloko-img.jpg",
   },
   {
     name: "Bokang Mahlaka",
     role: "Frontend Lead",
     description:
-      "Keeps the platform grounded in the daily reality of students, admins, and support teams.",
+      "Builds and guides the frontend experience, ensuring Litsamaiso is intuitive, responsive, and user-focused.",
     image: "/team/bokang.webp",
   },
   {
     name: "Rethabile Lebelo",
     role: "Backend Dev",
     description:
-      "Guides rollouts, training, and adoption so every office has a shared way forward.",
+      "Designs and implements backend services, APIs, and data processes that enable secure, scalable, and dependable platform functionality.",
     image: "/team/belo.webp",
   },
 ];
