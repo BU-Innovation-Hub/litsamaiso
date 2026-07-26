@@ -153,7 +153,7 @@ export const getAccountListLimit = parseAccountLimit;
 const toIsoString = (value: unknown): string => {
   if (!value) return "";
   const date = value instanceof Date ? value : new Date(String(value));
-  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().substring(0, 10);
 };
 
 const splitFullName = (value: unknown): { firstName: string; surname: string } => {
