@@ -183,25 +183,30 @@ export const confirmAccount = async (req: Request, res: Response) => {
       return;
     }
 
+    if (graduating === undefined || graduating === null || String(graduating).trim() === "") {
+      res.status(400).json({ message: "Please select whether you are completing this academic year" });
+      return;
+    }
+
     const user = (req as any).user;
     const instId = user.institution;
 
     let graduatingFlag: boolean | undefined;
-    if (graduating !== undefined) {
-      if (typeof graduating === "boolean") {
-        graduatingFlag = graduating;
-      } else if (typeof graduating === "string") {
-        const normalized = graduating.toLowerCase().trim();
-        if (["true", "1", "yes", "y"].includes(normalized)) {
-          graduatingFlag = true;
-        } else if (["false", "0", "no", "n"].includes(normalized)) {
-          graduatingFlag = false;
-        } else {
-          throw new Error("graduating must be a boolean");
-        }
+    if (typeof graduating === "boolean") {
+      graduatingFlag = graduating;
+    } else if (typeof graduating === "string") {
+      const normalized = graduating.toLowerCase().trim();
+      if (["true", "1", "yes", "y"].includes(normalized)) {
+        graduatingFlag = true;
+      } else if (["false", "0", "no", "n"].includes(normalized)) {
+        graduatingFlag = false;
       } else {
-        throw new Error("graduating must be a boolean");
+        res.status(400).json({ message: "Please choose Yes or No for whether you are completing this academic year" });
+        return;
       }
+    } else {
+      res.status(400).json({ message: "Please choose Yes or No for whether you are completing this academic year" });
+      return;
     }
 
     let confirmationInput: {

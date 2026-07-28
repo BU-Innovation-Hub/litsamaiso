@@ -20,6 +20,13 @@ type ExtractedDetails = {
 
 type BankValue = 'fnb' | 'slb' | 'nedbank' | 'lpb';
 
+type ConfirmationFormData = {
+  borrowerNumber: string;
+  bankName: string;
+  accountNumber: string;
+  graduating: boolean | null;
+};
+
 const BANK_OPTIONS = [
   { label: 'First National Bank', value: 'fnb' },
   { label: 'Standard Lesotho Bank', value: 'slb' },
@@ -98,11 +105,11 @@ const AccountConfirmationPage: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedDetails | null>(null);
   const [reviewAccepted, setReviewAccepted] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ConfirmationFormData>({
     borrowerNumber: user?.borrowerNumber || '',
     bankName: '',
     accountNumber: '',
-    graduating: false,
+    graduating: null,
   });
 
   // Confidence score is intentionally hidden from students (UX requirement).
@@ -196,11 +203,23 @@ const AccountConfirmationPage: React.FC = () => {
   }, [previewUrl]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = event.target;
-    const checked = type === 'checkbox' ? (event as React.ChangeEvent<HTMLInputElement>).target.checked : undefined;
+    const target = event.target;
+    const { name, value } = target;
+    const isInput = target instanceof HTMLInputElement;
+    const inputType = isInput ? target.type : 'select';
+
+    if (name === 'graduating' && inputType === 'radio') {
+      setFormData((prev) => ({
+        ...prev,
+        graduating: value === 'true',
+      }));
+      return;
+    }
+
+    const checked = isInput && inputType === 'checkbox' ? target.checked : undefined;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : name === 'bankName' ? normalizeBankValue(value) : value,
+      [name]: inputType === 'checkbox' ? checked : name === 'bankName' ? normalizeBankValue(value) : value,
     }));
     if (name === 'bankName' || name === 'accountNumber') {
       setReviewAccepted(false);
@@ -265,15 +284,27 @@ const AccountConfirmationPage: React.FC = () => {
 
     const normalizedBankName = normalizeBankValue(formData.bankName);
     const normalizedExtractedBankName = normalizeBankValue(extracted?.bankName || '');
-    const normalizedFormData = {
-      ...formData,
-      bankName: normalizedBankName,
-    };
 
     if (!normalizedBankName || !formData.accountNumber.trim()) {
       toast.error('Bank name and account number are required');
       return;
     }
+
+    if (formData.graduating === null) {
+      toast.error('Please select whether you are completing this academic year');
+      return;
+    }
+
+    const normalizedFormData: {
+      borrowerNumber: string;
+      bankName: string;
+      accountNumber: string;
+      graduating: boolean;
+    } = {
+      ...formData,
+      bankName: normalizedBankName,
+      graduating: formData.graduating,
+    };
 
     if (!/^\d{12}$/.test(formData.borrowerNumber.trim())) {
       toast.error('Borrower number must be exactly 12 digits');
@@ -512,20 +543,38 @@ const AccountConfirmationPage: React.FC = () => {
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    name="graduating"
-                    checked={formData.graduating}
-                    onChange={handleChange}
-                    className="h-4 w-4"
-                  />
-                  I am completing this academic year
-                </label>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Are you completing this academic year?</label>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <input
+                        type="radio"
+                        name="graduating"
+                        value="true"
+                        checked={formData.graduating === true}
+                        onChange={handleChange}
+                        className="h-4 w-4"
+                      />
+                      Yes
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <input
+                        type="radio"
+                        name="graduating"
+                        value="false"
+                        checked={formData.graduating === false}
+                        onChange={handleChange}
+                        className="h-4 w-4"
+                      />
+                      No
+                    </label>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Select one option to continue.</p>
+                </div>
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || isExtracting || (!reviewAccepted && extracted !== null && normalizeBankValue(formData.bankName) === normalizeBankValue(extracted.bankName) && formData.accountNumber === extracted.accountNumber)}
+                  disabled={isSubmitting || isExtracting || formData.graduating === null || (!reviewAccepted && extracted !== null && normalizeBankValue(formData.bankName) === normalizeBankValue(extracted.bankName) && formData.accountNumber === extracted.accountNumber)}
                   className="flex w-full items-center justify-center gap-2 rounded-md bg-button py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSubmitting && <Loader size={18} className="animate-spin" />}
