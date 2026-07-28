@@ -520,7 +520,7 @@ const AccountConfirmationPage: React.FC = () => {
                     onChange={handleChange}
                     className="h-4 w-4"
                   />
-                  I am graduating this academic year
+                  I am completing this academic year
                 </label>
 
                 <button
