@@ -415,22 +415,38 @@ const AccountsPage: React.FC = () => {
     a.remove();
   };
 
-  const summary = reports?.reports.summary;
-
-  const percentages = useMemo(() => {
-    const total = summary?.total || 0;
-    if (total === 0) return { confirmed: 0, paid: 0, unconfirmed: 0 };
-    return {
-      confirmed: Math.round(((summary?.confirmed || 0) / total) * 1000) / 10,
-      paid: Math.round(((summary?.paid || 0) / total) * 1000) / 10,
-      unconfirmed: Math.round(((summary?.unconfirmed || 0) / total) * 1000) / 10,
-    };
-  }, [summary]);
-
   const getStatusLabel = (status?: string) => {
     const normalized = (status || 'pending').toLowerCase();
     return normalized === 'undefined' ? 'pending' : normalized;
   };
+
+  const summary = useMemo(() => {
+    const total = accounts.length;
+    if (total === 0) {
+      return { total: 0, confirmed: 0, paid: 0, unconfirmed: 0 };
+    }
+
+    const confirmed = accounts.filter((account) => getStatusLabel(account.status) === 'confirmed').length;
+    const paid = accounts.filter((account) => getStatusLabel(account.status) === 'paid').length;
+    const unconfirmed = total - confirmed - paid;
+
+    return {
+      total,
+      confirmed,
+      paid,
+      unconfirmed: unconfirmed < 0 ? 0 : unconfirmed,
+    };
+  }, [accounts]);
+
+  const percentages = useMemo(() => {
+    const total = summary.total;
+    if (total === 0) return { confirmed: 0, paid: 0, unconfirmed: 0 };
+    return {
+      confirmed: Math.round(((summary.confirmed || 0) / total) * 1000) / 10,
+      paid: Math.round(((summary.paid || 0) / total) * 1000) / 10,
+      unconfirmed: Math.round(((summary.unconfirmed || 0) / total) * 1000) / 10,
+    };
+  }, [summary]);
 
   const getStatusColor = (status?: string) => {
     switch (getStatusLabel(status)) {
@@ -1016,7 +1032,7 @@ const AccountsPage: React.FC = () => {
           <Lightbox images={lightboxImages} startIndex={lightboxIndex} onClose={() => setLightboxOpen(false)} />
         )}
 
-        {summary && (
+        {canViewReports && (
           <div className="grid gap-4 md:grid-cols-4">
             <ReportCard label="Total Accounts" value={summary.total} />
             <ReportCard label="Confirmed" value={summary.confirmed} percent={percentages.confirmed} />
