@@ -1,16 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { CheckCircle, Loader, RefreshCcw } from 'lucide-react';
-import Tesseract from 'tesseract.js';
-import { toast } from 'sonner';
-import { accountService } from '../services/accountService';
-import { authService } from '../services/authService';
-import apiClient from '../lib/api';
-import { getApiErrorMessage } from '../utils/apiError';
-import { sanitizeUserForStorage } from '../utils/userDisplay';
-import { useAuth } from '../hooks/useAuth';
-import Globe from '../components/ui/Globe';
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { CheckCircle, Loader, RefreshCcw } from "lucide-react";
+import Tesseract from "tesseract.js";
+import { toast } from "sonner";
+import { accountService } from "../services/accountService";
+import { authService } from "../services/authService";
+import apiClient from "../lib/api";
+import { getApiErrorMessage } from "../utils/apiError";
+import { sanitizeUserForStorage } from "../utils/userDisplay";
+import { useAuth } from "../hooks/useAuth";
+import Globe from "../components/ui/Globe";
 
 type ExtractedDetails = {
   bankName: string;
@@ -18,63 +18,90 @@ type ExtractedDetails = {
   confidence: number;
 };
 
-type BankValue = 'fnb' | 'slb' | 'nedbank' | 'lpb';
+type BankValue = "fnb" | "slb" | "nedbank" | "lpb";
 
 const BANK_OPTIONS = [
-  { label: 'First National Bank', value: 'fnb' },
-  { label: 'Standard Lesotho Bank', value: 'slb' },
-  { label: 'Nedbank', value: 'nedbank' },
-  { label: 'Lesotho PostBank', value: 'lpb' },
+  { label: "First National Bank", value: "fnb" },
+  { label: "Standard Lesotho Bank", value: "slb" },
+  { label: "Nedbank", value: "nedbank" },
+  { label: "Lesotho PostBank", value: "lpb" },
 ] as const;
 
 const BANK_NAME_ALIASES: Record<string, BankValue> = {
-  'first national bank': 'fnb',
-  fnb: 'fnb',
-  'standard lesotho bank': 'slb',
-  'standard bank': 'slb',
-  slb: 'slb',
-  sbl: 'slb',
-  nedbank: 'nedbank',
-  'nedbank lesotho': 'nedbank',
-  'lesotho postbank': 'lpb',
-  'lesotho post bank': 'lpb',
-  'post bank': 'lpb',
-  postbank: 'lpb',
-  'lpb': "lpb"
+  "first national bank": "fnb",
+  fnb: "fnb",
+  "standard lesotho bank": "slb",
+  "standard bank": "slb",
+  slb: "slb",
+  sbl: "slb",
+  nedbank: "nedbank",
+  "nedbank lesotho": "nedbank",
+  "lesotho postbank": "lpb",
+  "lesotho post bank": "lpb",
+  "post bank": "lpb",
+  postbank: "lpb",
+  lpb: "lpb",
 };
 
 const normalizeBankValue = (bankName: string): string => {
-  const normalized = String(bankName || '').trim().toLowerCase();
-  if (!normalized) return '';
-  return BANK_NAME_ALIASES[normalized] || '';
+  const normalized = String(bankName || "")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return "";
+  return BANK_NAME_ALIASES[normalized] || "";
 };
 
 const BANK_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
-  { name: 'Standard Lesotho Bank', pattern: /\bstandard\s+lesotho\s+bank\b|\bstandard\s+bank\b|\bsbl\b|www\.standardbank\./i },
-  { name: 'First National Bank', pattern: /\bfirst\s+national\s+bank\b|\bfnb\b|@fnb\.|www\.fnb\./i },
-  { name: 'Lesotho PostBank', pattern: /\blesotho\s+post\s+bank\b|\bpost\s*bank\b|\bpostbank\b/i },
-  { name: 'Nedbank', pattern: /\bnedbank\s+lesotho\b|\bnedbank\b|www\.nedbank\./i },
+  {
+    name: "Standard Lesotho Bank",
+    pattern:
+      /\bstandard\s+lesotho\s+bank\b|\bstandard\s+bank\b|\bsbl\b|www\.standardbank\./i,
+  },
+  {
+    name: "First National Bank",
+    pattern: /\bfirst\s+national\s+bank\b|\bfnb\b|@fnb\.|www\.fnb\./i,
+  },
+  {
+    name: "Lesotho PostBank",
+    pattern: /\blesotho\s+post\s+bank\b|\bpost\s*bank\b|\bpostbank\b/i,
+  },
+  {
+    name: "Nedbank",
+    pattern: /\bnedbank\s+lesotho\b|\bnedbank\b|www\.nedbank\./i,
+  },
 ];
 
 const parseBankProofText = (rawText: string): ExtractedDetails => {
-  const normalized = rawText.replace(/[^\x20-\x7E\n]/g, ' ');
+  const normalized = rawText.replace(/[^\x20-\x7E\n]/g, " ");
   const lines = normalized
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const bankMatch = BANK_PATTERNS.find(({ pattern }) => pattern.test(normalized));
-  const fallbackBankLine = lines.find((line) => /bank/i.test(line) && line.length <= 60);
-  const labelMatch = normalized.match(/account(?:\s*no\.?|\s*number)?[:\s-]*([0-9\-\s]{8,24})/i);
+  const bankMatch = BANK_PATTERNS.find(({ pattern }) =>
+    pattern.test(normalized),
+  );
+  const fallbackBankLine = lines.find(
+    (line) => /bank/i.test(line) && line.length <= 60,
+  );
+  const labelMatch = normalized.match(
+    /account(?:\s*no\.?|\s*number)?[:\s-]*([0-9\-\s]{8,24})/i,
+  );
   const accountNumber = labelMatch?.[1]
-    ? labelMatch[1].replace(/[\s-]/g, '')
+    ? labelMatch[1].replace(/[\s-]/g, "")
     : Array.from(normalized.matchAll(/\b\d{8,20}\b/g))
-      .map((match) => match[0])
-      .sort((left, right) => right.length - left.length)[0] || '';
+        .map((match) => match[0])
+        .sort((left, right) => right.length - left.length)[0] || "";
 
-  const bankName = normalizeBankValue(bankMatch?.name || fallbackBankLine || '');
+  const bankName = normalizeBankValue(
+    bankMatch?.name || fallbackBankLine || "",
+  );
   const confidence = Number(
-    ((bankName ? 45 : 0) + (accountNumber ? 45 : 0) + (rawText.length > 80 ? 10 : 0)).toFixed(0),
+    (
+      (bankName ? 45 : 0) +
+      (accountNumber ? 45 : 0) +
+      (rawText.length > 80 ? 10 : 0)
+    ).toFixed(0),
   );
 
   return {
@@ -88,10 +115,10 @@ const AccountConfirmationPage: React.FC = () => {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
-  const [statusError, setStatusError] = useState('');
+  const [statusError, setStatusError] = useState("");
   const [contractValid, setContractValid] = useState<boolean | null>(null);
-  const [contractError, setContractError] = useState('');
-  const [contractReason, setContractReason] = useState('');
+  // const [contractError, setContractError] = useState('');
+  const [contractReason, setContractReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
@@ -100,9 +127,9 @@ const AccountConfirmationPage: React.FC = () => {
   const [extracted, setExtracted] = useState<ExtractedDetails | null>(null);
   const [reviewAccepted, setReviewAccepted] = useState(false);
   const [formData, setFormData] = useState({
-    borrowerNumber: user?.borrowerNumber || '',
-    bankName: '',
-    accountNumber: '',
+    borrowerNumber: user?.borrowerNumber || "",
+    bankName: "",
+    accountNumber: "",
     graduating: false,
   });
 
@@ -119,21 +146,41 @@ const AccountConfirmationPage: React.FC = () => {
   };
 
   const handleConfirmationError = (error: unknown): boolean => {
-    const responseData = (error as { response?: { data?: ConfirmationErrorPayload } } | undefined)?.response?.data;
-    const payload = responseData || (error as ConfirmationErrorPayload | undefined);
+    const responseData = (
+      error as { response?: { data?: ConfirmationErrorPayload } } | undefined
+    )?.response?.data;
+    const payload =
+      responseData || (error as ConfirmationErrorPayload | undefined);
 
-    if (!payload || typeof payload !== 'object') {
+    if (!payload || typeof payload !== "object") {
       return false;
     }
 
-    if (payload.issueCreated || payload.issue || payload.redirectTo === '/issues') {
-      toast.message(getApiErrorMessage(payload, 'Issue created. Redirecting to Issues for resolution.'));
-      navigate(payload.redirectTo || '/issues', { replace: true, state: { issueLogged: true } });
+    if (
+      payload.issueCreated ||
+      payload.issue ||
+      payload.redirectTo === "/issues"
+    ) {
+      toast.message(
+        getApiErrorMessage(
+          payload,
+          "Issue created. Redirecting to Issues for resolution.",
+        ),
+      );
+      navigate(payload.redirectTo || "/issues", {
+        replace: true,
+        state: { issueLogged: true },
+      });
       return true;
     }
 
-    if (payload.needsProof || payload.status === 'mismatch') {
-      toast.error(getApiErrorMessage(payload, 'Account details do not match. Please try again.'));
+    if (payload.needsProof || payload.status === "mismatch") {
+      toast.error(
+        getApiErrorMessage(
+          payload,
+          "Account details do not match. Please try again.",
+        ),
+      );
       return true;
     }
 
@@ -146,8 +193,10 @@ const AccountConfirmationPage: React.FC = () => {
     setExtracted(null);
     setReviewAccepted(false);
     // clear file input if present
-    const fileInput = document.querySelector('input[type=file]') as HTMLInputElement | null;
-    if (fileInput) fileInput.value = '';
+    const fileInput = document.querySelector(
+      "input[type=file]",
+    ) as HTMLInputElement | null;
+    if (fileInput) fileInput.value = "";
   };
 
   useEffect(() => {
@@ -156,19 +205,22 @@ const AccountConfirmationPage: React.FC = () => {
         const profileResult = await authService.getProfile();
         const profile = profileResult.data;
         if (profile) {
-          localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(profile)));
+          localStorage.setItem(
+            "user",
+            JSON.stringify(sanitizeUserForStorage(profile)),
+          );
           setUser(profile);
           setFormData((prev) => ({
             ...prev,
-            borrowerNumber: profile.borrowerNumber || '',
+            borrowerNumber: profile.borrowerNumber || "",
           }));
         }
 
         const contractResult = await accountService.validateContract();
         if (!contractResult.valid) {
           setContractValid(false);
-          setContractError(contractResult.message || 'Borrower number not found in accounts list');
-          setContractReason(contractResult.reason || '');
+          // setContractError(contractResult.message || 'Borrower number not found in accounts list');
+          setContractReason(contractResult.reason || "");
           setIsCheckingStatus(false);
           return;
         }
@@ -182,7 +234,9 @@ const AccountConfirmationPage: React.FC = () => {
         setIsConfirmed(response.confirmed);
         setAccountStatus(response.status || null);
       } catch (error: unknown) {
-        setStatusError(getApiErrorMessage(error, 'Unable to check confirmation status'));
+        setStatusError(
+          getApiErrorMessage(error, "Unable to check confirmation status"),
+        );
       } finally {
         setIsCheckingStatus(false);
       }
@@ -197,14 +251,24 @@ const AccountConfirmationPage: React.FC = () => {
     };
   }, [previewUrl]);
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value, type } = event.target;
-    const checked = type === 'checkbox' ? (event as React.ChangeEvent<HTMLInputElement>).target.checked : undefined;
+    const checked =
+      type === "checkbox"
+        ? (event as React.ChangeEvent<HTMLInputElement>).target.checked
+        : undefined;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : name === 'bankName' ? normalizeBankValue(value) : value,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : name === "bankName"
+            ? normalizeBankValue(value)
+            : value,
     }));
-    if (name === 'bankName' || name === 'accountNumber') {
+    if (name === "bankName" || name === "accountNumber") {
       setReviewAccepted(false);
     }
   };
@@ -226,34 +290,42 @@ const AccountConfirmationPage: React.FC = () => {
     setExtracted(null);
 
     try {
-      const result = await Tesseract.recognize(file, 'eng', {
+      const result = await Tesseract.recognize(file, "eng", {
         logger: undefined,
-        tessedit_pageseg_mode: '6',
-        preserve_interword_spaces: '1',
+        tessedit_pageseg_mode: "6",
+        preserve_interword_spaces: "1",
       } as any);
-      const text = result.data.text || '';
+      const text = result.data.text || "";
       const details = parseBankProofText(text);
       setExtracted(details);
       applyExtractedDetails(details);
 
       if (details.bankName && details.accountNumber) {
-        toast.success('Bank details extracted. Please review before confirming.');
+        toast.success(
+          "Bank details extracted. Please review before confirming.",
+        );
       } else {
-        toast.message('OCR finished, but some bank details could not be read. Please retry upload.');
+        toast.message(
+          "OCR finished, but some bank details could not be read. Please retry upload.",
+        );
       }
     } catch {
-      toast.error('Could not read the image. Please retry with a clearer bank confirmation image.');
+      toast.error(
+        "Could not read the image. Please retry with a clearer bank confirmation image.",
+      );
     } finally {
       setIsExtracting(false);
     }
   };
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Upload an image file for OCR');
+    if (!file.type.startsWith("image/")) {
+      toast.error("Upload an image file for OCR");
       return;
     }
 
@@ -266,24 +338,31 @@ const AccountConfirmationPage: React.FC = () => {
     event.preventDefault();
 
     const normalizedBankName = normalizeBankValue(formData.bankName);
-    const normalizedExtractedBankName = normalizeBankValue(extracted?.bankName || '');
+    const normalizedExtractedBankName = normalizeBankValue(
+      extracted?.bankName || "",
+    );
     const normalizedFormData = {
       ...formData,
       bankName: normalizedBankName,
     };
 
     if (!normalizedBankName || !formData.accountNumber.trim()) {
-      toast.error('Bank name and account number are required');
+      toast.error("Bank name and account number are required");
       return;
     }
 
     if (!/^\d{12}$/.test(formData.borrowerNumber.trim())) {
-      toast.error('Borrower number must be exactly 12 digits');
+      toast.error("Borrower number must be exactly 12 digits");
       return;
     }
 
-    if (extracted && !reviewAccepted && normalizedBankName === normalizedExtractedBankName && formData.accountNumber === extracted.accountNumber) {
-      toast.error('Review and accept or edit the extracted details first');
+    if (
+      extracted &&
+      !reviewAccepted &&
+      normalizedBankName === normalizedExtractedBankName &&
+      formData.accountNumber === extracted.accountNumber
+    ) {
+      toast.error("Review and accept or edit the extracted details first");
       return;
     }
 
@@ -291,32 +370,40 @@ const AccountConfirmationPage: React.FC = () => {
 
     try {
       // If a preview image is present (user uploaded), send it as multipart to allow server to attach proof
-      if ((document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0]) {
-        const file = (document.querySelector('input[type=file]') as HTMLInputElement).files![0];
+      if (
+        (document.querySelector("input[type=file]") as HTMLInputElement)
+          ?.files?.[0]
+      ) {
+        const file = (
+          document.querySelector("input[type=file]") as HTMLInputElement
+        ).files![0];
         const form = new FormData();
-        form.append('borrowerNumber', normalizedFormData.borrowerNumber);
-        form.append('bankName', normalizedFormData.bankName);
-        form.append('accountNumber', normalizedFormData.accountNumber);
-        form.append('graduating', String(normalizedFormData.graduating));
-        form.append('document', file);
+        form.append("borrowerNumber", normalizedFormData.borrowerNumber);
+        form.append("bankName", normalizedFormData.bankName);
+        form.append("accountNumber", normalizedFormData.accountNumber);
+        form.append("graduating", String(normalizedFormData.graduating));
+        form.append("document", file);
         try {
-          const resp = await apiClient.post('/accounts/confirm', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+          const resp = await apiClient.post("/accounts/confirm", form, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
           const data = resp.data;
-          toast.success(data.message || 'Account confirmed');
+          toast.success(data.message || "Account confirmed");
           setIsConfirmed(true);
         } catch (err: unknown) {
           if (!handleConfirmationError(err)) {
-            toast.error(getApiErrorMessage(err, 'Account confirmation failed'));
+            toast.error(getApiErrorMessage(err, "Account confirmation failed"));
           }
         }
       } else {
-        const response = await accountService.confirmAccount(normalizedFormData);
-        toast.success(response.message || 'Account confirmed');
+        const response =
+          await accountService.confirmAccount(normalizedFormData);
+        toast.success(response.message || "Account confirmed");
         setIsConfirmed(true);
       }
     } catch (error: unknown) {
       if (!handleConfirmationError(error)) {
-        toast.error(getApiErrorMessage(error, 'Account confirmation failed'));
+        toast.error(getApiErrorMessage(error, "Account confirmation failed"));
       }
     } finally {
       setIsSubmitting(false);
@@ -334,32 +421,58 @@ const AccountConfirmationPage: React.FC = () => {
   if (contractValid === false) {
     const isWarning = contractReason === "not_in_accounts";
     return (
-      <div className="global-bg min-h-screen pt-32">
+      <div className="global-bg min-h-screen flex items-center">
         <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
-          <div className={`mb-6 rounded-full p-4 ${isWarning ? "bg-amber-100" : "bg-red-100"}`}>
+          <div
+            className={`mb-6 rounded-full p-4 ${isWarning ? "bg-amber-100" : "bg-red-100"}`}
+          >
             {isWarning ? (
-              <svg className="h-12 w-12 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="h-12 w-12 text-amber-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             ) : (
-              <svg className="h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              <svg
+                className="h-12 w-12 text-red-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                />
               </svg>
             )}
           </div>
-          <h1 className={`text-3xl font-bold ${isWarning ? "text-amber-600" : "text-red-600"}`}>
-            {isWarning ? "Your Account Not Ready For Confirmation" : "Borrower's Number Not Found"}
+          <h1
+            className={`text-3xl font-bold ${isWarning ? "text-amber-600" : "text-red-600"}`}
+          >
+            {isWarning
+              ? "Your Account Not Ready For Confirmation"
+              : "Borrower's Number Not Found"}
           </h1>
-          <p className="mt-3 max-w-xl text-muted-foreground">
-            {contractError}
-          </p>
           {isWarning ? (
             <p className="mt-2 text-sm text-muted-foreground">
-              Your Finance Department has not yet prepared your account details for confirmation. Please check back later.
+              Your Finance Department has not yet prepared your account details
+              for confirmation. Please check back later.
             </p>
           ) : (
             <p className="mt-2 text-sm text-muted-foreground">
-              Please contact your institution admin or finance department to ensure your borrower's number is registered in the system if you do have a contract with NMDS.
+              Please contact your institution admin or finance department to
+              ensure your borrower's number is registered in the system if you
+              do have a contract with NMDS.
             </p>
           )}
         </div>
@@ -368,16 +481,28 @@ const AccountConfirmationPage: React.FC = () => {
   }
 
   if (isConfirmed) {
-    if (accountStatus === 'paid') {
+    if (accountStatus === "paid") {
       return (
-        <div className="global-bg min-h-screen pt-32">
+        <div className="global-bg min-h-screen flex items-center">
           <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
             <div className="mb-6 rounded-full bg-green-100 p-4">
-              <svg className="h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg
+                className="h-12 w-12 text-green-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
             </div>
-            <h1 className="text-4xl font-bold text-primary-clr">Payment Completed</h1>
+            <h1 className="text-4xl font-bold text-primary-clr">
+              Payment Completed
+            </h1>
             <p className="mt-3 max-w-xl text-muted-foreground">
               You have been Paid wait for your bank SMS
             </p>
@@ -387,16 +512,19 @@ const AccountConfirmationPage: React.FC = () => {
     }
 
     return (
-      <div className="global-bg min-h-screen pt-32">
+      <div className="global-bg min-h-screen flex items-center">
         <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
           <img
             src="/confirmed-illustration.webp"
             alt="Confirmed"
             className="mb-8 h-52 w-52 object-contain"
           />
-          <h1 className="text-4xl font-bold text-primary-clr">Account Confirmed</h1>
+          <h1 className="text-4xl font-bold text-primary-clr">
+            Account Confirmed
+          </h1>
           <p className="mt-3 max-w-xl text-muted-foreground">
-            Your account details have already been confirmed. No further action is required.
+            Your account details have already been confirmed. No further action
+            is required.
           </p>
         </div>
       </div>
@@ -411,16 +539,21 @@ const AccountConfirmationPage: React.FC = () => {
             <div className="max-h-[75vh] overflow-auto pr-1 md:pr-2">
               <div className="mb-6 flex items-center gap-3">
                 <div>
-                  <h1 className="text-2xl font-bold text-primary-clr">Confirm Account</h1>
+                  <h1 className="text-2xl font-bold text-primary-clr">
+                    Confirm Account
+                  </h1>
                   <p className="text-sm text-muted-foreground">
-                    Upload your bank proof, review the extracted details, then confirm.
+                    Upload your bank proof, review the extracted details, then
+                    confirm.
                   </p>
                 </div>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Borrower's Number</label>
+                  <label className="mb-2 block text-sm font-medium">
+                    Borrower's Number
+                  </label>
                   <input
                     name="borrowerNumber"
                     value={formData.borrowerNumber}
@@ -432,9 +565,11 @@ const AccountConfirmationPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Student ID</label>
+                  <label className="mb-2 block text-sm font-medium">
+                    Student ID
+                  </label>
                   <input
-                    value={user?.studentId || ''}
+                    value={user?.studentId || ""}
                     readOnly
                     className="w-full rounded-md border border-border bg-gray-100 px-4 py-2 text-muted-foreground"
                     placeholder="Student ID from your registered account"
@@ -451,13 +586,13 @@ const AccountConfirmationPage: React.FC = () => {
                   <label className="mb-3 block text-sm font-medium">Upload Bank Confirmation</label>
                   <div className="flex items-center gap-3">
                     <FileImage className="text-active" size={24} /> */}
-                    <input
-                      type="hidden"
-                      accept="image/*"
-                      onChange={handleFileSelect}
-                      className="w-full text-sm hidden"
-                    />
-                  {/* </div>
+                <input
+                  type="hidden"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="w-full text-sm hidden"
+                />
+                {/* </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     A clear screenshot or photo helps extract the bank name and account number.
                   </p>
@@ -476,12 +611,16 @@ const AccountConfirmationPage: React.FC = () => {
                       <p className="font-medium">Extracted details</p>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Check these values carefully. Retry upload if the OCR got anything wrong.
+                      Check these values carefully. Retry upload if the OCR got
+                      anything wrong.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        disabled={!formData.bankName.trim() || !formData.accountNumber.trim()}
+                        disabled={
+                          !formData.bankName.trim() ||
+                          !formData.accountNumber.trim()
+                        }
                         onClick={() => {
                           applyExtractedDetails(extracted);
                           setReviewAccepted(true);
@@ -505,7 +644,9 @@ const AccountConfirmationPage: React.FC = () => {
                 )}
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Bank Name</label>
+                  <label className="mb-2 block text-sm font-medium">
+                    Bank Name
+                  </label>
                   <select
                     name="bankName"
                     value={formData.bankName}
@@ -513,15 +654,21 @@ const AccountConfirmationPage: React.FC = () => {
                     required
                     className="w-full rounded-md border border-border bg-background px-4 py-2 focus:outline-none focus:ring-2 focus:ring-active"
                   >
-                    <option value="" disabled>Select your bank</option>
+                    <option value="" disabled>
+                      Select your bank
+                    </option>
                     {BANK_OPTIONS.map((bank) => (
-                      <option key={bank.value} value={bank.value}>{bank.label}</option>
+                      <option key={bank.value} value={bank.value}>
+                        {bank.label}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-sm font-medium">Account Number</label>
+                  <label className="mb-2 block text-sm font-medium">
+                    Account Number
+                  </label>
                   <input
                     name="accountNumber"
                     value={formData.accountNumber}
@@ -545,11 +692,21 @@ const AccountConfirmationPage: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || isExtracting || (!reviewAccepted && extracted !== null && normalizeBankValue(formData.bankName) === normalizeBankValue(extracted.bankName) && formData.accountNumber === extracted.accountNumber)}
+                  disabled={
+                    isSubmitting ||
+                    isExtracting ||
+                    (!reviewAccepted &&
+                      extracted !== null &&
+                      normalizeBankValue(formData.bankName) ===
+                        normalizeBankValue(extracted.bankName) &&
+                      formData.accountNumber === extracted.accountNumber)
+                  }
                   className="flex w-full items-center justify-center gap-2 rounded-md bg-button py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isSubmitting && <Loader size={18} className="animate-spin" />}
-                  {isSubmitting ? 'Confirming...' : 'Confirm Account'}
+                  {isSubmitting && (
+                    <Loader size={18} className="animate-spin" />
+                  )}
+                  {isSubmitting ? "Confirming..." : "Confirm Account"}
                 </button>
               </form>
             </div>
@@ -558,7 +715,12 @@ const AccountConfirmationPage: React.FC = () => {
               <article className="relative mx-auto min-h-112.5 w-full overflow-hidden rounded-3xl border bg-linear-to-b from-[#e60a64] to-[#e60a64]/5 p-6 text-3xl tracking-tight text-white shadow-lg md:p-8 md:text-4xl md:leading-[1.05] lg:text-5xl">
                 Why walk to campus when you can tap?
                 <div className="absolute -right-20 -bottom-20 z-10 mx-auto flex h-full w-full max-w-sm items-center justify-center transition-all duration-700 hover:scale-105 md:-right-28 md:-bottom-28 md:max-w-xl">
-                  <Globe scale={1.1} baseColor={[1, 0, 0.3]} markerColor={[0, 0, 0]} glowColor={[1, 0.3, 0.4]} />
+                  <Globe
+                    scale={1.1}
+                    baseColor={[1, 0, 0.3]}
+                    markerColor={[0, 0, 0]}
+                    glowColor={[1, 0.3, 0.4]}
+                  />
                 </div>
                 {/* Preview moved to the left column for consistency with Next.js UI */}
               </article>
