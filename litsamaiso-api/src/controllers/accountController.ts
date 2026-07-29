@@ -402,7 +402,8 @@ export const getConfirmationStatus = async (req: Request, res: Response) => {
       return;
     }
 
-    const confirmed = String(account.status || "").toLowerCase() === "confirmed" && account.confirmedBy && String((account as any).confirmedBy) === String(student._id);
+    const accountStatusLower = String(account.status || "").toLowerCase();
+    const confirmed = (accountStatusLower === "confirmed" || accountStatusLower === "paid") && account.confirmedBy && String((account as any).confirmedBy) === String(student._id);
 
     console.log(
       `[student-dashboard] /accounts/confirmation-status user=${String(user._id)} status=ok confirmed=${Boolean(confirmed)} durationMs=${Date.now() - startedAt}`,

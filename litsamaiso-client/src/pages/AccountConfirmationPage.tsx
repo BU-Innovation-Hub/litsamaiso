@@ -95,6 +95,7 @@ const AccountConfirmationPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [accountStatus, setAccountStatus] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [extracted, setExtracted] = useState<ExtractedDetails | null>(null);
   const [reviewAccepted, setReviewAccepted] = useState(false);
@@ -179,6 +180,7 @@ const AccountConfirmationPage: React.FC = () => {
 
         const response = await accountService.getConfirmationStatus();
         setIsConfirmed(response.confirmed);
+        setAccountStatus(response.status || null);
       } catch (error: unknown) {
         setStatusError(getApiErrorMessage(error, 'Unable to check confirmation status'));
       } finally {
@@ -366,6 +368,24 @@ const AccountConfirmationPage: React.FC = () => {
   }
 
   if (isConfirmed) {
+    if (accountStatus === 'paid') {
+      return (
+        <div className="global-bg min-h-screen pt-32">
+          <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
+            <div className="mb-6 rounded-full bg-green-100 p-4">
+              <svg className="h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h1 className="text-4xl font-bold text-primary-clr">Payment Completed</h1>
+            <p className="mt-3 max-w-xl text-muted-foreground">
+              You have been Paid wait for your bank SMS
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="global-bg min-h-screen pt-32">
         <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">

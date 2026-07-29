@@ -68,6 +68,9 @@ export const accountService = {
     try {
       const response = await apiClient.get<{
         confirmed: boolean;
+        status?: string;
+        confirmationDate?: string;
+        branchCode?: string;
         message?: string;
         record?: {
           borrowerNumber: string;
