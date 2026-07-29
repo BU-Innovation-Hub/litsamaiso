@@ -392,20 +392,20 @@ const DashboardPage: React.FC = () => {
         {
           label: 'Confirmed accounts',
           value: accountSummary?.confirmed ?? 0,
-          description: `${accountSummary?.confirmationRate ?? 0}% confirmation rate`,
+          description: `${((accountSummary?.confirmationRate ?? 0) * 100).toFixed(2)}% confirmation rate`,
           icon: BadgeCheck,
           tone: 'bg-gray-100 text-active-clr',
           accent: 'from-emerald-500 to-active-clr',
-          progress: clampPercent(accountSummary?.confirmationRate),
+          progress: clampPercent((accountSummary?.confirmationRate ?? 0) * 100),
         },
         {
           label: 'Paid accounts',
           value: accountSummary?.paid ?? 0,
-          description: `${accountSummary?.paymentRate ?? 0}% payment rate`,
+          description: `${((accountSummary?.paymentRate ?? 0) * 100).toFixed(2)}% payment rate`,
           icon: Banknote,
           tone: 'bg-gray-100 text-active-clr',
           accent: 'from-sky-500 to-active-clr',
-          progress: clampPercent(accountSummary?.paymentRate),
+          progress: clampPercent((accountSummary?.paymentRate ?? 0) * 100),
         },
         {
           label: 'Pending confirmations',
@@ -501,8 +501,8 @@ const DashboardPage: React.FC = () => {
   const recentRecords = canViewAdminIssues ? adminIssues : studentIssues.slice(0, 5);
   const hasStatusBreakdown = Boolean(accountReports?.reports.statusBreakdown?.length);
   const totalStatusCount = accountReports?.reports.statusBreakdown?.reduce((sum, item) => sum + item.count, 0) ?? 0;
-  const confirmationRate = clampPercent(accountSummary?.confirmationRate);
-  const paymentRate = clampPercent(accountSummary?.paymentRate);
+  const confirmationRate = clampPercent((accountSummary?.confirmationRate ?? 0) * 100);
+  const paymentRate = clampPercent((accountSummary?.paymentRate ?? 0) * 100);
   const workspaceName = institutionName || 'Litsamaiso';
   const displayName = user?.name || user?.email?.split('@')[0] || 'there';
 
