@@ -89,6 +89,7 @@ export const accountService = {
       if (error instanceof AxiosError && [400, 404].includes(error.response?.status ?? 0)) {
         return {
           confirmed: false,
+          status: undefined,
           message: error.response?.data?.message || 'Your account is not ready for confirmation yet',
         };
       }
