@@ -90,7 +90,7 @@ const AccountConfirmationPage: React.FC = () => {
   const [isCheckingStatus, setIsCheckingStatus] = useState(true);
   const [statusError, setStatusError] = useState('');
   const [contractValid, setContractValid] = useState<boolean | null>(null);
-  const [contractError, setContractError] = useState('');
+  // const [contractError, setContractError] = useState('');
   const [contractReason, setContractReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
@@ -167,7 +167,7 @@ const AccountConfirmationPage: React.FC = () => {
         const contractResult = await accountService.validateContract();
         if (!contractResult.valid) {
           setContractValid(false);
-          setContractError(contractResult.message || 'Borrower number not found in accounts list');
+          // setContractError(contractResult.message || 'Borrower number not found in accounts list');
           setContractReason(contractResult.reason || '');
           setIsCheckingStatus(false);
           return;
@@ -334,7 +334,7 @@ const AccountConfirmationPage: React.FC = () => {
   if (contractValid === false) {
     const isWarning = contractReason === "not_in_accounts";
     return (
-      <div className="global-bg min-h-screen pt-32">
+      <div className="global-bg min-h-screen flex items-center">
         <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
           <div className={`mb-6 rounded-full p-4 ${isWarning ? "bg-amber-100" : "bg-red-100"}`}>
             {isWarning ? (
@@ -350,9 +350,6 @@ const AccountConfirmationPage: React.FC = () => {
           <h1 className={`text-3xl font-bold ${isWarning ? "text-amber-600" : "text-red-600"}`}>
             {isWarning ? "Your Account Not Ready For Confirmation" : "Borrower's Number Not Found"}
           </h1>
-          <p className="mt-3 max-w-xl text-muted-foreground">
-            {contractError}
-          </p>
           {isWarning ? (
             <p className="mt-2 text-sm text-muted-foreground">
               Your Finance Department has not yet prepared your account details for confirmation. Please check back later.
@@ -370,7 +367,7 @@ const AccountConfirmationPage: React.FC = () => {
   if (isConfirmed) {
     if (accountStatus === 'paid') {
       return (
-        <div className="global-bg min-h-screen pt-32">
+        <div className="global-bg min-h-screen flex items-center">
           <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
             <div className="mb-6 rounded-full bg-green-100 p-4">
               <svg className="h-12 w-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -387,7 +384,7 @@ const AccountConfirmationPage: React.FC = () => {
     }
 
     return (
-      <div className="global-bg min-h-screen pt-32">
+      <div className="global-bg min-h-screen flex items-center">
         <div className="mx-auto flex max-w-3xl flex-col items-center px-4 text-center">
           <img
             src="/confirmed-illustration.webp"
