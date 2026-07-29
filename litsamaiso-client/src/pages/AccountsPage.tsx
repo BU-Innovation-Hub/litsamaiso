@@ -24,6 +24,23 @@ type FinancialClearanceImportState = {
   status: 'running' | 'completed' | 'error';
   percent: number;
   message: string;
+  processed?: number;
+  total?: number;
+  inserted?: number;
+  skipped?: number;
+  errors?: number;
+};
+
+type PaidImportState = {
+  fileName: string;
+  status: 'running' | 'completed' | 'error';
+  percent: number;
+  message: string;
+  processed?: number;
+  total?: number;
+  updated?: number;
+  skipped?: number;
+  errors?: number;
 };
 
 const AccountsPage: React.FC = () => {
@@ -55,6 +72,7 @@ const AccountsPage: React.FC = () => {
   const studentsFileRef = useRef<HTMLInputElement | null>(null);
   const [studentImport, setStudentImport] = useState<StudentImportState | null>(null);
   const [financialImport, setFinancialImport] = useState<FinancialClearanceImportState | null>(null);
+  const [paidImport, setPaidImport] = useState<PaidImportState | null>(null);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [issueList, setIssueList] = useState<any[] | null>(null);
@@ -215,22 +233,46 @@ const AccountsPage: React.FC = () => {
           fileName: file.name,
           status: 'running',
           percent: 0,
-          message: 'Preparing financial clearance import',
+          message: 'Uploading financial clearance list',
+        });
+      } else if (uploadType === 'paid') {
+        setPaidImport({
+          fileName: file.name,
+          status: 'running',
+          percent: 0,
+          message: 'Uploading paid records',
         });
       }
 
       const response =
         uploadType === 'accounts'
-          ? await accountService.uploadAccounts(file, (percent) => {
+          ? await accountService.uploadAccounts(file, (progress) => {
             setFinancialImport({
               fileName: file.name,
-              status: 'running',
-              percent,
-              message: 'Uploading financial clearance list',
+              status: progress.type === 'completed' ? 'completed' : 'running',
+              percent: Math.max(0, Math.min(100, progress.percent || 0)),
+              message: progress.message || 'Importing financial clearance records',
+              processed: progress.processed,
+              total: progress.total,
+              inserted: progress.inserted,
+              skipped: progress.skipped,
+              errors: progress.errors,
             });
           })
           : uploadType === 'paid'
-            ? await accountService.uploadPaidStudents(file)
+            ? await accountService.uploadPaidStudents(file, (progress) => {
+              setPaidImport({
+                fileName: file.name,
+                status: progress.type === 'completed' ? 'completed' : 'running',
+                percent: Math.max(0, Math.min(100, progress.percent || 0)),
+                message: progress.message || 'Importing paid records',
+                processed: progress.processed,
+                total: progress.total,
+                updated: progress.inserted,
+                skipped: progress.skipped,
+                errors: progress.errors,
+              });
+            })
             : await studentService.uploadStudents(file, (progress) => {
               setStudentImport({
                 ...progress,
@@ -254,12 +296,29 @@ const AccountsPage: React.FC = () => {
           type: 'completed',
         }));
       } else if (uploadType === 'accounts') {
-        setFinancialImport({
+        setFinancialImport((current) => ({
           fileName: file.name,
           status: 'completed',
           percent: 100,
           message: response.message || 'Import completed',
-        });
+          processed: response.result?.inserted + response.result?.skipped + response.result?.errors?.length || current?.total || 0,
+          total: response.result?.inserted + response.result?.skipped + response.result?.errors?.length || current?.total || 0,
+          inserted: response.result?.inserted || current?.inserted || 0,
+          skipped: response.result?.skipped || current?.skipped || 0,
+          errors: response.result?.errors?.length || current?.errors || 0,
+        }));
+      } else if (uploadType === 'paid') {
+        setPaidImport((current) => ({
+          fileName: file.name,
+          status: 'completed',
+          percent: 100,
+          message: response.message || 'Import completed',
+          processed: response.result?.updated + response.result?.skipped + response.result?.errors?.length || current?.total || 0,
+          total: response.result?.updated + response.result?.skipped + response.result?.errors?.length || current?.total || 0,
+          updated: response.result?.updated || current?.updated || 0,
+          skipped: response.result?.skipped || current?.skipped || 0,
+          errors: response.result?.errors?.length || current?.errors || 0,
+        }));
       }
 
       toast.success(response.message || 'Upload completed');
@@ -274,6 +333,8 @@ const AccountsPage: React.FC = () => {
         setStudentImport(null);
       } else if (uploadType === 'accounts') {
         setFinancialImport(null);
+      } else if (uploadType === 'paid') {
+        setPaidImport(null);
       }
     } catch (error: unknown) {
       if (uploadType === 'students') {
@@ -295,6 +356,23 @@ const AccountsPage: React.FC = () => {
           status: 'error',
           percent: current?.percent || 0,
           message: getApiErrorMessage(error, 'Upload failed'),
+          processed: current?.processed,
+          total: current?.total,
+          inserted: current?.inserted,
+          skipped: current?.skipped,
+          errors: current?.errors,
+        }));
+      } else if (uploadType === 'paid') {
+        setPaidImport((current) => ({
+          fileName: file.name,
+          status: 'error',
+          percent: current?.percent || 0,
+          message: getApiErrorMessage(error, 'Upload failed'),
+          processed: current?.processed,
+          total: current?.total,
+          updated: current?.updated,
+          skipped: current?.skipped,
+          errors: current?.errors,
         }));
       }
       toast.error(getApiErrorMessage(error, 'Upload failed'));
@@ -1106,13 +1184,29 @@ const AccountsPage: React.FC = () => {
                 <div className="flex items-center gap-3">
                   {role !== 'InstitutionAdmin' && (
                     <div>
-                      <button type="button" onClick={() => accountsFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white">Import Financial Clearance List</button>
+                      <button
+                        type="button"
+                        onClick={() => accountsFileRef.current?.click()}
+                        disabled={financialImport?.status === 'running'}
+                        className="inline-flex items-center gap-2 rounded-md bg-button px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {financialImport?.status === 'running' && <Loader className="h-4 w-4 animate-spin" />}
+                        {financialImport?.status === 'running' ? 'Importing...' : 'Import Financial Clearance List'}
+                      </button>
                       <input ref={accountsFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'accounts')} className="hidden" />
                     </div>
                   )}
                   {role !== 'InstitutionAdmin' && (
                     <div>
-                      <button type="button" onClick={() => paidFileRef.current?.click()} className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold">Import Paid</button>
+                      <button
+                        type="button"
+                        onClick={() => paidFileRef.current?.click()}
+                        disabled={paidImport?.status === 'running'}
+                        className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                      >
+                        {paidImport?.status === 'running' && <Loader className="h-4 w-4 animate-spin" />}
+                        {paidImport?.status === 'running' ? 'Importing...' : 'Import Paid'}
+                      </button>
                       <input ref={paidFileRef} type="file" accept=".xlsx,.xls,.csv" onChange={(e) => handleUpload(e, 'paid')} className="hidden" />
                     </div>
                   )}
@@ -1183,6 +1277,55 @@ const AccountsPage: React.FC = () => {
                       style={{ width: `${financialImport.percent}%` }}
                     />
                   </div>
+                  {financialImport.total != null && financialImport.total > 0 && (
+                    <div className="mt-4 grid gap-2 text-xs text-gray-700 sm:grid-cols-4">
+                      <span>Processed {financialImport.processed ?? 0}/{financialImport.total}</span>
+                      <span>Inserted {financialImport.inserted ?? 0}</span>
+                      <span>Skipped {financialImport.skipped ?? 0}</span>
+                      <span>Errors {financialImport.errors ?? 0}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {paidImport && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 backdrop-blur-sm">
+                <div className="w-full max-w-lg rounded-2xl border border-blue-100 bg-white p-5 shadow-2xl">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {paidImport.status === 'running' ? (
+                          <Loader className="h-4 w-4 animate-spin text-blue-700" />
+                        ) : paidImport.status === 'completed' ? (
+                          <CheckCircle className="h-4 w-4 text-green-700" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 text-red-700" />
+                        )}
+                        <h3 className="text-sm font-semibold text-gray-900">Paid accounts import</h3>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-600">
+                        {paidImport.message || 'Importing paid records'}: {paidImport.fileName}
+                      </p>
+                    </div>
+                    <span className="text-sm font-semibold text-blue-800">{paidImport.percent}%</span>
+                  </div>
+                  <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-gray-100">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        paidImport.status === 'error' ? 'bg-red-600' : 'bg-blue-600'
+                      }`}
+                      style={{ width: `${paidImport.percent}%` }}
+                    />
+                  </div>
+                  {paidImport.total != null && paidImport.total > 0 && (
+                    <div className="mt-4 grid gap-2 text-xs text-gray-700 sm:grid-cols-4">
+                      <span>Processed {paidImport.processed ?? 0}/{paidImport.total}</span>
+                      <span>Updated {paidImport.updated ?? 0}</span>
+                      <span>Skipped {paidImport.skipped ?? 0}</span>
+                      <span>Errors {paidImport.errors ?? 0}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
