@@ -1,7 +1,27 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { AxiosError, type AxiosProgressEvent } from 'axios';
-import apiClient from '../lib/api';
+import { AxiosError } from 'axios';
+import apiClient, { API_BASE_URL } from '../lib/api';
 import type { Account } from '../types';
+
+export interface AccountImportProgress {
+  type?: 'started' | 'progress' | 'completed' | 'error';
+  message?: string;
+  processed: number;
+  total: number;
+  inserted: number;
+  skipped: number;
+  errors: number;
+  percent: number;
+}
+
+const parseStreamError = (text: string) => {
+  try {
+    const data = JSON.parse(text);
+    return data.message || text;
+  } catch {
+    return text || 'Upload failed';
+  }
+};
 
 export interface AccountReports {
   scope: {
@@ -108,26 +128,157 @@ export const accountService = {
     return response.data;
   },
 
-  uploadAccounts: async (file: File, onProgress?: (percent: number) => void) => {
+  uploadAccounts: async (
+    file: File,
+    onProgress?: (progress: AccountImportProgress) => void,
+  ) => {
     const formData = new FormData();
     formData.append('file', file);
 
+    if (onProgress) {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/accounts/upload?stream=1`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/x-ndjson',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(parseStreamError(await response.text()));
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let completed: any = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+
+          if (event.type === 'error') {
+            throw new Error(event.message || 'Upload failed');
+          }
+
+          if (event.type === 'started' || event.type === 'progress' || event.type === 'completed') {
+            onProgress(event as AccountImportProgress);
+          }
+
+          if (event.type === 'completed') {
+            completed = {
+              message: event.message || 'Import completed',
+              result: event.result,
+            };
+          }
+        }
+
+        if (done) break;
+      }
+
+      if (buffer.trim()) {
+        const event = JSON.parse(buffer);
+        if (event.type === 'error') {
+          throw new Error(event.message || 'Upload failed');
+        }
+        if (event.type === 'completed') {
+          onProgress(event as AccountImportProgress);
+          completed = {
+            message: event.message || 'Import completed',
+            result: event.result,
+          };
+        }
+      }
+
+      return completed || { message: 'Import completed' };
+    }
+
     const response = await apiClient.post('/accounts/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: onProgress
-        ? (event: AxiosProgressEvent) => {
-            const total = event.total || file.size;
-            if (!total) return;
-            onProgress(Math.max(0, Math.min(100, Math.round((event.loaded / total) * 100))));
-          }
-        : undefined,
     });
     return response.data;
   },
 
-  uploadPaidStudents: async (file: File) => {
+  uploadPaidStudents: async (
+    file: File,
+    onProgress?: (progress: AccountImportProgress) => void,
+  ) => {
     const formData = new FormData();
     formData.append('file', file);
+
+    if (onProgress) {
+      const token = localStorage.getItem('authToken');
+      const response = await fetch(`${API_BASE_URL}/accounts/load_payed_students?stream=1`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/x-ndjson',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error(parseStreamError(await response.text()));
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let completed: any = null;
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value, { stream: !done });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const event = JSON.parse(line);
+
+          if (event.type === 'error') {
+            throw new Error(event.message || 'Upload failed');
+          }
+
+          if (event.type === 'started' || event.type === 'progress' || event.type === 'completed') {
+            onProgress(event as AccountImportProgress);
+          }
+
+          if (event.type === 'completed') {
+            completed = {
+              message: event.message || 'Import completed',
+              result: event.result,
+            };
+          }
+        }
+
+        if (done) break;
+      }
+
+      if (buffer.trim()) {
+        const event = JSON.parse(buffer);
+        if (event.type === 'error') {
+          throw new Error(event.message || 'Upload failed');
+        }
+        if (event.type === 'completed') {
+          onProgress(event as AccountImportProgress);
+          completed = {
+            message: event.message || 'Import completed',
+            result: event.result,
+          };
+        }
+      }
+
+      return completed || { message: 'Import completed' };
+    }
 
     const response = await apiClient.post('/accounts/load_payed_students', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },

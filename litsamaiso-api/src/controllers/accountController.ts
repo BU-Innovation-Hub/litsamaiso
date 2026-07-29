@@ -18,6 +18,14 @@ import { FinancialClearance } from "../models/FinancialClearance.js";
 import { sendIssueResolvedEmail } from "../utils/email.js";
 
 export const uploadAccounts = async (req: Request, res: Response) => {
+  const wantsStream =
+    req.query.stream === "1" ||
+    String(req.headers.accept || "").includes("application/x-ndjson");
+
+  const writeStreamEvent = (event: Record<string, unknown>) => {
+    res.write(`${JSON.stringify(event)}\n`);
+  };
+
   try {
     console.log("[Accounts Controller] POST /accounts/upload hit");
     console.log(
@@ -48,10 +56,62 @@ export const uploadAccounts = async (req: Request, res: Response) => {
       "[Accounts Controller] Starting accounts import for institution",
       String(instId),
     );
+
+    if (wantsStream) {
+      res.status(200);
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders?.();
+
+      writeStreamEvent({
+        type: "started",
+        message: "Reading spreadsheet",
+        processed: 0,
+        total: 0,
+        inserted: 0,
+        skipped: 0,
+        errors: 0,
+        percent: 0,
+      });
+
+      const result = await loadAccountsFromExcel(file.buffer, instId, (progress) => {
+        writeStreamEvent({
+          type: "progress",
+          message: "Importing financial clearance records",
+          ...progress,
+        });
+      });
+
+      writeStreamEvent({
+        type: "completed",
+        message: "Import completed",
+        result,
+        processed: result.inserted + result.skipped + result.errors.length,
+        total: result.inserted + result.skipped + result.errors.length,
+        inserted: result.inserted,
+        skipped: result.skipped,
+        errors: result.errors.length,
+        percent: 100,
+      });
+      res.end();
+      return;
+    }
+
     const result = await loadAccountsFromExcel(file.buffer, instId);
     console.log("[Accounts Controller] Import result:", result);
     res.json({ message: "Import completed", result });
   } catch (err: any) {
+    if (wantsStream && res.headersSent) {
+      writeStreamEvent({
+        type: "error",
+        message: err.message || String(err),
+        percent: 100,
+      });
+      res.end();
+      return;
+    }
+
     console.error("[Accounts Controller] Error during upload:", err);
     res.status(500).json({ message: err.message || String(err) });
   }
@@ -136,6 +196,14 @@ export const assignBranchCodesAction = async (req: Request, res: Response) => {
 };
 
 export const loadPayedStudents = async (req: Request, res: Response) => {
+  const wantsStream =
+    req.query.stream === "1" ||
+    String(req.headers.accept || "").includes("application/x-ndjson");
+
+  const writeStreamEvent = (event: Record<string, unknown>) => {
+    res.write(`${JSON.stringify(event)}\n`);
+  };
+
   try {
     console.log("[Accounts Controller] POST /accounts/load_payed_students hit");
     const file = (req as any).file;
@@ -153,9 +221,60 @@ export const loadPayedStudents = async (req: Request, res: Response) => {
       return;
     }
 
+    if (wantsStream) {
+      res.status(200);
+      res.setHeader("Content-Type", "application/x-ndjson");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders?.();
+
+      writeStreamEvent({
+        type: "started",
+        message: "Reading spreadsheet",
+        processed: 0,
+        total: 0,
+        inserted: 0,
+        skipped: 0,
+        errors: 0,
+        percent: 0,
+      });
+
+      const result = await loadPayedStudentsFromExcel(file.buffer, instId, (progress) => {
+        writeStreamEvent({
+          type: "progress",
+          message: "Importing paid records",
+          ...progress,
+        });
+      });
+
+      writeStreamEvent({
+        type: "completed",
+        message: "Paid accounts import completed",
+        result,
+        processed: result.updated + result.skipped + result.errors.length,
+        total: result.updated + result.skipped + result.errors.length,
+        inserted: result.updated,
+        skipped: result.skipped,
+        errors: result.errors.length,
+        percent: 100,
+      });
+      res.end();
+      return;
+    }
+
     const result = await loadPayedStudentsFromExcel(file.buffer, instId);
     res.json({ message: "Paid accounts import completed", result });
   } catch (err: any) {
+    if (wantsStream && res.headersSent) {
+      writeStreamEvent({
+        type: "error",
+        message: err.message || String(err),
+        percent: 100,
+      });
+      res.end();
+      return;
+    }
+
     console.error("[Accounts Controller] Error during paid upload:", err);
     res.status(500).json({ message: err.message || String(err) });
   }

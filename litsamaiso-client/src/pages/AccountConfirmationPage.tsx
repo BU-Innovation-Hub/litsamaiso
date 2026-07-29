@@ -532,33 +532,16 @@ const AccountConfirmationPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex flex-col gap-4 text-sm text-muted-foreground">
-                  <span>Are you completing this academic year?</span>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="graduating"
-                        value="yes"
-                        checked={formData.graduating === true}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, graduating: e.target.value === 'yes' }))}
-                        className="h-4 w-4"
-                      />
-                      Yes
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="graduating"
-                        value="no"
-                        checked={formData.graduating === false}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, graduating: e.target.value === 'yes' }))}
-                        className="h-4 w-4"
-                      />
-                      No
-                    </label>
-                  </div>
-                </div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    name="graduating"
+                    checked={formData.graduating}
+                    onChange={handleChange}
+                    className="h-4 w-4"
+                  />
+                  I am graduating this academic year
+                </label>
 
                 <button
                   type="submit"
