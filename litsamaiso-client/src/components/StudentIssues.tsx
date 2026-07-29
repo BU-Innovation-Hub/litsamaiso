@@ -31,6 +31,42 @@ interface Account {
   confirmationDate?: string;
 }
 
+type BankValue = 'fnb' | 'slb' | 'nedbank' | 'lpb';
+
+const BANK_OPTIONS = [
+  { label: 'First National Bank', value: 'fnb' },
+  { label: 'Standard Lesotho Bank', value: 'slb' },
+  { label: 'Nedbank', value: 'nedbank' },
+  { label: 'Lesotho PostBank', value: 'lpb' },
+] as const;
+
+const BANK_NAME_ALIASES: Record<string, BankValue> = {
+  'first national bank': 'fnb',
+  fnb: 'fnb',
+  'standard lesotho bank': 'slb',
+  'standard bank': 'slb',
+  slb: 'slb',
+  sbl: 'slb',
+  nedbank: 'nedbank',
+  'nedbank lesotho': 'nedbank',
+  'lesotho postbank': 'lpb',
+  'lesotho post bank': 'lpb',
+  'post bank': 'lpb',
+  postbank: 'lpb',
+  lpb: 'lpb',
+};
+
+const normalizeBankValue = (bankName: string): string => {
+  const normalized = String(bankName || '').trim().toLowerCase();
+  if (!normalized) return '';
+  return BANK_NAME_ALIASES[normalized] || '';
+};
+
+const getBankLabel = (bankName?: string): string => {
+  const normalized = normalizeBankValue(bankName || '');
+  return BANK_OPTIONS.find((bank) => bank.value === normalized)?.label || bankName || 'Unknown bank';
+};
+
 const getDefaultEditForm = () => ({
   fullnames: '',
   borrowerNumber: '',
@@ -122,7 +158,7 @@ export default function StudentIssues() {
       fullnames: account?.fullnames || '',
       borrowerNumber: issue.borrowerNumber || '',
       courseOfStudy: account?.courseOfStudy || '',
-      bankName: issue.bankName || '',
+      bankName: normalizeBankValue(issue.bankName || account?.bankName || ''),
       accountNumber: issue.accountNumber || '',
       studentId: issue.studentId || '',
       status: account?.status || 'pending',
@@ -181,7 +217,7 @@ export default function StudentIssues() {
       }
 
       const payload: any = {
-        bankName: editForm.bankName,
+        bankName: normalizeBankValue(editForm.bankName),
         accountNumber: editForm.accountNumber,
         notes: editNotes,
       } as any;
@@ -228,7 +264,7 @@ export default function StudentIssues() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                   <div className="bg-white p-3 rounded-lg border border-gray-200">
                     <p className="text-sm font-medium text-gray-700 mb-1">Bank Name</p>
-                    <p className="text-primary-clr font-medium">{issue.bankName}</p>
+                    <p className="text-primary-clr font-medium">{getBankLabel(issue.bankName)}</p>
                   </div>
                   <div className="bg-white p-3 rounded-lg border border-gray-200">
                     <p className="text-sm font-medium text-gray-700 mb-1">Account Number</p>
@@ -277,7 +313,18 @@ export default function StudentIssues() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
-                  <input type="text" value={editForm.bankName} disabled={isUpdatingIssue} onChange={(e) => setEditForm((prev) => ({ ...prev, bankName: e.target.value }))} className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100" required />
+                  <select
+                    value={editForm.bankName}
+                    disabled={isUpdatingIssue}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, bankName: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+                    required
+                  >
+                    <option value="" disabled>Select your bank</option>
+                    {BANK_OPTIONS.map((bank) => (
+                      <option key={bank.value} value={bank.value}>{bank.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
