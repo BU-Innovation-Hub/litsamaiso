@@ -27,6 +27,15 @@ interface LoadPaidResult {
   skippedDetails: { row: number; reasons: string[] }[];
 }
 
+export interface AccountImportProgress {
+  processed: number;
+  total: number;
+  inserted: number;
+  skipped: number;
+  errors: number;
+  percent: number;
+}
+
 const REQUIRED_COLUMNS = [
   "borrowernumber",
   "accountnumber",
@@ -273,6 +282,7 @@ export const exportAccounts = async (params: {
 export const loadAccountsFromExcel = async (
   fileBuffer: Buffer,
   institutionId: Types.ObjectId,
+  onProgress?: (progress: AccountImportProgress) => void,
 ): Promise<LoadResult> => {
   const latestAccount = await FinancialClearance.findOne({ institution: institutionId })
     .sort({ batchNumber: -1, createdAt: -1 })
@@ -322,6 +332,21 @@ export const loadAccountsFromExcel = async (
   let skipped = 0;
   const errors: string[] = [];
   const skippedDetails: { row: number; reasons: string[] }[] = [];
+  const total = rows.length;
+  const batchSize = 50;
+
+  const emitProgress = (processed: number) => {
+    onProgress?.({
+      processed,
+      total,
+      inserted,
+      skipped,
+      errors: errors.length,
+      percent: total === 0 ? 100 : Math.round((processed / total) * 100),
+    });
+  };
+
+  emitProgress(0);
 
   for (const [idx, row] of rows.entries()) {
     try {
@@ -335,6 +360,7 @@ export const loadAccountsFromExcel = async (
           row: idx + 2,
           reasons: [`Missing required fields: ${missingFields.join(", ")}`],
         });
+        if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
         continue;
       }
 
@@ -365,6 +391,7 @@ export const loadAccountsFromExcel = async (
           row: idx + 2,
           reasons: ["Duplicate borrowerNumber or accountNumber"],
         });
+        if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
         continue;
       }
 
@@ -388,7 +415,11 @@ export const loadAccountsFromExcel = async (
     } catch (err: any) {
       errors.push(`Row ${idx + 2}: ${err.message || String(err)}`);
     }
+
+    if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
   }
+
+  emitProgress(total);
 
   return { inserted, skipped, errors, skippedDetails };
 };
@@ -396,6 +427,7 @@ export const loadAccountsFromExcel = async (
 export const loadPayedStudentsFromExcel = async (
   fileBuffer: Buffer,
   institutionId: Types.ObjectId,
+  onProgress?: (progress: AccountImportProgress) => void,
 ): Promise<LoadPaidResult> => {
   const workbook = XLSX.read(fileBuffer, { type: "buffer" });
   const sheetName = workbook.SheetNames[0];
@@ -436,6 +468,21 @@ export const loadPayedStudentsFromExcel = async (
   let skipped = 0;
   const errors: string[] = [];
   const skippedDetails: { row: number; reasons: string[] }[] = [];
+  const total = rows.length;
+  const batchSize = 50;
+
+  const emitProgress = (processed: number) => {
+    onProgress?.({
+      processed,
+      total,
+      inserted: updated,
+      skipped,
+      errors: errors.length,
+      percent: total === 0 ? 100 : Math.round((processed / total) * 100),
+    });
+  };
+
+  emitProgress(0);
 
   for (const [idx, row] of rows.entries()) {
     try {
@@ -449,6 +496,7 @@ export const loadPayedStudentsFromExcel = async (
           row: idx + 2,
           reasons: [`Missing required fields: ${missingFields.join(", ")}`],
         });
+        if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
         continue;
       }
 
@@ -465,6 +513,7 @@ export const loadPayedStudentsFromExcel = async (
           row: idx + 2,
           reasons: ['Spreadsheet status must be "paid"'],
         });
+        if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
         continue;
       }
 
@@ -479,6 +528,7 @@ export const loadPayedStudentsFromExcel = async (
           row: idx + 2,
           reasons: ["Account not found for borrowerNumber"],
         });
+        if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
         continue;
       }
 
@@ -497,6 +547,7 @@ export const loadPayedStudentsFromExcel = async (
           row: idx + 2,
           reasons: ["Account details do not match the spreadsheet row"],
         });
+        if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
         continue;
       }
 
@@ -509,6 +560,7 @@ export const loadPayedStudentsFromExcel = async (
             `Current account status must be confirmed before marking paid (found: ${account.status || "pending"})`,
           ],
         });
+        if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
         continue;
       }
 
@@ -519,7 +571,11 @@ export const loadPayedStudentsFromExcel = async (
     } catch (err: any) {
       errors.push(`Row ${idx + 2}: ${err.message || String(err)}`);
     }
+
+    if (onProgress && (idx + 1) % batchSize === 0) emitProgress(idx + 1);
   }
+
+  emitProgress(total);
 
   return { updated, skipped, errors, skippedDetails };
 };
