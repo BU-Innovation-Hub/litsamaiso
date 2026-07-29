@@ -286,9 +286,12 @@ const loadScopedAccounts = async (filter: Record<string, unknown>): Promise<Scop
 
 const buildSummary = (rows: ScopedAccountRow[]) => {
   const total = rows.length;
-  const confirmed = rows.filter((row) => normalizeStatus(row.status) === "confirmed").length;
   const paid = rows.filter((row) => normalizeStatus(row.status) === "paid").length;
-  const unconfirmed = total - confirmed - paid;
+  const confirmed = rows.filter((row) => {
+    const status = normalizeStatus(row.status);
+    return status === "confirmed" || status === "paid";
+  }).length;
+  const unconfirmed = total - confirmed;
 
   return {
     total,
