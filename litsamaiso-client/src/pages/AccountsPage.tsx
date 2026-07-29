@@ -112,21 +112,18 @@ const AccountsPage: React.FC = () => {
     }
   }, [accountBatch, accountEndDate, accountSearch, accountStartDate, accountStatus, canViewReports, selectedInstitutionId]);
 
-  useEffect(() => {
-    const loadReports = async () => {
-      if (!canViewReports) return;
+  const loadReports = useCallback(async () => {
+    if (!canViewReports) return;
 
-      try {
-        setReports(await accountService.getReports({
-          institutionId: selectedInstitutionId || undefined,
-        }));
-      } catch {
-        setReports(null);
-      }
-    };
-
-    void loadReports();
-  }, [canViewReports, selectedInstitutionId]);
+    try {
+      setReports(await accountService.getReports({
+        institutionId: selectedInstitutionId || undefined,
+        batchNumber: accountBatch || undefined,
+      }));
+    } catch {
+      setReports(null);
+    }
+  }, [accountBatch, canViewReports, selectedInstitutionId]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -134,6 +131,13 @@ const AccountsPage: React.FC = () => {
     }, 250);
     return () => window.clearTimeout(timeout);
   }, [loadAccountRows]);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void loadReports();
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [loadReports]);
 
   useEffect(() => {
     const loadInstitutions = async () => {
@@ -264,10 +268,7 @@ const AccountsPage: React.FC = () => {
 
       toast.success(response.message || 'Upload completed');
       if (canViewReports) {
-        setReports(await accountService.getReports({
-          institutionId: selectedInstitutionId || undefined,
-        }));
-        await loadAccountRows();
+        await Promise.all([loadReports(), loadAccountRows()]);
       }
 
       if (uploadType === 'students') {
@@ -333,9 +334,7 @@ const AccountsPage: React.FC = () => {
       toast.success('Account status updated');
       await Promise.all([
         loadAccountRows(),
-        accountService.getReports({
-          institutionId: selectedInstitutionId || undefined,
-        }).then(setReports),
+        loadReports(),
       ]);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Failed to update account status'));
@@ -367,7 +366,7 @@ const AccountsPage: React.FC = () => {
       toast.success(`Marked ${selectedAccountIds.length} accounts as paid`);
       setSelectedAccountIds([]);
       setIsSelectAll(false);
-      await Promise.all([loadAccountRows(), accountService.getReports({ institutionId: selectedInstitutionId || undefined }).then(setReports)]);
+      await Promise.all([loadAccountRows(), loadReports()]);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Failed to mark selected accounts as paid'));
     }
@@ -398,7 +397,7 @@ const AccountsPage: React.FC = () => {
       await accountService.updateAccount(editingAccount._id, editForm as any);
       toast.success('Account updated');
       closeEditModal();
-      await Promise.all([loadAccountRows(), accountService.getReports({ institutionId: selectedInstitutionId || undefined }).then(setReports)]);
+      await Promise.all([loadAccountRows(), loadReports()]);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Failed to update account'));
     }

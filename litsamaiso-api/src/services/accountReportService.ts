@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { FinancialClearance } from "../models/FinancialClearance.js";
 import { Institution } from "../models/Institution.js";
+import { getAccountListFilter } from "./accountService.js";
 
 export type AccountReportKey =
   | "summary"
@@ -198,9 +199,17 @@ const dateDiffDays = (start: Date, end: Date): number =>
 const resolveScope = async (params: {
   user: any;
   institutionId?: string | undefined;
+  search?: string;
+  status?: string;
+  batchNumber?: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<ResolvedScope> => {
   const userRole = safeString(params.user?.role?.name || params.user?.role);
   const isAppAdmin = userRole.toLowerCase() === "appadmin";
+
+  const listFilter = getAccountListFilter(params.user, params);
+  let scope: ReportScope;
 
   if (isAppAdmin && params.institutionId) {
     const institutionObjectId = new Types.ObjectId(params.institutionId);
@@ -212,36 +221,27 @@ const resolveScope = async (params: {
       throw new Error("Institution not found");
     }
 
-    return {
-      filter: { institution: institutionObjectId },
-      scope: {
-        institutionId: institutionIdString(institutionObjectId),
-        ...(institution.name ? { institutionName: institution.name } : {}),
-        allInstitutions: false,
-      },
+    scope = {
+      institutionId: institutionIdString(institutionObjectId),
+      ...(institution.name ? { institutionName: institution.name } : {}),
+      allInstitutions: false,
     };
-  }
+  } else if (isAppAdmin) {
+    scope = { allInstitutions: true };
+  } else {
+    const institutionObjectId = new Types.ObjectId(params.user.institution);
+    const institution = await Institution.findById(institutionObjectId)
+      .select("name")
+      .lean();
 
-  if (isAppAdmin) {
-    return {
-      filter: {},
-      scope: { allInstitutions: true },
-    };
-  }
-
-  const institutionObjectId = new Types.ObjectId(params.user.institution);
-  const institution = await Institution.findById(institutionObjectId)
-    .select("name")
-    .lean();
-
-  return {
-    filter: { institution: institutionObjectId },
-    scope: {
+    scope = {
       institutionId: institutionIdString(institutionObjectId),
       ...(institution?.name ? { institutionName: institution.name } : {}),
       allInstitutions: false,
-    },
-  };
+    };
+  }
+
+  return { filter: listFilter, scope };
 };
 
 const institutionIdString = (value: Types.ObjectId): string => value.toString();
@@ -525,11 +525,29 @@ export const getAccountReports = async (params: {
   institutionId?: string | undefined;
   stuckDays?: number;
   recentDays?: number;
+  search?: string;
+  status?: string;
+  batchNumber?: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<AccountReportContext> => {
-  const scopeInput: { user: any; institutionId?: string } = { user: params.user };
+  const scopeInput: { 
+    user: any; 
+    institutionId?: string;
+    search?: string;
+    status?: string;
+    batchNumber?: string;
+    startDate?: string;
+    endDate?: string;
+  } = { user: params.user };
   if (params.institutionId !== undefined) {
     scopeInput.institutionId = params.institutionId;
   }
+  if (params.search !== undefined) scopeInput.search = params.search;
+  if (params.status !== undefined) scopeInput.status = params.status;
+  if (params.batchNumber !== undefined) scopeInput.batchNumber = params.batchNumber;
+  if (params.startDate !== undefined) scopeInput.startDate = params.startDate;
+  if (params.endDate !== undefined) scopeInput.endDate = params.endDate;
 
   const { filter, scope } = await resolveScope(scopeInput);
 
@@ -552,6 +570,11 @@ export const getAccountReport = async (params: {
   institutionId?: string | undefined;
   stuckDays?: number;
   recentDays?: number;
+  search?: string;
+  status?: string;
+  batchNumber?: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<{ scope: ReportScope; reportKey: AccountReportKey; report: unknown; catalog: ReportCatalogItem[] }> => {
   const reportKey = normalizeKey(params.key) as AccountReportKey;
   if (!REPORT_KEYS.has(reportKey)) {
@@ -563,6 +586,11 @@ export const getAccountReport = async (params: {
     institutionId?: string;
     stuckDays?: number;
     recentDays?: number;
+    search?: string;
+    status?: string;
+    batchNumber?: string;
+    startDate?: string;
+    endDate?: string;
   } = { user: params.user };
   if (params.institutionId !== undefined) {
     reportParams.institutionId = params.institutionId;
@@ -573,6 +601,11 @@ export const getAccountReport = async (params: {
   if (params.recentDays !== undefined) {
     reportParams.recentDays = params.recentDays;
   }
+  if (params.search !== undefined) reportParams.search = params.search;
+  if (params.status !== undefined) reportParams.status = params.status;
+  if (params.batchNumber !== undefined) reportParams.batchNumber = params.batchNumber;
+  if (params.startDate !== undefined) reportParams.startDate = params.startDate;
+  if (params.endDate !== undefined) reportParams.endDate = params.endDate;
 
   const bundle = await getAccountReports(reportParams);
 

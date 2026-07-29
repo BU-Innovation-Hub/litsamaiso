@@ -151,12 +151,28 @@ export const accountService = {
     return response.data;
   },
 
-  getReports: async (params?: { institutionId?: string }) => {
+  getReports: async (params?: { 
+    institutionId?: string;
+    search?: string;
+    status?: string;
+    batchNumber?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
     const response = await apiClient.get<AccountReports>('/reports/accounts', { params });
     return response.data;
   },
 
-  getReport: async (reportKey: string, params?: { institutionId?: string; stuckDays?: number; recentDays?: number }) => {
+  getReport: async (reportKey: string, params?: { 
+    institutionId?: string; 
+    stuckDays?: number; 
+    recentDays?: number;
+    search?: string;
+    status?: string;
+    batchNumber?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => {
     const response = await apiClient.get(`/reports/accounts/${encodeURIComponent(reportKey)}`, { params });
     return response.data;
   },
