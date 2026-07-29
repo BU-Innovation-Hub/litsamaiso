@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { FinancialClearance } from "../models/FinancialClearance.js";
 import { Institution } from "../models/Institution.js";
+import { getAccountListFilter } from "./accountService.js";
 
 export type AccountReportKey =
   | "summary"
@@ -148,7 +149,8 @@ export const REPORT_CATALOG: ReportCatalogItem[] = [
   {
     key: "stuck-confirmed",
     title: "Stuck Confirmed",
-    description: "Confirmed accounts older than the configured threshold that are still unpaid.",
+    description:
+      "Confirmed accounts older than the configured threshold that are still unpaid.",
   },
   {
     key: "recent-payments",
@@ -164,8 +166,7 @@ export const REPORT_CATALOG: ReportCatalogItem[] = [
 
 const REPORT_KEYS = new Set(REPORT_CATALOG.map((item) => item.key));
 
-const safeString = (value: unknown): string =>
-  String(value ?? "").trim();
+const safeString = (value: unknown): string => String(value ?? "").trim();
 
 const normalizeStatus = (value: unknown): string => {
   const status = safeString(value).toLowerCase();
@@ -198,9 +199,17 @@ const dateDiffDays = (start: Date, end: Date): number =>
 const resolveScope = async (params: {
   user: any;
   institutionId?: string | undefined;
+  search?: string;
+  status?: string;
+  batchNumber?: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<ResolvedScope> => {
   const userRole = safeString(params.user?.role?.name || params.user?.role);
   const isAppAdmin = userRole.toLowerCase() === "appadmin";
+
+  const listFilter = getAccountListFilter(params.user, params);
+  let scope: ReportScope;
 
   if (isAppAdmin && params.institutionId) {
     const institutionObjectId = new Types.ObjectId(params.institutionId);
@@ -212,36 +221,27 @@ const resolveScope = async (params: {
       throw new Error("Institution not found");
     }
 
-    return {
-      filter: { institution: institutionObjectId },
-      scope: {
-        institutionId: institutionIdString(institutionObjectId),
-        ...(institution.name ? { institutionName: institution.name } : {}),
-        allInstitutions: false,
-      },
+    scope = {
+      institutionId: institutionIdString(institutionObjectId),
+      ...(institution.name ? { institutionName: institution.name } : {}),
+      allInstitutions: false,
     };
-  }
+  } else if (isAppAdmin) {
+    scope = { allInstitutions: true };
+  } else {
+    const institutionObjectId = new Types.ObjectId(params.user.institution);
+    const institution = await Institution.findById(institutionObjectId)
+      .select("name")
+      .lean();
 
-  if (isAppAdmin) {
-    return {
-      filter: {},
-      scope: { allInstitutions: true },
-    };
-  }
-
-  const institutionObjectId = new Types.ObjectId(params.user.institution);
-  const institution = await Institution.findById(institutionObjectId)
-    .select("name")
-    .lean();
-
-  return {
-    filter: { institution: institutionObjectId },
-    scope: {
+    scope = {
       institutionId: institutionIdString(institutionObjectId),
       ...(institution?.name ? { institutionName: institution.name } : {}),
       allInstitutions: false,
-    },
-  };
+    };
+  }
+
+  return { filter: listFilter, scope };
 };
 
 const institutionIdString = (value: Types.ObjectId): string => value.toString();
@@ -257,7 +257,10 @@ const groupCount = (
   }
   return [...map.entries()]
     .map(([label, count]) => ({ label, count }))
-    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+    .sort(
+      (left, right) =>
+        right.count - left.count || left.label.localeCompare(right.label),
+    );
 };
 
 const groupByDate = (
@@ -276,7 +279,9 @@ const groupByDate = (
     .sort((left, right) => left.date.localeCompare(right.date));
 };
 
-const loadScopedAccounts = async (filter: Record<string, unknown>): Promise<ScopedAccountRow[]> => {
+const loadScopedAccounts = async (
+  filter: Record<string, unknown>,
+): Promise<ScopedAccountRow[]> => {
   return FinancialClearance.find(filter)
     .select(
       "borrowerNumber accountNumber bankName batchNumber courseOfStudy fullnames graduating status paidDate paidAt institution confirmedBy confirmationDate createdAt updatedAt",
@@ -286,7 +291,9 @@ const loadScopedAccounts = async (filter: Record<string, unknown>): Promise<Scop
 
 const buildSummary = (rows: ScopedAccountRow[]) => {
   const total = rows.length;
-  const paid = rows.filter((row) => normalizeStatus(row.status) === "paid").length;
+  const paid = rows.filter(
+    (row) => normalizeStatus(row.status) === "paid",
+  ).length;
   const confirmed = rows.filter((row) => {
     const status = normalizeStatus(row.status);
     return status === "confirmed" || status === "paid";
@@ -322,7 +329,9 @@ const buildConfirmedNotPaid = (rows: ScopedAccountRow[]) => {
 
 const buildSnapshot = (rows: ScopedAccountRow[], targetStatus: string) => {
   const lowerTarget = targetStatus.toLowerCase();
-  const matching = rows.filter((row) => normalizeStatus(row.status) === lowerTarget);
+  const matching = rows.filter(
+    (row) => normalizeStatus(row.status) === lowerTarget,
+  );
   const others = rows.length - matching.length;
 
   return {
@@ -345,7 +354,10 @@ const buildAverageDays = (
       if (!start || !end) return null;
       return dateDiffDays(start, end);
     })
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0);
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value) && value >= 0,
+    );
 
   const average = durations.length
     ? durations.reduce((sum, value) => sum + value, 0) / durations.length
@@ -390,7 +402,10 @@ const buildRecentPayments = (rows: ScopedAccountRow[], days: number) => {
   const paidRows = rows
     .filter((row) => normalizeStatus(row.status) === "paid")
     .filter((row) => row.paidAt && row.paidAt >= threshold)
-    .sort((left, right) => (right.paidAt?.getTime() || 0) - (left.paidAt?.getTime() || 0));
+    .sort(
+      (left, right) =>
+        (right.paidAt?.getTime() || 0) - (left.paidAt?.getTime() || 0),
+    );
 
   return {
     windowDays: days,
@@ -410,7 +425,12 @@ const buildRecentPayments = (rows: ScopedAccountRow[], days: number) => {
 };
 
 const buildAnomalies = (rows: ScopedAccountRow[]) => {
-  const allowedStatuses = new Set(["pending", "confirmed", "erroneous", "paid"]);
+  const allowedStatuses = new Set([
+    "pending",
+    "confirmed",
+    "erroneous",
+    "paid",
+  ]);
   const anomalies = rows.flatMap((row) => {
     const issues: string[] = [];
     const status = normalizeStatus(row.status);
@@ -427,7 +447,12 @@ const buildAnomalies = (rows: ScopedAccountRow[]) => {
     if (status === "confirmed" && !row.confirmationDate) {
       issues.push("confirmed status without confirmationDate");
     }
-    if (status === "paid" && row.confirmationDate && row.paidAt && row.paidAt < row.confirmationDate) {
+    if (
+      status === "paid" &&
+      row.confirmationDate &&
+      row.paidAt &&
+      row.paidAt < row.confirmationDate
+    ) {
       issues.push("paidAt earlier than confirmationDate");
     }
     if (status === "confirmed" && row.paidAt) {
@@ -463,9 +488,13 @@ const buildInstitutionBreakdown = async (rows: ScopedAccountRow[]) => {
     counts.set(key, (counts.get(key) || 0) + 1);
   }
 
-  const institutionIds = [...counts.keys()].map((value) => new Types.ObjectId(value));
+  const institutionIds = [...counts.keys()].map(
+    (value) => new Types.ObjectId(value),
+  );
   const institutions = institutionIds.length
-    ? await Institution.find({ _id: { $in: institutionIds } }).select("name email").lean()
+    ? await Institution.find({ _id: { $in: institutionIds } })
+        .select("name email")
+        .lean()
     : [];
 
   const labelById = new Map<string, { name: string; email: string }>();
@@ -483,14 +512,20 @@ const buildInstitutionBreakdown = async (rows: ScopedAccountRow[]) => {
       institutionEmail: labelById.get(institutionId)?.email || null,
       count,
     }))
-    .sort((left, right) => right.count - left.count || left.institutionName.localeCompare(right.institutionName));
+    .sort(
+      (left, right) =>
+        right.count - left.count ||
+        left.institutionName.localeCompare(right.institutionName),
+    );
 };
 
 const buildReportBundle = async (
   rows: ScopedAccountRow[],
   options: { stuckDays: number; recentDays: number },
 ) => {
-  const confirmedRows = rows.filter((row) => normalizeStatus(row.status) === "confirmed");
+  const confirmedRows = rows.filter(
+    (row) => normalizeStatus(row.status) === "confirmed",
+  );
   const paidRows = rows.filter((row) => normalizeStatus(row.status) === "paid");
 
   const byInstitution = await buildInstitutionBreakdown(rows);
@@ -510,10 +545,21 @@ const buildReportBundle = async (
     },
     byInstitution,
     importsByDay: groupByDate(rows, (row) => row.createdAt || null),
-    confirmationsByDay: groupByDate(confirmedRows, (row) => row.confirmationDate || null),
+    confirmationsByDay: groupByDate(
+      confirmedRows,
+      (row) => row.confirmationDate || null,
+    ),
     paymentsByDay: groupByDate(paidRows, (row) => row.paidAt || null),
-    averageImportToConfirm: buildAverageDays(rows, (row) => row.createdAt || null, (row) => row.confirmationDate || null),
-    averageConfirmToPay: buildAverageDays(rows, (row) => row.confirmationDate || null, (row) => row.paidAt || null),
+    averageImportToConfirm: buildAverageDays(
+      rows,
+      (row) => row.createdAt || null,
+      (row) => row.confirmationDate || null,
+    ),
+    averageConfirmToPay: buildAverageDays(
+      rows,
+      (row) => row.confirmationDate || null,
+      (row) => row.paidAt || null,
+    ),
     stuckConfirmed: buildStuckConfirmed(rows, options.stuckDays),
     recentPayments: buildRecentPayments(rows, options.recentDays),
     anomalies: buildAnomalies(rows),
@@ -525,11 +571,30 @@ export const getAccountReports = async (params: {
   institutionId?: string | undefined;
   stuckDays?: number;
   recentDays?: number;
+  search?: string;
+  status?: string;
+  batchNumber?: string;
+  startDate?: string;
+  endDate?: string;
 }): Promise<AccountReportContext> => {
-  const scopeInput: { user: any; institutionId?: string } = { user: params.user };
+  const scopeInput: {
+    user: any;
+    institutionId?: string;
+    search?: string;
+    status?: string;
+    batchNumber?: string;
+    startDate?: string;
+    endDate?: string;
+  } = { user: params.user };
   if (params.institutionId !== undefined) {
     scopeInput.institutionId = params.institutionId;
   }
+  if (params.search !== undefined) scopeInput.search = params.search;
+  if (params.status !== undefined) scopeInput.status = params.status;
+  if (params.batchNumber !== undefined)
+    scopeInput.batchNumber = params.batchNumber;
+  if (params.startDate !== undefined) scopeInput.startDate = params.startDate;
+  if (params.endDate !== undefined) scopeInput.endDate = params.endDate;
 
   const { filter, scope } = await resolveScope(scopeInput);
 
@@ -552,7 +617,17 @@ export const getAccountReport = async (params: {
   institutionId?: string | undefined;
   stuckDays?: number;
   recentDays?: number;
-}): Promise<{ scope: ReportScope; reportKey: AccountReportKey; report: unknown; catalog: ReportCatalogItem[] }> => {
+  search?: string;
+  status?: string;
+  batchNumber?: string;
+  startDate?: string;
+  endDate?: string;
+}): Promise<{
+  scope: ReportScope;
+  reportKey: AccountReportKey;
+  report: unknown;
+  catalog: ReportCatalogItem[];
+}> => {
   const reportKey = normalizeKey(params.key) as AccountReportKey;
   if (!REPORT_KEYS.has(reportKey)) {
     throw new Error(`Unknown report key: ${params.key}`);
@@ -563,6 +638,11 @@ export const getAccountReport = async (params: {
     institutionId?: string;
     stuckDays?: number;
     recentDays?: number;
+    search?: string;
+    status?: string;
+    batchNumber?: string;
+    startDate?: string;
+    endDate?: string;
   } = { user: params.user };
   if (params.institutionId !== undefined) {
     reportParams.institutionId = params.institutionId;
@@ -573,6 +653,12 @@ export const getAccountReport = async (params: {
   if (params.recentDays !== undefined) {
     reportParams.recentDays = params.recentDays;
   }
+  if (params.search !== undefined) reportParams.search = params.search;
+  if (params.status !== undefined) reportParams.status = params.status;
+  if (params.batchNumber !== undefined)
+    reportParams.batchNumber = params.batchNumber;
+  if (params.startDate !== undefined) reportParams.startDate = params.startDate;
+  if (params.endDate !== undefined) reportParams.endDate = params.endDate;
 
   const bundle = await getAccountReports(reportParams);
 

@@ -13,16 +13,31 @@ export const listAccountReports = async (req: Request, res: Response) => {
     const institutionId = typeof req.query.institutionId === "string" ? req.query.institutionId : undefined;
     const stuckDays = getOptionalNumber(req.query.stuckDays);
     const recentDays = getOptionalNumber(req.query.recentDays);
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const batchNumber = typeof req.query.batchNumber === "string" ? req.query.batchNumber : undefined;
+    const startDate = typeof req.query.startDate === "string" ? req.query.startDate : undefined;
+    const endDate = typeof req.query.endDate === "string" ? req.query.endDate : undefined;
 
     const reportArgs: {
       user: any;
       institutionId?: string;
       stuckDays?: number;
       recentDays?: number;
+      search?: string;
+      status?: string;
+      batchNumber?: string;
+      startDate?: string;
+      endDate?: string;
     } = { user };
     if (institutionId !== undefined) reportArgs.institutionId = institutionId;
     if (stuckDays !== undefined) reportArgs.stuckDays = stuckDays;
     if (recentDays !== undefined) reportArgs.recentDays = recentDays;
+    if (search !== undefined) reportArgs.search = search;
+    if (status !== undefined) reportArgs.status = status;
+    if (batchNumber !== undefined) reportArgs.batchNumber = batchNumber;
+    if (startDate !== undefined) reportArgs.startDate = startDate;
+    if (endDate !== undefined) reportArgs.endDate = endDate;
 
     const result = await getAccountReports(reportArgs);
 
@@ -44,6 +59,11 @@ export const getSingleAccountReport = async (req: Request, res: Response) => {
     const institutionId = typeof req.query.institutionId === "string" ? req.query.institutionId : undefined;
     const stuckDays = getOptionalNumber(req.query.stuckDays);
     const recentDays = getOptionalNumber(req.query.recentDays);
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const batchNumber = typeof req.query.batchNumber === "string" ? req.query.batchNumber : undefined;
+    const startDate = typeof req.query.startDate === "string" ? req.query.startDate : undefined;
+    const endDate = typeof req.query.endDate === "string" ? req.query.endDate : undefined;
 
     if (!reportKey) {
       res.status(400).json({ message: "reportKey is required" });
@@ -56,10 +76,20 @@ export const getSingleAccountReport = async (req: Request, res: Response) => {
       institutionId?: string;
       stuckDays?: number;
       recentDays?: number;
+      search?: string;
+      status?: string;
+      batchNumber?: string;
+      startDate?: string;
+      endDate?: string;
     } = { user, key: reportKey };
     if (institutionId !== undefined) reportArgs.institutionId = institutionId;
     if (stuckDays !== undefined) reportArgs.stuckDays = stuckDays;
     if (recentDays !== undefined) reportArgs.recentDays = recentDays;
+    if (search !== undefined) reportArgs.search = search;
+    if (status !== undefined) reportArgs.status = status;
+    if (batchNumber !== undefined) reportArgs.batchNumber = batchNumber;
+    if (startDate !== undefined) reportArgs.startDate = startDate;
+    if (endDate !== undefined) reportArgs.endDate = endDate;
 
     const result = await getAccountReport(reportArgs);
 
