@@ -31,7 +31,7 @@ export async function composeAdministrativeEmail(input: {
     throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
   }
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const model = getGenAI().getGenerativeModel({ model: "gemini-3.5-flash" });
   const result = await model.generateContent(`You are the administrative writing assistant for Litsamaiso.
 
 Write clear administrative email copy for the Litsamaiso platform.

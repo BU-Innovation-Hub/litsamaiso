@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { userService } from '../services/userService';
+import { accountService } from '../services/accountService';
 import {
   aiEmailComposerService,
   type EmailComposerJob,
@@ -66,6 +67,8 @@ const AIEmailComposerPage: React.FC = () => {
   const [selectedRole, setSelectedRole] = useState('Student');
   const [financialStatus, setFinancialStatus] = useState<FinancialStatus>('pending');
   const [batchNumber, setBatchNumber] = useState('');
+  const [availableBatches, setAvailableBatches] = useState<number[]>([]);
+  const [batchesLoading, setBatchesLoading] = useState(false);
   const [recipientCount, setRecipientCount] = useState(0);
   const [countLoading, setCountLoading] = useState(false);
   const [prompt, setPrompt] = useState('');
@@ -114,6 +117,22 @@ const AIEmailComposerPage: React.FC = () => {
     };
 
     void loadRoles();
+  }, []);
+
+  useEffect(() => {
+    const loadBatches = async () => {
+      setBatchesLoading(true);
+      try {
+        const response = await accountService.listAccounts();
+        setAvailableBatches(response.batches || []);
+      } catch (error: unknown) {
+        toast.error(getApiErrorMessage(error, 'Failed to load available batches'));
+      } finally {
+        setBatchesLoading(false);
+      }
+    };
+
+    void loadBatches();
   }, []);
 
   useEffect(() => {
@@ -278,17 +297,24 @@ const AIEmailComposerPage: React.FC = () => {
                       <label className="mb-1 block text-sm font-medium text-gray-700">
                         Batch
                       </label>
-                      <input
-                        type="number"
-                        min="1"
+                      <select
                         value={batchNumber}
                         onChange={(event) => {
                           setBatchNumber(event.target.value);
                           setJob(null);
                         }}
-                        placeholder="All batches"
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">All batches</option>
+                        {availableBatches.map((batch) => (
+                          <option key={batch} value={String(batch)}>
+                            Batch {batch}
+                          </option>
+                        ))}
+                      </select>
+                      {batchesLoading && (
+                        <p className="mt-2 text-xs text-gray-500">Loading batch options…</p>
+                      )}
                     </div>
                   </div>
                 )}
