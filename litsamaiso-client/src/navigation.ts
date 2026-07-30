@@ -7,6 +7,7 @@ import {
   GitBranch,
   History,
   LayoutDashboard,
+  MailPlus,
   MessageSquareWarning,
   Users,
   type LucideIcon,
@@ -84,6 +85,13 @@ export const navigationItems: NavigationItem[] = [
     href: '/audit-logs',
     roles: ['AppAdmin'],
     icon: History,
+  },
+  {
+    id: 'ai-email-composer',
+    label: 'AI Email Composer',
+    href: '/ai-email-composer',
+    roles: ['AppAdmin'],
+    icon: MailPlus,
   },
   {
     id: 'branch-codes',

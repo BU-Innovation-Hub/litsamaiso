@@ -28,6 +28,7 @@ import adminIssueRoutes from "./routes/adminIssueRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import auditLogRoutes from "./routes/auditLogRoutes.js";
 import branchCodeRoutes from "./routes/branchCodeRoutes.js";
+import administrativeEmailRoutes from "./routes/administrativeEmailRoutes.js";
 import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
@@ -137,6 +138,7 @@ app.use("/admin/issues", adminIssueRoutes);
 app.use("/audit-logs", auditLogRoutes);
 app.use("/branch-codes", branchCodeRoutes);
 app.use("/institutions", institutionRoutes);
+app.use("/admin/email-composer", administrativeEmailRoutes);
 
 app.get("/", (req: Request, res: Response) => {
   res.json({

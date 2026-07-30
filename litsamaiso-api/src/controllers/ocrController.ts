@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import Tesseract from "tesseract.js";
-import { extractAccountCandidates, validateWithGemini } from "../services/geminiService.js";
+import { extractAccountCandidates } from "../services/geminiService.js";
 
 const BANK_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
   { name: "Standard Lesotho Bank", pattern: /\bstandard\s+lesotho\s+bank\b|\bstandard\s+bank\b|\bsbl\b|www\.standardbank\./i },
@@ -25,8 +25,7 @@ export const serverOcr = async (req: Request, res: Response) => {
     }
 
     const mimeType = file.mimetype || "image/jpeg";
-    const base64 = file.buffer.toString("base64");
-    const dataUrl = `data:${mimeType};base64,${base64}`;
+    const dataUrl = `data:${mimeType};base64,${file.buffer.toString("base64")}`;
 
     const result = await Tesseract.recognize(dataUrl, "eng", {
       tessedit_pageseg_mode: "6",
@@ -38,14 +37,7 @@ export const serverOcr = async (req: Request, res: Response) => {
     const candidates = extractAccountCandidates(ocrText);
     const detectedBank = extractBankName(ocrText);
 
-    let geminiValidation = null;
-    try {
-      geminiValidation = await validateWithGemini(base64, ocrText, candidates, detectedBank);
-    } catch (geminiErr) {
-      console.warn("Gemini validation unavailable (OCR text still returned):", geminiErr);
-    }
-
-    res.json({ ocrText, candidates, detectedBank, geminiValidation });
+    res.json({ ocrText, candidates, detectedBank });
   } catch (err: any) {
     console.error("Server OCR error:", err);
     res.status(500).json({ error: err?.message || "OCR failed" });

@@ -9,188 +9,74 @@ function getGenAI(): GoogleGenerativeAI {
   return genAI;
 }
 
-export interface ExtractionCandidate {
-  number: string;
-  confidence: number;
-  reason: string;
+export interface GeneratedAdministrativeEmail {
+  subject: string;
+  body: string;
 }
 
-export interface GeminiExtractionResult {
-  accountNumber: string | null;
-  bankName: string | null;
-  confidence: number; // 0-100
-  candidates: ExtractionCandidate[];
-  reasoning: string;
-  shouldPromptUser: boolean; // True if confidence 70-85%
-}
+export async function composeAdministrativeEmail(input: {
+  prompt: string;
+  tone: string;
+}): Promise<GeneratedAdministrativeEmail> {
+  const prompt = String(input.prompt || "").trim();
+  const tone = String(input.tone || "").trim();
 
-function validateSAAccountFormat(num: string): { valid: boolean; confidence: number; reason: string } {
-  if (!num || !/^[0-9]+$/.test(num)) {
-    return { valid: false, confidence: 0, reason: "Non-numeric" };
+  if (!prompt) {
+    throw new Error("Prompt is required");
+  }
+  if (!tone) {
+    throw new Error("Desired tone is required");
+  }
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
   }
 
-  const length = num.length;
-  let confidence = 100;
-  let reason = "";
+  const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+  const result = await model.generateContent(`You are the administrative writing assistant for Litsamaiso.
 
-  if (length === 11) {
-    reason = "Standard SA 11-digit format";
-    confidence = 100;
-  } else if (length >= 10 && length <= 13) {
-    reason = `Acceptable length (${length} digits, expected 11)`;
-    confidence = 85;
-  } else {
-    reason = `Invalid length: ${length} digits (expected 8-13)`;
-    confidence = 0;
-    return { valid: false, confidence, reason };
-  }
+Write clear administrative email copy for the Litsamaiso platform.
 
-  const knownBranchCodes = new Set([
-    "011", "250", "198", "008", "062", "051", "632", "633", "634",
-    "635", "636", "637", "638", "801", "802", "105", "106", "107", "108",
-  ]);
+Use this tone: ${tone}
 
-  const firstThree = num.substring(0, 3);
-  if (knownBranchCodes.has(firstThree)) {
-    confidence = Math.min(100, confidence + 15);
-    reason += " with recognized branch code";
-  }
+Administrator prompt:
+${prompt}
 
-  if (/(\d)\1{5,}/.test(num)) {
-    confidence = Math.max(0, confidence - 40);
-    reason += " - WARNING: repeating sequence detected";
-    return { valid: false, confidence, reason };
-  }
-
-  return { valid: confidence >= 70, confidence, reason };
-}
-
-export async function validateWithGemini(
-  imageBase64: string,
-  ocrExtractedText: string,
-  candidates: string[],
-  bankName: string | null,
-): Promise<GeminiExtractionResult> {
-  try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-
-    const candidatesInfo = candidates
-      .slice(0, 10)
-      .map((c) => {
-        const validation = validateSAAccountFormat(c);
-        return `- ${c} (${c.length} digits, SA validation: ${validation.reason})`;
-      })
-      .join("\n");
-
-    const prompt = `You are a financial document analysis expert. Analyze this bank statement to identify the account number and bank name.
-
-## Task
-Extract the account number and bank name from the bank statement. Use these guidelines:
-- South African account numbers are typically 11 digits
-- Format: 3-digit branch code + 8-digit account number
-- Bank name appears in the header/logo area (e.g. FNB, Standard Bank, ABSA, Nedbank, Standard Lesotho Bank, Lesotho Post Bank)
-- Account number labels may appear as: "Account No.", "A/c", "Smart Account", "My Account", "Account #"
-
-## OCR Extracted Text:
-${ocrExtractedText}
-
-## Detected Bank (from OCR):
-${bankName || "Unknown — verify from the image"}
-
-## Candidate Numbers (extracted from OCR):
-${candidatesInfo}
-
-## Your Response (JSON format):
+Return only valid JSON in this exact shape:
 {
-  "accountNumber": "the most likely account number or null",
-  "bankName": "the bank name as it appears on the statement or null",
-  "confidence": 0-100,
-  "selectedCandidateReason": "why you chose this candidate or why you extracted fresh",
-  "allCandidatesRanked": [
-    {"number": "candidate1", "confidence": 95, "reason": "matches SA format with known branch code"},
-    {"number": "candidate2", "confidence": 70, "reason": "valid length but no known branch code"}
-  ],
-  "reasoning": "detailed explanation of your analysis"
+  "subject": "short, specific subject line",
+  "body": "complete email body as plain text with paragraph breaks"
 }
 
-## Important:
-- Only return valid JSON
-- Confidence should reflect how sure you are this is the account number
-- If no candidates match SA format, extract the most likely number from the image directly
-- Return null for accountNumber if completely unable to determine
-- Validate against SA banking standards: 11-digit format, known branch codes
-- Identify the bank name from the image even if OCR text was unclear`;
+Guidelines:
+- Generate only the email content. Do not include branding, layout, HTML, or template wrappers.
+- Do not invent recipient names, dates, amounts, or private details not supplied in the prompt.
+- Keep the body complete and ready to send.
+- Sign off as the Litsamaiso Team unless the prompt explicitly says otherwise.`);
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: imageBase64,
-          mimeType: "image/jpeg",
-        },
-      },
-      prompt,
-    ] as any);
-
-    const responseText = result.response.text();
-
-    let parsedResponse: any;
-    try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No JSON found in response");
-      }
-      parsedResponse = JSON.parse(jsonMatch[0]);
-    } catch (parseErr) {
-      console.error("Failed to parse Gemini response:", responseText);
-      const validatedCandidates = candidates
-        .map((c) => {
-          const validation = validateSAAccountFormat(c);
-          return {
-            number: c,
-            confidence: validation.confidence,
-            reason: validation.reason,
-          };
-        })
-        .filter((x) => x.confidence > 0)
-        .sort((a, b) => b.confidence - a.confidence);
-
-      return {
-        accountNumber: validatedCandidates[0]?.number || null,
-        bankName,
-        confidence: validatedCandidates[0]?.confidence || 0,
-        candidates: validatedCandidates.slice(0, 3),
-        reasoning: "Fallback to local validation (Gemini parse failed)",
-        shouldPromptUser: (validatedCandidates[0]?.confidence || 0) < 85,
-      };
-    }
-
-    const geminiBankName = parsedResponse.bankName || bankName;
-
-    let finalConfidence = parsedResponse.confidence || 0;
-    if (parsedResponse.accountNumber) {
-      const validation = validateSAAccountFormat(parsedResponse.accountNumber);
-      finalConfidence = (finalConfidence + validation.confidence) / 2;
-    }
-
-    return {
-      accountNumber: parsedResponse.accountNumber || null,
-      bankName: geminiBankName,
-      confidence: Math.round(finalConfidence),
-      candidates: (parsedResponse.allCandidatesRanked || [])
-        .slice(0, 3)
-        .map((c: any) => ({
-          number: c.number,
-          confidence: c.confidence,
-          reason: c.reason,
-        })),
-      reasoning: parsedResponse.reasoning || "Unable to provide detailed reasoning",
-      shouldPromptUser: finalConfidence >= 70 && finalConfidence < 85,
-    };
-  } catch (error) {
-    console.error("Gemini extraction error:", error);
-    throw error;
+  const responseText = result.response.text();
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Gemini did not return a valid email draft");
   }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    throw new Error("Gemini returned an invalid email draft format");
+  }
+
+  const draft = parsed as Partial<GeneratedAdministrativeEmail>;
+  const subject = String(draft.subject || "").trim();
+  const body = String(draft.body || "").trim();
+
+  if (!subject || !body) {
+    throw new Error("Gemini returned an incomplete email draft");
+  }
+
+  return { subject, body };
 }
+
 export function extractAccountCandidates(text: string): string[] {
   const normalized = text.replace(/[^\x20-\x7E\n]/g, " ");
 
@@ -214,7 +100,6 @@ export function extractAccountCandidates(text: string): string[] {
 
   for (const pattern of labelPatterns) {
     let match;
-    // eslint-disable-next-line no-cond-assign
     while ((match = pattern.exec(normalized)) !== null) {
       let num = match[1]?.replace(/[\s-]/g, "") || "";
       num = correctOcrArtifacts(num);
@@ -225,11 +110,13 @@ export function extractAccountCandidates(text: string): string[] {
     }
   }
 
-  const lines = normalized.split(/\r?\n/).slice(0, Math.ceil(normalized.split(/\r?\n/).length * 0.25));
-  const headerText = lines.join(" ");
+  const normalizedLines = normalized.split(/\r?\n/);
+  const headerText = normalizedLines
+    .slice(0, Math.ceil(normalizedLines.length * 0.25))
+    .join(" ");
 
   const allNumbers = Array.from(headerText.matchAll(/\b(\d{8,13})\b/g))
-    .map((m) => m[1] || "")
+    .map((match) => match[1] || "")
     .map((num) => correctOcrArtifacts(num))
     .filter((num) => /^\d+$/.test(num));
 
@@ -238,7 +125,7 @@ export function extractAccountCandidates(text: string): string[] {
   }
 
   const allDocNumbers = Array.from(normalized.matchAll(/\b(\d{10,13})\b/g))
-    .map((m) => m[1] || "")
+    .map((match) => match[1] || "")
     .map((num) => correctOcrArtifacts(num))
     .filter((num) => /^\d+$/.test(num) && !/(\d)\1{5,}/.test(num));
 
