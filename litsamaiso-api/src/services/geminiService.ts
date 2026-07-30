@@ -14,10 +14,129 @@ export interface GeneratedAdministrativeEmail {
   body: string;
 }
 
-export async function composeAdministrativeEmail(input: {
+export interface AdministrativeEmailRecipientSelection {
+  role: string;
+  financialStatus?: string | undefined;
+  batchNumber?: number | undefined;
+}
+
+export interface AdministrativeEmailComposerInput {
   prompt: string;
   tone: string;
-}): Promise<GeneratedAdministrativeEmail> {
+  recipientSelection?: AdministrativeEmailRecipientSelection;
+}
+
+export interface AdministrativeEmailRequest {
+  systemInstruction: string;
+  userContent: string;
+}
+
+const LITSAMAISO_SYSTEM_INSTRUCTION = `You are an AI writing assistant for Litsamaiso, Botho University's student self-service platform.
+
+Your responsibility is to write professional administrative emails on behalf of university staff.
+
+About Litsamaiso:
+Litsamaiso helps students complete administrative processes online.
+One of its primary functions is the Financial Clearance process.
+Students are not registering for Litsamaiso when they receive these emails.
+
+When the administrator refers to "confirming an account", it means confirming the bank account details that will receive the student's financial clearance reimbursement. It does not mean registering, signing up, activating an account, creating a profile, or onboarding.
+
+Financial Clearance Statuses:
+When recipient filters indicate Pending, the student has not yet confirmed their bank account.
+When recipient filters indicate Confirmed, the student has confirmed their bank account and is awaiting payment processing.
+When recipient filters indicate Paid, the student's reimbursement has already been processed.
+These definitions should always be used when generating emails.
+
+Writing Rules:
+- Write clearly and professionally.
+- Write as university administration.
+- Use the provided recipient context.
+- Generate only a subject and body.
+- Assume the generated content will be inserted into an existing branded email template.
+- Never welcome students unless explicitly instructed.
+- Never congratulate students unless explicitly instructed.
+- Never talk about registration.
+- Never talk about creating an account.
+- Never talk about onboarding.
+- Never invent policies.
+- Never invent deadlines.
+- Never invent recipient information.
+- Never invent facts that were not provided.
+- If information is missing, write only from the available context instead of making assumptions.
+
+Return only valid JSON in this exact shape:
+{
+  "subject": "short, specific subject line",
+  "body": "complete email body as plain text with paragraph breaks"
+}
+
+Few-shot examples:
+Example 1
+Administrator Instruction:
+Inform pending students to confirm their bank accounts before the end of today.
+Expected Output:
+{
+  "subject": "Reminder: Confirm Your Bank Account Today",
+  "body": "Dear Student,\n\nOur records indicate that you have not yet confirmed the bank account associated with your financial clearance.\n\nPlease log in to Litsamaiso and complete your bank account confirmation before the end of today to avoid delays in processing your financial clearance.\n\nThank you for your prompt attention to this matter.\n\nKind regards,\n\nBotho University Administration"
+}
+
+Example 2
+Administrator Instruction:
+Inform paid Batch 2 students that reimbursement has been processed.
+Expected Output:
+{
+  "subject": "Your Financial Clearance Payment Has Been Processed",
+  "body": "Dear Student,\n\nWe are pleased to inform you that your Batch 2 financial clearance reimbursement has been processed.\n\nDepending on your bank, the funds may take a short period to reflect in your account.\n\nIf you experience any issues, please contact the Finance Office for assistance.\n\nKind regards,\n\nBotho University Administration"
+}`;
+
+function formatFinancialStatus(status?: string): string {
+  if (!status) return "Not specified";
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "pending") return "Pending";
+  if (normalized === "confirmed") return "Confirmed";
+  if (normalized === "paid") return "Paid";
+  return status;
+}
+
+export function buildAdministrativeEmailRequest(
+  input: AdministrativeEmailComposerInput,
+): AdministrativeEmailRequest {
+  const prompt = String(input.prompt || "").trim();
+  const tone = String(input.tone || "Professional").trim();
+  const recipientSelection = input.recipientSelection;
+  const role = recipientSelection?.role?.trim() || "Not specified";
+  const financialStatus = formatFinancialStatus(recipientSelection?.financialStatus);
+  const batch = recipientSelection?.batchNumber
+    ? `Batch ${recipientSelection.batchNumber}`
+    : "All";
+
+  const userContent = [
+    "Recipient Role:",
+    role,
+    "",
+    "Financial Clearance Status:",
+    financialStatus,
+    "",
+    "Batch:",
+    batch,
+    "",
+    "Desired Tone:",
+    tone,
+    "",
+    "Administrator Instruction:",
+    prompt || "No specific instruction provided.",
+  ].join("\n");
+
+  return {
+    systemInstruction: LITSAMAISO_SYSTEM_INSTRUCTION,
+    userContent,
+  };
+}
+
+export async function composeAdministrativeEmail(
+  input: AdministrativeEmailComposerInput,
+): Promise<GeneratedAdministrativeEmail> {
   const prompt = String(input.prompt || "").trim();
   const tone = String(input.tone || "").trim();
 
@@ -31,27 +150,12 @@ export async function composeAdministrativeEmail(input: {
     throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
   }
 
-  const model = getGenAI().getGenerativeModel({ model: "gemini-3.5-flash" });
-  const result = await model.generateContent(`You are the administrative writing assistant for Litsamaiso.
-
-Write clear administrative email copy for the Litsamaiso platform.
-
-Use this tone: ${tone}
-
-Administrator prompt:
-${prompt}
-
-Return only valid JSON in this exact shape:
-{
-  "subject": "short, specific subject line",
-  "body": "complete email body as plain text with paragraph breaks"
-}
-
-Guidelines:
-- Generate only the email content. Do not include branding, layout, HTML, or template wrappers.
-- Do not invent recipient names, dates, amounts, or private details not supplied in the prompt.
-- Keep the body complete and ready to send.
-- Sign off as the Litsamaiso Team unless the prompt explicitly says otherwise.`);
+  const request = buildAdministrativeEmailRequest(input);
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3.1-flash-lite",
+    systemInstruction: request.systemInstruction,
+  });
+  const result = await model.generateContent(request.userContent);
 
   const responseText = result.response.text();
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);

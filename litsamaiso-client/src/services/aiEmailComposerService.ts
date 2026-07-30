@@ -34,7 +34,11 @@ export const aiEmailComposerService = {
     return response.data.count;
   },
 
-  generateEmail: async (input: { prompt: string; tone: string }) => {
+  generateEmail: async (input: {
+    prompt: string;
+    tone: string;
+    recipientSelection?: EmailRecipientSelection;
+  }) => {
     const response = await apiClient.post<{ draft: GeneratedEmailDraft }>(
       '/admin/email-composer/generate',
       input,

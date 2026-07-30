@@ -58,13 +58,20 @@ export const generateEmail = async (req: Request, res: Response) => {
   try {
     const prompt = String(req.body?.prompt || "").trim();
     const tone = String(req.body?.tone || "").trim();
+    const recipientSelection = parseSelection(
+      req.body?.recipientSelection || req.body?.recipients || req.body || {},
+    );
 
     if (!prompt || !tone) {
       res.status(400).json({ message: "Prompt and desired tone are required" });
       return;
     }
 
-    const draft = await composeAdministrativeEmail({ prompt, tone });
+    const draft = await composeAdministrativeEmail({
+      prompt,
+      tone,
+      recipientSelection,
+    });
     res.json({ draft });
   } catch (error: any) {
     console.error("[administrativeEmail.generate] Error:", error);

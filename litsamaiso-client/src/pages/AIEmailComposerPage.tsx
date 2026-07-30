@@ -185,6 +185,7 @@ const AIEmailComposerPage: React.FC = () => {
       const draft = await aiEmailComposerService.generateEmail({
         prompt,
         tone,
+        recipientSelection: selection,
       });
       setSubject(draft.subject);
       setBody(draft.body);
