@@ -11,6 +11,7 @@ export interface UserDocument {
   studentCardUrl?: string;
   faceDescriptor: number[];
   faceImageUrl?: string;
+  financialInfoConsentAt?: Date;
   passwordResetTokenHash?: string;
   passwordResetTokenExpiresAt?: Date;
 }
@@ -31,6 +32,7 @@ const userSchema = new Schema<UserDocument>(
     studentCardUrl: { type: String, trim: true },
     faceDescriptor: { type: [Number], default: [] },
     faceImageUrl: { type: String, trim: true },
+    financialInfoConsentAt: { type: Date },
     passwordResetTokenHash: { type: String, select: false },
     passwordResetTokenExpiresAt: { type: Date, select: false },
   },

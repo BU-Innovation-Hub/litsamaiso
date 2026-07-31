@@ -56,6 +56,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     faceImageBase64,
     faceDescriptor,
     faceImageUrl,
+    financialInfoConsent,
   } = req.body as {
     email?: string;
     password?: string;
@@ -68,6 +69,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     faceImageBase64?: string;
     faceDescriptor?: number[];
     faceImageUrl?: string;
+    financialInfoConsent?: boolean;
   };
 
   const normalizedEmail =
@@ -79,6 +81,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   if (!normalizedEmail || !password || !role) {
     res.status(400).json({ message: getFriendlyRegistrationErrorMessage("missingFields") });
+    return;
+  }
+
+  if (financialInfoConsent !== true) {
+    res.status(400).json({ message: getFriendlyRegistrationErrorMessage("consentRequired") });
     return;
   }
 
@@ -215,11 +222,13 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     studentCardUrl?: string;
     faceDescriptor?: number[];
     faceImageUrl?: string;
+    financialInfoConsentAt?: Date;
   } = {
     email: normalizedEmail,
     password: hashedPassword,
     role: roleDoc._id,
     institution: institution._id,
+    financialInfoConsentAt: new Date(),
   };
 
   if (studentId) {
@@ -310,6 +319,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       studentCardUrl: user.studentCardUrl,
       faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,
+      financialInfoConsentAt: user.financialInfoConsentAt,
     },
   });
 };

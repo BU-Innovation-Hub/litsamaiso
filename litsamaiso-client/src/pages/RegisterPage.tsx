@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
@@ -15,6 +15,30 @@ const RegisterPage: React.FC = () => {
     confirmPassword: '',
     studentId: '',
   });
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const consentModalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showConsentModal) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowConsentModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showConsentModal]);
+
+  useEffect(() => {
+    if (showConsentModal) {
+      consentModalRef.current?.focus();
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [showConsentModal]);
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -36,12 +60,25 @@ const RegisterPage: React.FC = () => {
       return;
     }
 
+    setConsentChecked(false);
+    setShowConsentModal(true);
+  };
+
+  const handleConsentSubmit = async () => {
+    if (!consentChecked) {
+      toast.error('Please confirm you have read the financial information consent.');
+      return;
+    }
+
+    setShowConsentModal(false);
+
     try {
       await register({
         email: formData.email,
         password: formData.password,
         role,
         studentId: formData.studentId || undefined,
+        financialInfoConsent: true,
       });
 
       toast.success('Account created successfully! Please sign in.');
@@ -151,6 +188,82 @@ const RegisterPage: React.FC = () => {
               </button>
             )}
           </form>
+
+          {showConsentModal && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="financial-consent-title"
+              onClick={(event) => {
+                if (event.target === event.currentTarget) {
+                  setShowConsentModal(false);
+                }
+              }}
+            >
+              <div
+                ref={consentModalRef}
+                tabIndex={-1}
+                className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl outline-none"
+              >
+                <h2
+                  id="financial-consent-title"
+                  className="text-lg font-semibold text-gray-900"
+                >
+                  Financial Information Consent
+                </h2>
+
+                <div className="mt-4 space-y-3 text-sm text-gray-600">
+                  <p>By continuing, I confirm that:</p>
+                  <ul className="list-disc space-y-2 pl-5">
+                    <li>
+                      The financial information I provide to Litsamaiso is true,
+                      complete, and accurate to the best of my knowledge.
+                    </li>
+                    <li>
+                      This information will be used by Litsamaiso in partnership
+                      with my Institution to assess and manage my student account.
+                    </li>
+                    <li>
+                      Submitting false or misleading information may delay,
+                      restrict, or invalidate my registration.
+                    </li>
+                  </ul>
+                </div>
+
+                <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-md border border-gray-300 bg-gray-50 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={consentChecked}
+                    onChange={(event) => setConsentChecked(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 accent-primary-clr"
+                  />
+                  <span className="text-sm font-medium text-gray-800">
+                    I have read and agree to provide true and accurate financial
+                    information.
+                  </span>
+                </label>
+
+                <div className="mt-6 flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowConsentModal(false)}
+                    className="rounded-md border border-gray-300 px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConsentSubmit}
+                    disabled={isLoading}
+                    className="rounded-md bg-button px-4 py-2 font-semibold text-white transition-colors hover:bg-active disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isLoading ? 'Creating Account...' : 'I Agree & Continue'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <p className="mt-4 text-center text-sm">
             Already have an account?{' '}
