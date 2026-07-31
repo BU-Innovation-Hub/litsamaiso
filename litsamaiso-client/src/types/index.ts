@@ -41,6 +41,15 @@ export interface AuthResponse {
   user: User;
 }
 
+export interface FeedbackSubmission {
+  rating: number;
+  comment?: string;
+}
+
+export interface FeedbackStatusResponse {
+  hasSubmittedFeedback: boolean;
+}
+
 export interface LoginRequest {
   email: string;
   studentId?: string;

@@ -1,14 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { getRoleName, getUserInitials } from '../utils/userDisplay';
 import { getVisibleNavItems, isNavItemActive } from '../navigation';
+import { feedbackService } from '../services/feedbackService';
+import { LogoutFeedbackModal } from './LogoutFeedbackModal';
 
 export const Header: React.FC = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const roleName = getRoleName(user);
   const username = user?.name || user?.email?.split('@')[0] || 'User';
@@ -35,10 +40,39 @@ export const Header: React.FC = () => {
     };
   }, [isMenuOpen]);
 
-  const handleLogout = async () => {
-    setIsMenuOpen(false);
+  const completeLogout = async () => {
+    setShowFeedbackModal(false);
     await logout();
     navigate('/login');
+  };
+
+  const handleLogout = async () => {
+    setIsMenuOpen(false);
+
+    try {
+      const { hasSubmittedFeedback } = await feedbackService.getStatus();
+      if (hasSubmittedFeedback) {
+        await completeLogout();
+        return;
+      }
+
+      setShowFeedbackModal(true);
+    } catch {
+      await completeLogout();
+    }
+  };
+
+  const handleFeedbackSubmit = async (rating: number, comment: string) => {
+    setIsSubmittingFeedback(true);
+    try {
+      await feedbackService.submit({ rating, comment });
+      await completeLogout();
+    } catch (error) {
+      toast.error('Unable to submit feedback right now. Please try again.');
+      console.error('Failed to submit feedback during logout', error);
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
   const closeMobileMenu = () => {
@@ -128,6 +162,15 @@ export const Header: React.FC = () => {
           </div>
         </div>
       </header>
+      <LogoutFeedbackModal
+        isOpen={showFeedbackModal}
+        isSubmitting={isSubmittingFeedback}
+        onClose={async () => {
+          setShowFeedbackModal(false);
+          await completeLogout();
+        }}
+        onSubmit={handleFeedbackSubmit}
+      />
     </div>
   );
 };

@@ -310,6 +310,13 @@ const AccountConfirmationPage: React.FC = () => {
           const data = resp.data;
           toast.success(data.message || 'Account confirmed');
           setIsConfirmed(true);
+          window.setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('litsamaiso:feedback-prompt', {
+                detail: { reason: 'confirmation' },
+              })
+            );
+          }, 5000);
         } catch (err: unknown) {
           if (!handleConfirmationError(err)) {
             toast.error(getApiErrorMessage(err, 'Account confirmation failed'));
@@ -319,6 +326,13 @@ const AccountConfirmationPage: React.FC = () => {
         const response = await accountService.confirmAccount(normalizedFormData);
         toast.success(response.message || 'Account confirmed');
         setIsConfirmed(true);
+        window.setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent('litsamaiso:feedback-prompt', {
+              detail: { reason: 'confirmation' },
+            })
+          );
+        }, 1500);
       }
     } catch (error: unknown) {
       if (!handleConfirmationError(error)) {
