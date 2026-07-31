@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut, Menu, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { getInstitutionName, getRoleName, getUserInitials } from '../utils/userDisplay';
 import { getVisibleNavItems, isNavItemActive } from '../navigation';
+import { feedbackService } from '../services/feedbackService';
+import { LogoutFeedbackModal } from './LogoutFeedbackModal';
 
 const sidebarWidth = 'lg:w-72';
 
@@ -12,14 +15,44 @@ export const DashboardSidebar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const roleName = getRoleName(user);
   const institutionName = getInstitutionName(user);
   const username = user?.name || user?.email?.split('@')[0] || 'User';
   const visibleNavItems = getVisibleNavItems(roleName);
 
-  const handleLogout = async () => {
+  const completeLogout = async () => {
+    setShowFeedbackModal(false);
     await logout();
     navigate('/login');
+  };
+
+  const handleLogout = async () => {
+    try {
+      const { hasSubmittedFeedback } = await feedbackService.getStatus();
+      if (hasSubmittedFeedback) {
+        await completeLogout();
+        return;
+      }
+
+      setShowFeedbackModal(true);
+    } catch {
+      await completeLogout();
+    }
+  };
+
+  const handleFeedbackSubmit = async (rating: number, comment: string) => {
+    setIsSubmittingFeedback(true);
+    try {
+      await feedbackService.submit({ rating, comment });
+      await completeLogout();
+    } catch (error) {
+      toast.error('Unable to submit feedback right now. Please try again.');
+      console.error('Failed to submit feedback during logout', error);
+    } finally {
+      setIsSubmittingFeedback(false);
+    }
   };
 
   const nav = (
@@ -118,6 +151,15 @@ export const DashboardSidebar: React.FC = () => {
       <aside className={`fixed inset-y-0 left-0 z-40 hidden border-r border-slate-200 ${sidebarWidth} lg:block`}>
         {sidebarContent}
       </aside>
+      <LogoutFeedbackModal
+        isOpen={showFeedbackModal}
+        isSubmitting={isSubmittingFeedback}
+        onClose={async () => {
+          setShowFeedbackModal(false);
+          await completeLogout();
+        }}
+        onSubmit={handleFeedbackSubmit}
+      />
 
       {isOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">

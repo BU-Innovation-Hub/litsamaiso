@@ -2,8 +2,42 @@ import type { Request, Response } from "express";
 import { Feedback } from "../models/Feedback.js";
 import { recordAudit } from "../utils/auditLog.js";
 
+export const getFeedbackStatus = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    if (!user?._id) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const hasSubmittedFeedback = Boolean(
+      await Feedback.exists({ user: user._id }),
+    );
+
+    res.json({ hasSubmittedFeedback });
+  } catch (err: any) {
+    await recordAudit({
+      action: "feedback.status.failed",
+      details: { error: err.message || String(err) },
+    });
+    res.status(500).json({ message: err.message || String(err) });
+  }
+};
+
 export const submitFeedback = async (req: Request, res: Response) => {
   try {
+    const user = (req as any).user;
+    if (!user?._id) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    const existingFeedback = await Feedback.findOne({ user: user._id }).lean();
+    if (existingFeedback) {
+      res.status(409).json({ message: "Feedback already submitted" });
+      return;
+    }
+
     const body = (req.body || {}) as { rating?: number; comment?: string };
     const rating = Number(body.rating || 0);
     const comment = body.comment ? String(body.comment).trim() : undefined;
@@ -13,7 +47,7 @@ export const submitFeedback = async (req: Request, res: Response) => {
       return;
     }
 
-    const payload: any = { rating };
+    const payload: any = { user: user._id, rating };
     if (comment !== undefined) payload.comment = comment;
 
     const feedbackDoc = new Feedback(payload);
@@ -21,6 +55,9 @@ export const submitFeedback = async (req: Request, res: Response) => {
 
     await recordAudit({
       action: "feedback.submit",
+      actorId: user._id?.toString(),
+      actorEmail: user.email,
+      actorRole: (user.role && (user.role as any).name) || undefined,
       targetCollection: "Feedback",
       targetId: feedbackDoc._id?.toString(),
       details: { rating, comment },
