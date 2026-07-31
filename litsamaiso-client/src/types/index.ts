@@ -11,6 +11,7 @@ export interface User {
   studentCardUrl?: string;
   faceDescriptor?: number[];
   faceImageUrl?: string;
+  financialInfoConsentAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -58,6 +59,7 @@ export interface RegisterRequest {
   faceImageBase64?: string;
   faceDescriptor?: number[];
   faceImageUrl?: string;
+  financialInfoConsent?: boolean;
 }
 
 // Election Types
