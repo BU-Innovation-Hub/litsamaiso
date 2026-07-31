@@ -103,7 +103,7 @@ const AccountConfirmationPage: React.FC = () => {
     borrowerNumber: user?.borrowerNumber || '',
     bankName: '',
     accountNumber: '',
-    graduating: false,
+    graduating: null as boolean | null,
   });
 
   // Confidence score is intentionally hidden from students (UX requirement).
@@ -270,10 +270,16 @@ const AccountConfirmationPage: React.FC = () => {
     const normalizedFormData = {
       ...formData,
       bankName: normalizedBankName,
+      graduating: formData.graduating === true,
     };
 
     if (!normalizedBankName || !formData.accountNumber.trim()) {
       toast.error('Bank name and account number are required');
+      return;
+    }
+
+    if (formData.graduating === null) {
+      toast.error('Please indicate whether you are completing this academic year');
       return;
     }
 
@@ -529,16 +535,35 @@ const AccountConfirmationPage: React.FC = () => {
                   />
                 </div>
 
-                <label className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    name="graduating"
-                    checked={formData.graduating}
-                    onChange={handleChange}
-                    className="h-4 w-4"
-                  />
-                  I am graduating this academic year
-                </label>
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">Are you completing this academic year?</label>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <input
+                        type="radio"
+                        name="graduating"
+                        value="yes"
+                        checked={formData.graduating === true}
+                        onChange={() => setFormData((prev) => ({ ...prev, graduating: true }))}
+                        required
+                        className="h-4 w-4"
+                      />
+                      Yes
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <input
+                        type="radio"
+                        name="graduating"
+                        value="no"
+                        checked={formData.graduating === false}
+                        onChange={() => setFormData((prev) => ({ ...prev, graduating: false }))}
+                        required
+                        className="h-4 w-4"
+                      />
+                      No
+                    </label>
+                  </div>
+                </div>
 
                 <button
                   type="submit"
