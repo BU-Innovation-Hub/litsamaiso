@@ -9,188 +9,178 @@ function getGenAI(): GoogleGenerativeAI {
   return genAI;
 }
 
-export interface ExtractionCandidate {
-  number: string;
-  confidence: number;
-  reason: string;
+export interface GeneratedAdministrativeEmail {
+  subject: string;
+  body: string;
 }
 
-export interface GeminiExtractionResult {
-  accountNumber: string | null;
-  bankName: string | null;
-  confidence: number; // 0-100
-  candidates: ExtractionCandidate[];
-  reasoning: string;
-  shouldPromptUser: boolean; // True if confidence 70-85%
+export interface AdministrativeEmailRecipientSelection {
+  role: string;
+  financialStatus?: string | undefined;
+  batchNumber?: number | undefined;
 }
 
-function validateSAAccountFormat(num: string): { valid: boolean; confidence: number; reason: string } {
-  if (!num || !/^[0-9]+$/.test(num)) {
-    return { valid: false, confidence: 0, reason: "Non-numeric" };
-  }
-
-  const length = num.length;
-  let confidence = 100;
-  let reason = "";
-
-  if (length === 11) {
-    reason = "Standard SA 11-digit format";
-    confidence = 100;
-  } else if (length >= 10 && length <= 13) {
-    reason = `Acceptable length (${length} digits, expected 11)`;
-    confidence = 85;
-  } else {
-    reason = `Invalid length: ${length} digits (expected 8-13)`;
-    confidence = 0;
-    return { valid: false, confidence, reason };
-  }
-
-  const knownBranchCodes = new Set([
-    "011", "250", "198", "008", "062", "051", "632", "633", "634",
-    "635", "636", "637", "638", "801", "802", "105", "106", "107", "108",
-  ]);
-
-  const firstThree = num.substring(0, 3);
-  if (knownBranchCodes.has(firstThree)) {
-    confidence = Math.min(100, confidence + 15);
-    reason += " with recognized branch code";
-  }
-
-  if (/(\d)\1{5,}/.test(num)) {
-    confidence = Math.max(0, confidence - 40);
-    reason += " - WARNING: repeating sequence detected";
-    return { valid: false, confidence, reason };
-  }
-
-  return { valid: confidence >= 70, confidence, reason };
+export interface AdministrativeEmailComposerInput {
+  prompt: string;
+  tone: string;
+  recipientSelection?: AdministrativeEmailRecipientSelection;
 }
 
-export async function validateWithGemini(
-  imageBase64: string,
-  ocrExtractedText: string,
-  candidates: string[],
-  bankName: string | null,
-): Promise<GeminiExtractionResult> {
-  try {
-    const model = getGenAI().getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+export interface AdministrativeEmailRequest {
+  systemInstruction: string;
+  userContent: string;
+}
 
-    const candidatesInfo = candidates
-      .slice(0, 10)
-      .map((c) => {
-        const validation = validateSAAccountFormat(c);
-        return `- ${c} (${c.length} digits, SA validation: ${validation.reason})`;
-      })
-      .join("\n");
+const LITSAMAISO_SYSTEM_INSTRUCTION = `You are an AI writing assistant for Litsamaiso, Botho University's student self-service platform.
 
-    const prompt = `You are a financial document analysis expert. Analyze this bank statement to identify the account number and bank name.
+Your responsibility is to write professional administrative emails on behalf of university staff.
 
-## Task
-Extract the account number and bank name from the bank statement. Use these guidelines:
-- South African account numbers are typically 11 digits
-- Format: 3-digit branch code + 8-digit account number
-- Bank name appears in the header/logo area (e.g. FNB, Standard Bank, ABSA, Nedbank, Standard Lesotho Bank, Lesotho Post Bank)
-- Account number labels may appear as: "Account No.", "A/c", "Smart Account", "My Account", "Account #"
+About Litsamaiso:
+Litsamaiso helps students complete administrative processes online.
+One of its primary functions is the Financial Clearance process.
+Students are not registering for Litsamaiso when they receive these emails.
 
-## OCR Extracted Text:
-${ocrExtractedText}
+When the administrator refers to "confirming an account", it means confirming the bank account details that will receive the student's financial clearance reimbursement. It does not mean registering, signing up, activating an account, creating a profile, or onboarding.
 
-## Detected Bank (from OCR):
-${bankName || "Unknown — verify from the image"}
+Financial Clearance Statuses:
+When recipient filters indicate Pending, the student has not yet confirmed their bank account.
+When recipient filters indicate Confirmed, the student has confirmed their bank account and is awaiting payment processing.
+When recipient filters indicate Paid, the student's reimbursement has already been processed.
+These definitions should always be used when generating emails.
 
-## Candidate Numbers (extracted from OCR):
-${candidatesInfo}
+Writing Rules:
+- Write clearly and professionally.
+- Write as university administration.
+- Use the provided recipient context.
+- Generate only a subject and body.
+- Assume the generated content will be inserted into an existing branded email template.
+- Never welcome students unless explicitly instructed.
+- Never congratulate students unless explicitly instructed.
+- Never talk about registration.
+- Never talk about creating an account.
+- Never talk about onboarding.
+- Never invent policies.
+- Never invent deadlines.
+- Never invent recipient information.
+- Never invent facts that were not provided.
+- If information is missing, write only from the available context instead of making assumptions.
 
-## Your Response (JSON format):
+Return only valid JSON in this exact shape:
 {
-  "accountNumber": "the most likely account number or null",
-  "bankName": "the bank name as it appears on the statement or null",
-  "confidence": 0-100,
-  "selectedCandidateReason": "why you chose this candidate or why you extracted fresh",
-  "allCandidatesRanked": [
-    {"number": "candidate1", "confidence": 95, "reason": "matches SA format with known branch code"},
-    {"number": "candidate2", "confidence": 70, "reason": "valid length but no known branch code"}
-  ],
-  "reasoning": "detailed explanation of your analysis"
+  "subject": "short, specific subject line",
+  "body": "complete email body as plain text with paragraph breaks"
 }
 
-## Important:
-- Only return valid JSON
-- Confidence should reflect how sure you are this is the account number
-- If no candidates match SA format, extract the most likely number from the image directly
-- Return null for accountNumber if completely unable to determine
-- Validate against SA banking standards: 11-digit format, known branch codes
-- Identify the bank name from the image even if OCR text was unclear`;
+Few-shot examples:
+Example 1
+Administrator Instruction:
+Inform pending students to confirm their bank accounts before the end of today.
+Expected Output:
+{
+  "subject": "Reminder: Confirm Your Bank Account Today",
+  "body": "Dear Student,\n\nOur records indicate that you have not yet confirmed the bank account associated with your financial clearance.\n\nPlease log in to Litsamaiso and complete your bank account confirmation before the end of today to avoid delays in processing your financial clearance.\n\nThank you for your prompt attention to this matter.\n\nKind regards,\n\nBotho University Administration"
+}
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: imageBase64,
-          mimeType: "image/jpeg",
-        },
-      },
-      prompt,
-    ] as any);
+Example 2
+Administrator Instruction:
+Inform paid Batch 2 students that reimbursement has been processed.
+Expected Output:
+{
+  "subject": "Your Financial Clearance Payment Has Been Processed",
+  "body": "Dear Student,\n\nWe are pleased to inform you that your Batch 2 financial clearance reimbursement has been processed.\n\nDepending on your bank, the funds may take a short period to reflect in your account.\n\nIf you experience any issues, please contact the Finance Office for assistance.\n\nKind regards,\n\nBotho University Administration"
+}`;
 
-    const responseText = result.response.text();
+function formatFinancialStatus(status?: string): string {
+  if (!status) return "Not specified";
+  const normalized = status.trim().toLowerCase();
+  if (normalized === "pending") return "Pending";
+  if (normalized === "confirmed") return "Confirmed";
+  if (normalized === "paid") return "Paid";
+  return status;
+}
 
-    let parsedResponse: any;
-    try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("No JSON found in response");
-      }
-      parsedResponse = JSON.parse(jsonMatch[0]);
-    } catch (parseErr) {
-      console.error("Failed to parse Gemini response:", responseText);
-      const validatedCandidates = candidates
-        .map((c) => {
-          const validation = validateSAAccountFormat(c);
-          return {
-            number: c,
-            confidence: validation.confidence,
-            reason: validation.reason,
-          };
-        })
-        .filter((x) => x.confidence > 0)
-        .sort((a, b) => b.confidence - a.confidence);
+export function buildAdministrativeEmailRequest(
+  input: AdministrativeEmailComposerInput,
+): AdministrativeEmailRequest {
+  const prompt = String(input.prompt || "").trim();
+  const tone = String(input.tone || "Professional").trim();
+  const recipientSelection = input.recipientSelection;
+  const role = recipientSelection?.role?.trim() || "Not specified";
+  const financialStatus = formatFinancialStatus(recipientSelection?.financialStatus);
+  const batch = recipientSelection?.batchNumber
+    ? `Batch ${recipientSelection.batchNumber}`
+    : "All";
 
-      return {
-        accountNumber: validatedCandidates[0]?.number || null,
-        bankName,
-        confidence: validatedCandidates[0]?.confidence || 0,
-        candidates: validatedCandidates.slice(0, 3),
-        reasoning: "Fallback to local validation (Gemini parse failed)",
-        shouldPromptUser: (validatedCandidates[0]?.confidence || 0) < 85,
-      };
-    }
+  const userContent = [
+    "Recipient Role:",
+    role,
+    "",
+    "Financial Clearance Status:",
+    financialStatus,
+    "",
+    "Batch:",
+    batch,
+    "",
+    "Desired Tone:",
+    tone,
+    "",
+    "Administrator Instruction:",
+    prompt || "No specific instruction provided.",
+  ].join("\n");
 
-    const geminiBankName = parsedResponse.bankName || bankName;
+  return {
+    systemInstruction: LITSAMAISO_SYSTEM_INSTRUCTION,
+    userContent,
+  };
+}
 
-    let finalConfidence = parsedResponse.confidence || 0;
-    if (parsedResponse.accountNumber) {
-      const validation = validateSAAccountFormat(parsedResponse.accountNumber);
-      finalConfidence = (finalConfidence + validation.confidence) / 2;
-    }
+export async function composeAdministrativeEmail(
+  input: AdministrativeEmailComposerInput,
+): Promise<GeneratedAdministrativeEmail> {
+  const prompt = String(input.prompt || "").trim();
+  const tone = String(input.tone || "").trim();
 
-    return {
-      accountNumber: parsedResponse.accountNumber || null,
-      bankName: geminiBankName,
-      confidence: Math.round(finalConfidence),
-      candidates: (parsedResponse.allCandidatesRanked || [])
-        .slice(0, 3)
-        .map((c: any) => ({
-          number: c.number,
-          confidence: c.confidence,
-          reason: c.reason,
-        })),
-      reasoning: parsedResponse.reasoning || "Unable to provide detailed reasoning",
-      shouldPromptUser: finalConfidence >= 70 && finalConfidence < 85,
-    };
-  } catch (error) {
-    console.error("Gemini extraction error:", error);
-    throw error;
+  if (!prompt) {
+    throw new Error("Prompt is required");
   }
+  if (!tone) {
+    throw new Error("Desired tone is required");
+  }
+  if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    throw new Error("GOOGLE_GENERATIVE_AI_API_KEY is not configured");
+  }
+
+  const request = buildAdministrativeEmailRequest(input);
+  const model = getGenAI().getGenerativeModel({
+    model: "gemini-3.1-flash-lite",
+    systemInstruction: request.systemInstruction,
+  });
+  const result = await model.generateContent(request.userContent);
+
+  const responseText = result.response.text();
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Gemini did not return a valid email draft");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    throw new Error("Gemini returned an invalid email draft format");
+  }
+
+  const draft = parsed as Partial<GeneratedAdministrativeEmail>;
+  const subject = String(draft.subject || "").trim();
+  const body = String(draft.body || "").trim();
+
+  if (!subject || !body) {
+    throw new Error("Gemini returned an incomplete email draft");
+  }
+
+  return { subject, body };
 }
+
 export function extractAccountCandidates(text: string): string[] {
   const normalized = text.replace(/[^\x20-\x7E\n]/g, " ");
 
@@ -214,7 +204,6 @@ export function extractAccountCandidates(text: string): string[] {
 
   for (const pattern of labelPatterns) {
     let match;
-    // eslint-disable-next-line no-cond-assign
     while ((match = pattern.exec(normalized)) !== null) {
       let num = match[1]?.replace(/[\s-]/g, "") || "";
       num = correctOcrArtifacts(num);
@@ -225,11 +214,13 @@ export function extractAccountCandidates(text: string): string[] {
     }
   }
 
-  const lines = normalized.split(/\r?\n/).slice(0, Math.ceil(normalized.split(/\r?\n/).length * 0.25));
-  const headerText = lines.join(" ");
+  const normalizedLines = normalized.split(/\r?\n/);
+  const headerText = normalizedLines
+    .slice(0, Math.ceil(normalizedLines.length * 0.25))
+    .join(" ");
 
   const allNumbers = Array.from(headerText.matchAll(/\b(\d{8,13})\b/g))
-    .map((m) => m[1] || "")
+    .map((match) => match[1] || "")
     .map((num) => correctOcrArtifacts(num))
     .filter((num) => /^\d+$/.test(num));
 
@@ -238,7 +229,7 @@ export function extractAccountCandidates(text: string): string[] {
   }
 
   const allDocNumbers = Array.from(normalized.matchAll(/\b(\d{10,13})\b/g))
-    .map((m) => m[1] || "")
+    .map((match) => match[1] || "")
     .map((num) => correctOcrArtifacts(num))
     .filter((num) => /^\d+$/.test(num) && !/(\d)\1{5,}/.test(num));
 

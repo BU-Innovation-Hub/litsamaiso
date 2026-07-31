@@ -27,6 +27,7 @@ const ElectionsManagementPage = lazy(() => import('./pages/ElectionsManagementPa
 const InstitutionsPage = lazy(() => import('./pages/InstitutionsPage'));
 const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'));
 const BranchCodesPage = lazy(() => import('./pages/BranchCodesPage'));
+const AIEmailComposerPage = lazy(() => import('./pages/AIEmailComposerPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 
@@ -109,6 +110,7 @@ function App() {
               </Route>
               <Route element={<RoleRoute allowedRoles={['AppAdmin']} />}>
                 <Route path="/audit-logs" element={<AuditLogsPage />} />
+                <Route path="/ai-email-composer" element={<AIEmailComposerPage />} />
               </Route>
               <Route element={<RoleRoute allowedRoles={roleAccess.branchCodes} />}>
                 <Route path="/branch-codes" element={<BranchCodesPage />} />
