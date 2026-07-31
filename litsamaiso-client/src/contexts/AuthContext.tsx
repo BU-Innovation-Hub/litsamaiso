@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { User } from '../types';
 import { authService } from '../services/authService';
+import { accountService } from '../services/accountService';
+import { feedbackService } from '../services/feedbackService';
 import { AuthContext } from './authContextValue';
 import { onAuthExpired } from '../lib/api';
 import posthog from 'posthog-js';
@@ -86,6 +88,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         name: response.user.name,
         role: response.user.role,
       });
+
+      if (response.user?.role?.name === 'Student') {
+        try {
+          const confirmationStatus = await accountService.getConfirmationStatus();
+          if (!confirmationStatus.confirmed) {
+            return;
+          }
+
+          const feedbackStatus = await feedbackService.getStatus();
+          if (feedbackStatus.hasSubmittedFeedback) {
+            return;
+          }
+
+          window.setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('litsamaiso:feedback-prompt', {
+                detail: { reason: 'login' },
+              })
+            );
+          }, 0);
+        } catch {
+          // Ignore prompt gating failures and keep the login flow stable.
+        }
+      }
     } finally {
       setIsLoading(false);
     }

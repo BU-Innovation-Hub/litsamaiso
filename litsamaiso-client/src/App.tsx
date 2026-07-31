@@ -1,6 +1,6 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import { PostHogErrorBoundary } from '@posthog/react';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute, PublicRoute, RoleRoute } from './components/ProtectedRoute';
@@ -10,6 +10,8 @@ import { useAuth } from './hooks/useAuth';
 import { isAdminDashboardRole } from './navigation';
 import { roleAccess } from './utils/roleAccess';
 import { getRoleName } from './utils/userDisplay';
+import { feedbackService } from './services/feedbackService';
+import { LogoutFeedbackModal } from './components/LogoutFeedbackModal';
 
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -36,6 +38,58 @@ const PageLoader = () => (
     <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-active-clr" />
   </div>
 );
+
+const GlobalFeedbackPromptHost = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const handlePromptRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ reason?: string }>).detail;
+      if (detail?.reason === 'logout') {
+        return;
+      }
+
+      setIsOpen(true);
+    };
+
+    window.addEventListener('litsamaiso:feedback-prompt', handlePromptRequest);
+    return () => {
+      window.removeEventListener('litsamaiso:feedback-prompt', handlePromptRequest);
+    };
+  }, []);
+
+  const handleClose = () => {
+    setIsOpen(false);
+  };
+
+  const handleSubmit = async (rating: number, comment: string) => {
+    setIsSubmitting(true);
+    try {
+      await feedbackService.submit({ rating, comment });
+      setIsOpen(false);
+      toast.success('Thanks for your feedback.');
+    } catch (error) {
+      toast.error('Unable to submit feedback right now. Please try again.');
+      console.error('Failed to submit feedback prompt', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <LogoutFeedbackModal
+      isOpen={isOpen}
+      isSubmitting={isSubmitting}
+      onClose={handleClose}
+      onSubmit={handleSubmit}
+      title="Rate Litsamaiso"
+      description="Help us improve your experience. Your rating is required, while the comment is optional."
+      submitLabel="Submit feedback"
+      closeLabel="Skip"
+    />
+  );
+};
 
 import './index.css';
 
@@ -67,6 +121,7 @@ function App() {
     <PostHogErrorBoundary fallback={<div className="flex items-center justify-center min-h-screen text-destructive">Something went wrong. Please try again later.</div>}>
     <BrowserRouter>
       <AuthProvider>
+        <GlobalFeedbackPromptHost />
         <Toaster richColors position="top-right" />
         <Suspense fallback={<PageLoader />}>
         <Routes>

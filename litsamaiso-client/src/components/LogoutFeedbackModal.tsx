@@ -8,6 +8,10 @@ type LogoutFeedbackModalProps = {
   isSubmitting: boolean;
   onClose: () => void;
   onSubmit: (rating: number, comment: string) => Promise<void>;
+  title?: string;
+  description?: string;
+  submitLabel?: string;
+  closeLabel?: string;
 };
 
 export const LogoutFeedbackModal: React.FC<LogoutFeedbackModalProps> = ({
@@ -15,6 +19,10 @@ export const LogoutFeedbackModal: React.FC<LogoutFeedbackModalProps> = ({
   isSubmitting,
   onClose,
   onSubmit,
+  title = 'Rate Litsamaiso',
+  description = 'Help us improve your experience. Your rating is required, while the comment is optional.',
+  submitLabel = 'Submit feedback & logout',
+  closeLabel = 'Skip',
 }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -48,10 +56,8 @@ export const LogoutFeedbackModal: React.FC<LogoutFeedbackModalProps> = ({
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-primary-clr/80">
               One-time feedback
             </p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">Rate Litsamaiso</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Help us improve your experience. Your rating is required, while the comment is optional.
-            </p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">{title}</h2>
+            <p className="mt-2 text-sm text-slate-600">{description}</p>
           </div>
           <button
             type="button"
@@ -103,10 +109,10 @@ export const LogoutFeedbackModal: React.FC<LogoutFeedbackModalProps> = ({
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="outline" type="button" onClick={handleClose} disabled={isSubmitting}>
-            Skip
+            {closeLabel}
           </Button>
           <Button type="button" onClick={handleSubmit} className="bg-primary-clr hover:bg-black" disabled={submitDisabled}>
-            {isSubmitting ? 'Submitting...' : 'Submit feedback & logout'}
+            {isSubmitting ? 'Submitting...' : submitLabel}
           </Button>
         </div>
       </div>
