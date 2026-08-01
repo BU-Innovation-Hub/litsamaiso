@@ -311,6 +311,7 @@ const DashboardPage: React.FC = () => {
   ]);
 
   const accountSummary = accountReports?.reports.summary;
+  const confirmedNotPaidCount = Math.max(0, (accountSummary?.confirmed ?? 0) - (accountSummary?.paid ?? 0));
   const openElections = elections.filter((election) => election.status === 'OPEN').length;
   const scheduledElections = elections.filter((election) => election.status === 'SCHEDULED').length;
   const pendingIssues = adminIssues.filter((issue) => isPendingIssueStatus(issue.status)).length;
@@ -391,8 +392,8 @@ const DashboardPage: React.FC = () => {
         },
         {
           label: 'Confirmed accounts',
-          value: accountSummary?.confirmed ?? 0,
-          description: `${((accountSummary?.confirmationRate ?? 0) * 100).toFixed(2)}% confirmation rate`,
+          value: confirmedNotPaidCount,
+          description: 'Confirmed but not yet paid',
           icon: BadgeCheck,
           tone: 'bg-gray-100 text-active-clr',
           accent: 'from-emerald-500 to-active-clr',
@@ -475,11 +476,11 @@ const DashboardPage: React.FC = () => {
     return cards;
   }, [
     accountSummary?.confirmationRate,
-    accountSummary?.confirmed,
     accountSummary?.paid,
     accountSummary?.paymentRate,
     accountSummary?.total,
     accountSummary?.unconfirmed,
+    confirmedNotPaidCount,
     activeInstitutions,
     canViewAdminIssues,
     canViewInstitutions,
