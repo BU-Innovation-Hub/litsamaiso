@@ -15,6 +15,7 @@ export const userService = {
       page: number;
       limit: number;
       pages: number;
+      roleCounts?: Record<string, number>;
     }>(
       '/users',
       { params }

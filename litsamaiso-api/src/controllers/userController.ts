@@ -78,7 +78,7 @@ export const listUsers = async (req: Request, res: Response): Promise<void> => {
   const lim = Math.max(Math.min(parseInt(limit) || 10000, 10000), 1);
   const skip = (pageNum - 1) * lim;
 
-  const [users, total] = await Promise.all([
+  const [users, total, roleCountsAggregate] = await Promise.all([
     User.find(query)
       .select("email role institution studentId faceImageUrl name")
       .populate("role", "name")
@@ -86,9 +86,26 @@ export const listUsers = async (req: Request, res: Response): Promise<void> => {
       .skip(skip)
       .limit(lim),
     User.countDocuments(query),
+    User.aggregate([
+      { $match: query },
+      { $lookup: { from: "roles", localField: "role", foreignField: "_id", as: "roleDoc" } },
+      { $unwind: "$roleDoc" },
+      { $group: { _id: "$roleDoc.name", count: { $sum: 1 } } },
+    ]),
   ]);
 
-  res.json({ users, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
+  const roleCounts = Object.fromEntries(
+    roleCountsAggregate.map((item: any) => [item._id, item.count]),
+  );
+
+  res.json({
+    users,
+    total,
+    page: pageNum,
+    limit: lim,
+    pages: Math.ceil(total / lim),
+    roleCounts,
+  });
 };
 
 export const getUser = async (req: Request, res: Response): Promise<void> => {

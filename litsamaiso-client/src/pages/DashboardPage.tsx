@@ -209,7 +209,7 @@ const DashboardPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [elections, setElections] = useState<Election[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [userTotal, setUserTotal] = useState(0);
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [accountReports, setAccountReports] = useState<AccountReports | null>(null);
   const [recentAccounts, setRecentAccounts] = useState<Account[]>([]);
@@ -253,7 +253,7 @@ const DashboardPage: React.FC = () => {
 
       const [
         nextElections,
-        nextUsers,
+        nextUserPage,
         nextInstitutions,
         nextReports,
         nextAccounts,
@@ -262,7 +262,11 @@ const DashboardPage: React.FC = () => {
         nextConfirmation,
       ] = await Promise.all([
         load(canViewElections, () => electionService.getElections({ limit: 10 }), [] as Election[]),
-        load(canViewUsers, () => userService.getUsers({ limit: 100 }).then((res) => res.users), [] as User[]),
+        load(
+          canViewUsers,
+          () => userService.getUsers({ limit: 100 }),
+          { users: [] as User[], total: 0 } as { users: User[]; total: number },
+        ),
         load(canViewInstitutions, () => institutionService.getInstitutions(), [] as Institution[]),
         load(canViewReports, () => accountService.getReports(), null as AccountReports | null),
         load(canViewReports, () => accountService.listAccounts({ limit: 6 }).then((res) => res.accounts), [] as Account[]),
@@ -274,7 +278,7 @@ const DashboardPage: React.FC = () => {
       if (!isMounted) return;
 
       setElections(nextElections);
-      setUsers(nextUsers);
+      setUserTotal(nextUserPage.total);
       setInstitutions(nextInstitutions);
       setAccountReports(nextReports);
       setRecentAccounts(nextAccounts);
@@ -443,7 +447,7 @@ const DashboardPage: React.FC = () => {
     if (canViewUsers) {
       cards.push({
         label: 'Users',
-        value: users.length,
+        value: userTotal,
         description: 'People you can manage',
         icon: Users,
         tone: 'bg-gray-100 text-active-clr',
@@ -496,7 +500,7 @@ const DashboardPage: React.FC = () => {
     roleName,
     scheduledElections,
     studentIssues.length,
-    users.length,
+    userTotal,
   ]);
 
   const recentRecords = canViewAdminIssues ? adminIssues : studentIssues.slice(0, 5);

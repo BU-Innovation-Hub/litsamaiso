@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyRound, Search, Trash2, UserCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { userService } from '../services/userService';
@@ -18,6 +18,7 @@ const UsersPage: React.FC = () => {
   const isAppAdmin = currentRole === 'AppAdmin';
   const [users, setUsers] = useState<User[]>([]);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [roleCounts, setRoleCounts] = useState<Array<[string, number]>>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -58,6 +59,7 @@ const UsersPage: React.FC = () => {
         setUsers(response.users || []);
       }
       setTotalUsers(response.total);
+      setRoleCounts(Object.entries(response.roleCounts || {}).sort((a, b) => b[1] - a[1]));
       setCurrentPage(page);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Failed to fetch users'));
@@ -142,15 +144,6 @@ const UsersPage: React.FC = () => {
       toast.error(getApiErrorMessage(err, 'Failed to create user'));
     }
   };
-
-  const roleCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    users.forEach((user) => {
-      const roleName = getRoleName(user) || 'Unknown';
-      counts.set(roleName, (counts.get(roleName) || 0) + 1);
-    });
-    return Array.from(counts.entries());
-  }, [users]);
 
   const handleRoleChange = async (targetUser: User, roleId: string) => {
     const userId = getUserId(targetUser);
