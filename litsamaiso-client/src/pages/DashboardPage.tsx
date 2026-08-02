@@ -488,6 +488,7 @@ const DashboardPage: React.FC = () => {
 
     return cards;
   }, [
+    accountSummary?.confirmed,
     accountSummary?.confirmationRate,
     accountSummary?.paid,
     accountSummary?.paymentRate,
