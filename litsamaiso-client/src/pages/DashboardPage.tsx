@@ -396,11 +396,20 @@ const DashboardPage: React.FC = () => {
         },
         {
           label: 'Confirmed accounts',
-          value: confirmedNotPaidCount,
-          description: 'Confirmed but not yet paid',
+          value: accountSummary?.confirmed ?? 0,
+          description: 'All confirmed accounts in the workspace',
           icon: BadgeCheck,
           tone: 'bg-gray-100 text-active-clr',
           accent: 'from-emerald-500 to-active-clr',
+          progress: clampPercent((accountSummary?.confirmationRate ?? 0) * 100),
+        },
+        {
+          label: 'Confirmed but not paid',
+          value: confirmedNotPaidCount,
+          description: 'Confirmed and waiting on payment',
+          icon: BadgeCheck,
+          tone: 'bg-gray-100 text-active-clr',
+          accent: 'from-sky-500 to-active-clr',
           progress: clampPercent((accountSummary?.confirmationRate ?? 0) * 100),
         },
         {
