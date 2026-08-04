@@ -584,14 +584,32 @@ const AccountsPage: React.FC = () => {
 
   const percentages = useMemo(() => {
     const total = summary?.total || 0;
-    if (total === 0) return { confirmed: 0, paid: 0, unconfirmed: 0 };
+    const calc = (count: number, base: number) =>
+      base > 0 ? Math.round((count / base) * 1000) / 10 : 0;
+
+    const unpaidReport = reports?.reports.unpaid;
+    let unpaidTotal = 0;
+    let unpaidBase = total;
+    if (accountBatch) {
+      const batch = unpaidReport?.batches?.find(
+        (b) => String(b.batchNumber) === String(accountBatch),
+      );
+      if (batch) {
+        unpaidTotal = batch.unpaid;
+        unpaidBase = batch.total;
+      }
+    } else {
+      unpaidTotal = unpaidReport?.total || 0;
+      unpaidBase = total;
+    }
+
     return {
-      confirmed: Math.round(((summary?.confirmed || 0) / total) * 1000) / 10,
-      paid: Math.round(((summary?.paid || 0) / total) * 1000) / 10,
-      unconfirmed:
-        Math.round(((summary?.unconfirmed || 0) / total) * 1000) / 10,
+      confirmed: calc(summary?.confirmed || 0, total),
+      paid: calc(summary?.paid || 0, total),
+      unconfirmed: calc(summary?.unconfirmed || 0, total),
+      unpaid: calc(unpaidTotal, unpaidBase),
     };
-  }, [summary]);
+  }, [accountBatch, reports?.reports.unpaid, summary]);
 
   const getStatusLabel = (status?: string) => {
     const normalized = (status || "pending").toLowerCase();
@@ -1543,7 +1561,7 @@ const AccountsPage: React.FC = () => {
         )}
 
         {summary && (
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <ReportCard label="Total Accounts" value={summary.total} />
             <ReportCard
               label="Confirmed"
@@ -1559,6 +1577,11 @@ const AccountsPage: React.FC = () => {
               label="Unconfirmed"
               value={summary.unconfirmed}
               percent={percentages.unconfirmed}
+            />
+            <ReportCard
+              label="Unpaid"
+              value={reports?.reports.unpaid?.total ?? 0}
+              percent={percentages.unpaid}
             />
           </div>
         )}
@@ -2021,6 +2044,7 @@ const AccountsPage: React.FC = () => {
                   <option value="confirmed">Confirmed</option>
                   <option value="paid">Paid</option>
                   <option value="erroneous">Erroneous</option>
+                  <option value="unpaid">Unpaid</option>
                 </select>
                 <select
                   value={accountBatch}

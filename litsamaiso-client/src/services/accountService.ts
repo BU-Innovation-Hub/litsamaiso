@@ -51,6 +51,25 @@ export interface AccountReports {
         confirmationDate?: string | null;
       }>;
     };
+    unpaid?: {
+      total: number;
+      batches: Array<{
+        batchNumber: number;
+        total: number;
+        paid: number;
+        unpaid: number;
+      }>;
+      accounts: Array<{
+        borrowerNumber: string;
+        accountNumber: string;
+        bankName: string;
+        courseOfStudy: string;
+        fullnames: string;
+        batchNumber: number;
+        status?: string;
+        confirmationDate?: string | null;
+      }>;
+    };
     stuckConfirmed?: {
       total: number;
       thresholdDays: number;

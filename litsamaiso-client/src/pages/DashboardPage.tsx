@@ -316,6 +316,7 @@ const DashboardPage: React.FC = () => {
 
   const accountSummary = accountReports?.reports.summary;
   const confirmedNotPaidCount = Math.max(0, (accountSummary?.confirmed ?? 0) - (accountSummary?.paid ?? 0));
+  const unpaidStudentsCount = accountReports?.reports.unpaid?.total ?? 0;
   const openElections = elections.filter((election) => election.status === 'OPEN').length;
   const scheduledElections = elections.filter((election) => election.status === 'SCHEDULED').length;
   const pendingIssues = adminIssues.filter((issue) => isPendingIssueStatus(issue.status)).length;
@@ -429,6 +430,14 @@ const DashboardPage: React.FC = () => {
           tone: 'bg-gray-100 text-active-clr',
           accent: 'from-amber-400 to-active-clr',
         },
+        {
+          label: 'Unpaid students',
+          value: unpaidStudentsCount,
+          description: 'Students in batches that already have some payments still outstanding',
+          icon: Banknote,
+          tone: 'bg-gray-100 text-active-clr',
+          accent: 'from-rose-500 to-active-clr',
+        },
       );
     }
 
@@ -495,6 +504,7 @@ const DashboardPage: React.FC = () => {
     accountSummary?.total,
     accountSummary?.unconfirmed,
     confirmedNotPaidCount,
+    unpaidStudentsCount,
     activeInstitutions,
     canViewAdminIssues,
     canViewInstitutions,

@@ -152,6 +152,38 @@ const buildAccountFilter = (user: any, params: AccountQueryParams): Record<strin
 
 export const getAccountListFilter = buildAccountFilter;
 
+// Builds a query for "unpaid" accounts: accounts in batches that already have
+// at least one paid student but whose own status is not yet "paid".
+export const getUnpaidAccountFilter = async (
+  user: any,
+  params: AccountQueryParams,
+): Promise<Record<string, unknown>> => {
+  const q = buildAccountFilter(user, {
+    ...params,
+    status: undefined,
+    batchNumber: undefined,
+  });
+
+  const paidBatchQuery: Record<string, unknown> = { status: "paid" };
+  if (q.institution) {
+    paidBatchQuery.institution = q.institution;
+  }
+
+  const batchNumber = Number(params.batchNumber);
+  if (Number.isFinite(batchNumber)) {
+    paidBatchQuery.batchNumber = batchNumber;
+  }
+
+  const paidBatches = (
+    await FinancialClearance.distinct("batchNumber", paidBatchQuery)
+  ).filter((value: unknown) => value != null);
+
+  q.status = { $ne: "paid" };
+  q.batchNumber = { $in: paidBatches };
+
+  return q;
+};
+
 const parseAccountLimit = (value: unknown, fallback = 2000, max = 10000): number => {
   const parsed = Number.parseInt(String(value || fallback), 10);
   return Math.min(Number.isFinite(parsed) && parsed > 0 ? parsed : fallback, max);
@@ -245,7 +277,11 @@ export const exportAccounts = async (params: {
 }): Promise<AccountExportResult> => {
   await assignBranchCodesForExport(params.user, params.query);
 
-  const filter = buildAccountFilter(params.user, params.query);
+  const statusInput = safeString(params.query.status).toLowerCase();
+  const filter =
+    statusInput === "unpaid"
+      ? await getUnpaidAccountFilter(params.user, params.query)
+      : buildAccountFilter(params.user, params.query);
   const limit = parseAccountLimit(params.query.limit, 5000, 50000);
   const accounts = await FinancialClearance.find(filter)
     .sort({ createdAt: -1 })
