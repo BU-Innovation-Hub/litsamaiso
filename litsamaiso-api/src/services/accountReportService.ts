@@ -9,6 +9,7 @@ export type AccountReportKey =
   | "confirmation-overview"
   | "payment-overview"
   | "confirmed-not-paid"
+  | "unpaid"
   | "by-batch"
   | "by-bank"
   | "by-course"
@@ -95,6 +96,12 @@ export const REPORT_CATALOG: ReportCatalogItem[] = [
     key: "confirmed-not-paid",
     title: "Confirmed Not Paid",
     description: "Accounts confirmed by students but not yet marked paid.",
+  },
+  {
+    key: "unpaid",
+    title: "Unpaid Students",
+    description:
+      "Accounts that are not yet paid in batches that already have at least one paid student.",
   },
   {
     key: "by-batch",
@@ -327,6 +334,61 @@ const buildConfirmedNotPaid = (rows: ScopedAccountRow[]) => {
   return { total: accounts.length, accounts };
 };
 
+const buildUnpaid = (rows: ScopedAccountRow[]) => {
+  const paidBatches = new Set<number>();
+  const batchTotals = new Map<number, number>();
+  const batchPaid = new Map<number, number>();
+
+  for (const row of rows) {
+    if (row.batchNumber === null || row.batchNumber === undefined) continue;
+    const batch = Number(row.batchNumber);
+    batchTotals.set(batch, (batchTotals.get(batch) || 0) + 1);
+    if (normalizeStatus(row.status) === "paid") {
+      paidBatches.add(batch);
+      batchPaid.set(batch, (batchPaid.get(batch) || 0) + 1);
+    }
+  }
+
+  const unpaidRows = rows.filter(
+    (row) =>
+      row.batchNumber !== null &&
+      row.batchNumber !== undefined &&
+      paidBatches.has(Number(row.batchNumber)) &&
+      normalizeStatus(row.status) !== "paid",
+  );
+
+  const batchUnpaid = new Map<number, number>();
+  for (const row of unpaidRows) {
+    const batch = Number(row.batchNumber);
+    batchUnpaid.set(batch, (batchUnpaid.get(batch) || 0) + 1);
+  }
+
+  const batches = [...paidBatches]
+    .sort((left, right) => left - right)
+    .map((batchNumber) => ({
+      batchNumber,
+      total: batchTotals.get(batchNumber) || 0,
+      paid: batchPaid.get(batchNumber) || 0,
+      unpaid: batchUnpaid.get(batchNumber) || 0,
+    }));
+
+  return {
+    total: unpaidRows.length,
+    batches,
+    accounts: unpaidRows.map((row) => ({
+      borrowerNumber: row.borrowerNumber,
+      accountNumber: row.accountNumber,
+      bankName: row.bankName,
+      courseOfStudy: row.courseOfStudy,
+      fullnames: row.fullnames,
+      batchNumber: Number(row.batchNumber),
+      status: row.status,
+      confirmationDate: row.confirmationDate || null,
+      institution: row.institution.toString(),
+    })),
+  };
+};
+
 const buildSnapshot = (rows: ScopedAccountRow[], targetStatus: string) => {
   const lowerTarget = targetStatus.toLowerCase();
   const matching = rows.filter(
@@ -536,6 +598,7 @@ const buildReportBundle = async (
     confirmationOverview: buildSnapshot(rows, "confirmed"),
     paymentOverview: buildSnapshot(rows, "paid"),
     confirmedNotPaid: buildConfirmedNotPaid(rows),
+    unpaid: buildUnpaid(rows),
     byBatch: groupCount(rows, (row) => String(row.batchNumber || "unassigned")),
     byBank: groupCount(rows, (row) => row.bankName),
     byCourse: groupCount(rows, (row) => row.courseOfStudy),
@@ -675,7 +738,9 @@ export const getAccountReport = async (params: {
             ? reportMap.paymentOverview
             : reportKey === "confirmed-not-paid"
               ? reportMap.confirmedNotPaid
-              : reportKey === "by-batch"
+              : reportKey === "unpaid"
+                ? reportMap.unpaid
+                : reportKey === "by-batch"
                 ? reportMap.byBatch
                 : reportKey === "by-bank"
                   ? reportMap.byBank

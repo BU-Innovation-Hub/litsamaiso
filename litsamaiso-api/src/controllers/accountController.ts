@@ -8,6 +8,7 @@ import {
   exportAccounts,
   getAccountListFilter,
   getAccountListLimit,
+  getUnpaidAccountFilter,
 } from "../services/accountService.js";
 import { Institution } from "../models/Institution.js";
 import { Issue } from "../models/Issue.js";
@@ -122,7 +123,11 @@ export const listAccounts = async (req: Request, res: Response) => {
     const user = (req as any).user;
     const params = (req.query || {}) as any;
     const limit = getAccountListLimit(params.limit);
-    const q = getAccountListFilter(user, params);
+    const statusInput = String(params.status || "").trim().toLowerCase();
+    const q =
+      statusInput === "unpaid"
+        ? await getUnpaidAccountFilter(user, params)
+        : getAccountListFilter(user, params);
     const batchOptionsFilter = getAccountListFilter(user, {
       institutionId: params.institutionId,
     });
