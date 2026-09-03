@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import mongoose from "mongoose";
 import { loadStudentsFromExcel } from "../services/studentService.js";
 import { Institution } from "../models/Institution.js";
 
@@ -18,14 +19,43 @@ export const uploadStudents = async (req: Request, res: Response) => {
       return;
     }
 
-    // The requesting user's institution: require InstitutionAdmin user
+    // Resolve the institution the students belong to.
+    // AppAdmin imports on behalf of any institution and must name it explicitly;
+    // InstitutionAdmin is always pinned to their own institution.
     const user = (req as any).user;
-    const instId = user.institution;
+    const roleName = String(
+      (user.role && (user.role as any).name) || (user.role as string) || "",
+    ).toLowerCase();
+
+    let instId = user.institution;
+
+    if (roleName === "appadmin") {
+      const requestedInstId = String(
+        req.body?.institutionId || req.query.institutionId || "",
+      ).trim();
+
+      if (!requestedInstId) {
+        res
+          .status(400)
+          .json({ message: "Select the institution to import students into" });
+        return;
+      }
+
+      if (!mongoose.isValidObjectId(requestedInstId)) {
+        res.status(400).json({ message: "Invalid institution id" });
+        return;
+      }
+
+      instId = requestedInstId;
+    } else if (!instId) {
+      res.status(400).json({ message: "User institution not found" });
+      return;
+    }
 
     // Ensure institution exists
     const inst = await Institution.findById(instId);
     if (!inst) {
-      res.status(400).json({ message: "User institution not found" });
+      res.status(400).json({ message: "Institution not found" });
       return;
     }
 
@@ -47,7 +77,7 @@ export const uploadStudents = async (req: Request, res: Response) => {
         percent: 0,
       });
 
-      const result = await loadStudentsFromExcel(file.buffer, instId, (progress) => {
+      const result = await loadStudentsFromExcel(file.buffer, inst._id, (progress) => {
         writeStreamEvent({
           type: "progress",
           message: "Importing student records",
@@ -70,7 +100,7 @@ export const uploadStudents = async (req: Request, res: Response) => {
       return;
     }
 
-    const result = await loadStudentsFromExcel(file.buffer, instId);
+    const result = await loadStudentsFromExcel(file.buffer, inst._id);
     const totalRows = result.inserted + result.skipped + result.errors.length;
     res.json({
       message: "Import completed",

@@ -6,11 +6,11 @@ import { uploadStudents } from "../controllers/studentController.js";
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Protected route: only InstitutionAdmin may upload students
+// Protected route: AppAdmin (any institution) and InstitutionAdmin (own institution)
 router.post(
   "/upload",
   requireAuth,
-  requireRole("InstitutionAdmin"),
+  requireRole(["AppAdmin", "InstitutionAdmin"]),
   upload.single("file"),
   uploadStudents,
 );

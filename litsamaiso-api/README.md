@@ -377,9 +377,14 @@ Public endpoint. Completes the reset using the token from the email.
 
 `POST /students/upload`
 
-Role: `InstitutionAdmin`
+Roles: `AppAdmin`, `InstitutionAdmin`
 
 Upload a student Excel file using `multipart/form-data` with a `file` field.
+
+`AppAdmin` imports on behalf of any institution and must supply an
+`institutionId` field (form field or query parameter) naming the target
+institution. `InstitutionAdmin` always imports into their own institution; an
+`institutionId` sent by an `InstitutionAdmin` is ignored.
 
 Required columns in the first sheet:
 

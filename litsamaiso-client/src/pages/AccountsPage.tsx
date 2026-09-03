@@ -273,6 +273,13 @@ const AccountsPage: React.FC = () => {
     if (!file) return;
 
     try {
+      if (uploadType === "students" && isAppAdmin && !selectedInstitutionId) {
+        toast.error(
+          "Choose a specific institution under Report Scope before importing students",
+        );
+        return;
+      }
+
       if (uploadType === "students") {
         setStudentImport({
           fileName: file.name,
@@ -333,7 +340,7 @@ const AccountsPage: React.FC = () => {
                   errors: progress.errors,
                 });
               })
-            : await studentService.uploadStudents(file, (progress) => {
+            : await studentService.uploadStudents(file, selectedInstitutionId || undefined, (progress) => {
                 setStudentImport({
                   ...progress,
                   fileName: file.name,
@@ -1727,12 +1734,20 @@ const AccountsPage: React.FC = () => {
                     </div>
                   )}
 
-                  {isAppAdmin ? (
+                  {isAppAdmin || role === "InstitutionAdmin" ? (
                     <div>
                       <button
                         type="button"
                         onClick={() => studentsFileRef.current?.click()}
-                        disabled={studentImport?.status === "running"}
+                        disabled={
+                          studentImport?.status === "running" ||
+                          (isAppAdmin && !selectedInstitutionId)
+                        }
+                        title={
+                          isAppAdmin && !selectedInstitutionId
+                            ? "Choose a specific institution under Report Scope first"
+                            : undefined
+                        }
                         className="inline-flex items-center gap-2 rounded-md bg-white border border-gray-300 px-3 py-2 text-sm font-semibold disabled:opacity-60"
                       >
                         {studentImport?.status === "running" && (
@@ -1742,6 +1757,12 @@ const AccountsPage: React.FC = () => {
                           ? "Importing..."
                           : "Import Students"}
                       </button>
+                      {isAppAdmin && !selectedInstitutionId && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Select an institution under Report Scope to import
+                          students.
+                        </p>
+                      )}
                       <input
                         ref={studentsFileRef}
                         type="file"

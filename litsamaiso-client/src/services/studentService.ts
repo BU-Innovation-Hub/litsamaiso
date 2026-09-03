@@ -47,9 +47,15 @@ export const studentService = {
 
   uploadStudents: async (
     file: File,
+    institutionId?: string,
     onProgress?: (progress: StudentImportProgress) => void,
   ): Promise<StudentUploadResult> => {
     const formData = new FormData();
+    // AppAdmin imports on behalf of a chosen institution; other roles are
+    // pinned to their own institution server-side and this field is ignored.
+    if (institutionId) {
+      formData.append('institutionId', institutionId);
+    }
     formData.append('file', file);
 
     if (onProgress) {
