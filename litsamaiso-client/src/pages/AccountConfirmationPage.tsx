@@ -9,6 +9,12 @@ import { authService } from '../services/authService';
 import apiClient from '../lib/api';
 import { getApiErrorMessage } from '../utils/apiError';
 import { sanitizeUserForStorage } from '../utils/userDisplay';
+import {
+  borrowerNumberError,
+  borrowerNumberRule,
+  isValidBorrowerNumber,
+  normalizeBorrowerNumber,
+} from '../utils/borrowerNumber';
 import { useAuth } from '../hooks/useAuth';
 import Globe from '../components/ui/Globe';
 
@@ -269,6 +275,7 @@ const AccountConfirmationPage: React.FC = () => {
     const normalizedExtractedBankName = normalizeBankValue(extracted?.bankName || '');
     const normalizedFormData = {
       ...formData,
+      borrowerNumber: normalizeBorrowerNumber(formData.borrowerNumber),
       bankName: normalizedBankName,
       graduating: formData.graduating === true,
     };
@@ -283,8 +290,8 @@ const AccountConfirmationPage: React.FC = () => {
       return;
     }
 
-    if (!/^\d{12}$/.test(formData.borrowerNumber.trim())) {
-      toast.error('Borrower number must be exactly 12 digits');
+    if (!isValidBorrowerNumber(formData.borrowerNumber)) {
+      toast.error(borrowerNumberError());
       return;
     }
 
@@ -443,9 +450,13 @@ const AccountConfirmationPage: React.FC = () => {
                     value={formData.borrowerNumber}
                     onChange={handleChange}
                     required
+                    inputMode="numeric"
                     className="w-full rounded-md border border-border px-4 py-2 focus:outline-none focus:ring-2 focus:ring-active"
-                    placeholder="e.g. 202211001706"
+                    placeholder="Borrower number as it appears on your NMDS records"
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Numbers only ({borrowerNumberRule()}).
+                  </p>
                 </div>
 
                 <div>
