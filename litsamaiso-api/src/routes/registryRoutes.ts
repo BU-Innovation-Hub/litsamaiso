@@ -1,0 +1,27 @@
+import { Router } from "express";
+import multer from "multer";
+import { requireAuth, requireRole } from "../middleware/authMiddleware.js";
+import { addException, addStudent, applyImport, dashboard, deleteException, deleteStudent, editException, editStudent, exceptions, getImport, listStudents, reconcileExceptionRow, resolveRow, searchStudentByNationalId, uploadRegistryFinancial, uploadRegistryStudents } from "../controllers/registryController.js";
+
+const router = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const registryRoles = ["Registry", "AppAdmin"];
+router.use(requireAuth, requireRole(registryRoles));
+router.get("/dashboard", dashboard);
+router.get("/students", listStudents);
+router.get("/students/search/national-id/:nationalId", searchStudentByNationalId);
+router.post("/students", addStudent);
+router.put("/students/:id", editStudent);
+router.delete("/students/:id", deleteStudent);
+router.get("/exceptions", exceptions);
+router.put("/exceptions/:importId/:rowNumber", editException);
+router.post("/exceptions/:importId/:rowNumber/reconcile", reconcileExceptionRow);
+router.delete("/exceptions/:importId/:rowNumber", deleteException);
+router.post("/exceptions/:importId/:rowNumber/add-to-registry", addException);
+router.post("/exceptions/:id/resolve", resolveRow);
+router.post("/uploads/students", upload.single("file"), uploadRegistryStudents);
+router.post("/uploads/financial-clearance", upload.single("file"), uploadRegistryFinancial);
+router.get("/imports/:id", getImport);
+router.post("/imports/:id/resolve", resolveRow);
+router.post("/imports/:id/apply", applyImport);
+export default router;

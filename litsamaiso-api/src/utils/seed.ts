@@ -9,6 +9,7 @@ const ROLE_NAMES = [
   "InstitutionAdmin",
   "Finance",
   "SAAD",
+  "Registry",
   "student",
 ] as const;
 

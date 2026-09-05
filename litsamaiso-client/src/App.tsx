@@ -32,6 +32,7 @@ const BranchCodesPage = lazy(() => import('./pages/BranchCodesPage'));
 const AIEmailComposerPage = lazy(() => import('./pages/AIEmailComposerPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const StudentRegistryPage = lazy(() => import('./pages/StudentRegistryPage'));
 
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -142,6 +143,9 @@ function App() {
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
+              <Route element={<RoleRoute allowedRoles={roleAccess.registry} />}>
+                <Route path="/student-registry" element={<StudentRegistryPage />} />
+              </Route>
               <Route element={<RoleRoute allowedRoles={roleAccess.elections} />}>
                 <Route path="/elections" element={<ElectionsPage />} />
                 <Route path="/elections/:id/vote" element={<VotingPage />} />

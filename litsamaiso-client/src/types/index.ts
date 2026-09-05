@@ -18,7 +18,7 @@ export interface User {
 
 export interface Role {
   _id: string;
-  name: 'Student' | 'InstitutionAdmin' | 'AppAdmin' | 'Finance' | 'SAAD';
+  name: 'Student' | 'InstitutionAdmin' | 'AppAdmin' | 'Finance' | 'SAAD' | 'Registry';
   permissions?: string[];
 }
 
