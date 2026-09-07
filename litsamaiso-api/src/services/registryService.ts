@@ -60,7 +60,7 @@ export const stageRegistryUpload = async (input: { buffer: Buffer; filename: str
   const workbook = XLSX.read(input.buffer, { type: "buffer", cellDates: false });
   const firstSheet = workbook.SheetNames[0];
   if (!firstSheet) throw new Error("Spreadsheet has no worksheet");
-  const source = XLSX.utils.sheet_to_json<RegistryRow>(workbook.Sheets[firstSheet]!, { defval: "" });
+  const source = XLSX.utils.sheet_to_json<RegistryRow>(workbook.Sheets[firstSheet]!, { defval: "", blankrows: true });
   if (!source.length) throw new Error("Spreadsheet has no data rows");
   const headers = Object.keys(source[0] || {}).map(normalizeHeader);
   const missing = requiredHeaders[input.kind].filter((group) => !group.some((header) => headers.includes(normalizeHeader(header))));
@@ -68,19 +68,19 @@ export const stageRegistryUpload = async (input: { buffer: Buffer; filename: str
 
   const rows = source.map((raw, index) => {
     const a = aliases[input.kind];
-    const row: RegistryRow = { rowNumber: index + 2, source: raw, classification: "missing/unmatched", reasons: [], resolution: null };
+    const row: RegistryRow = { rowNumber: index + 2, source: raw, classification: "missing/unmatched", reasons: [], resolution: null, outcome: "pending", exceptionStatus: null, failure: null };
       if (input.kind === "students") { const nationalId = normalizeNationalId(value(raw, a.nationalId || [])); Object.assign(row, { name: value(raw, a.name || []), surname: value(raw, a.surname || []), email: value(raw, a.email || []).toLowerCase(), nationalId, studentId: value(raw, a.studentId || []), studentStatus: asBoolean(value(raw, a.studentStatus || [])), borrowerNumber: value(raw, a.borrowerNumber || []) }); }
      else Object.assign(row, { fullnames: value(raw, a.fullnames || []), nationalId: normalizeNationalId(value(raw, a.nationalId || [])), borrowerNumber: value(raw, a.borrowerNumber || []), courseOfStudy: value(raw, a.courseOfStudy || []), bankName: value(raw, a.bankName || []), accountNumber: value(raw, a.accountNumber || []), batchNumber: Number(value(raw, a.batchNumber || [])) || 0, graduating: asBoolean(value(raw, a.graduating || [])), status: value(raw, a.status || []) || "pending" });
      const required = input.kind === "students" ? [row.name, row.surname, row.email, row.studentId, row.nationalId, value(raw, a.studentStatus || [])] : [row.fullnames, row.nationalId, row.borrowerNumber, row.courseOfStudy, row.bankName, row.accountNumber];
     if (required.some((item) => !String(item).trim())) { row.classification = "conflict"; row.reasons = ["One or more required values are blank"]; }
     else if (input.kind === "students" && !validStatus(value(raw, a.studentStatus || []))) { row.classification = "conflict"; row.reasons = ["studentStatus must be a recognized boolean/status value"]; }
-     input.onProgress?.({ processed: index + 1, total: source.length, inserted: index + 1, skipped: 0, errors: 0, percent: Math.round(((index + 1) / source.length) * 70), message: "Validating Registry records" });
+      input.onProgress?.({ processed: index + 1, total: source.length, inserted: 0, skipped: 0, errors: 0, percent: Math.round(((index + 1) / source.length) * 20), message: "Validating Registry records" });
      return row;
   });
   classify(rows, input.kind);
-  const imported: any = await RegistryImport.create({ institution: input.actor.institution as any, uploadedBy: input.actor._id as any, kind: input.kind, filename: input.filename, rows, summary: summarize(rows) });
+  const imported: any = await RegistryImport.create({ institution: input.actor.institution as any, uploadedBy: input.actor._id as any, kind: input.kind, filename: input.filename, rows, summary: summarize(rows), totalRows: rows.length, processingStatus: "staged" });
   await reconcileRegistryImport(imported._id.toString(), input.actor);
-  input.onProgress?.({ processed: rows.length, total: rows.length, inserted: rows.filter((row) => row.classification === "matched").length, skipped: rows.filter((row) => row.classification === "duplicate").length, errors: rows.filter((row) => row.classification === "conflict" || row.classification === "missing/unmatched").length, percent: 90, message: "Reconciling Registry records" });
+  input.onProgress?.({ processed: 0, total: rows.length, inserted: 0, skipped: 0, errors: 0, percent: 25, message: "Registry records staged; starting database processing" });
   await recordAudit({ action: "registry.upload.staged", actorId: id(input.actor._id), ...(input.actor.email ? { actorEmail: input.actor.email } : {}), actorRole: roleName(input.actor), targetCollection: "RegistryImport", targetId: imported._id.toString(), details: { kind: input.kind, filename: input.filename, rows: rows.length } });
   return RegistryImport.findById(imported._id).lean();
 };
@@ -143,106 +143,164 @@ export const resolveRegistryRow = async (importId: string, rowNumber: number, re
   return imported.toObject();
 };
 
-export const applyRegistryImport = async (importId: string, actor: Actor) => {
-  const imported: any = await (RegistryImport as any).findOne({ _id: importId, institution: actor.institution as any });
-  if (!imported) throw new Error("Registry import not found");
-  let applied = 0; let nationalIdsBackfilled = 0; const skipped: Array<{ rowNumber: number; reason: string }> = [];
-  for (const row of imported.rows as RegistryRow[]) {
-    if (imported.kind === "students") {
-      if (row.classification === "conflict" || row.classification === "duplicate") {
-        skipped.push({ rowNumber: row.rowNumber, reason: "Conflict or duplicate requires review" });
-        continue;
-      }
-       const existing: any = await (Student as any).findOne({ institution: actor.institution as any, $or: [{ studentId: row.studentId }, { email: row.email }, ...(row.nationalId ? [{ nationalId: row.nationalId }] : [])] });
-      if (existing) {
-        if (row.nationalId) {
-          const currentNationalId = normalizeNationalId(existing.nationalId || "");
-          if (!currentNationalId) {
-            const nationalIdOwner: any = await (Student as any).findOne({ institution: actor.institution as any, nationalId: row.nationalId, _id: { $ne: existing._id } });
-            if (nationalIdOwner) {
-              skipped.push({ rowNumber: row.rowNumber, reason: "National ID belongs to another student" });
-              continue;
+const terminalOutcome = (row: RegistryRow, outcome: "inserted" | "updated" | "skipped" | "error", reason?: string, error?: unknown) => {
+  row.outcome = outcome;
+  row.processedAt = new Date().toISOString();
+  if (outcome === "skipped" || outcome === "error") {
+    row.exceptionStatus = "open";
+    row.reasons = [reason || "Row could not be processed"];
+    const failure = { reason: reason || "Row could not be processed", error: error instanceof Error ? error.message : String(error || reason || "Unknown error"), at: row.processedAt };
+    row.failureHistory = [...(Array.isArray(row.failureHistory) ? row.failureHistory : []), failure];
+    row.failure = failure;
+  } else {
+    row.exceptionStatus = null;
+    row.failure = null;
+  }
+  return { rowNumber: row.rowNumber, reason };
+};
+
+const processRegistryRow = async (imported: any, row: RegistryRow, actor: Actor) => {
+  if (["inserted", "updated", "skipped", "error"].includes(String(row.outcome))) return row.outcome;
+  if (row.classification === "conflict" || row.classification === "duplicate") {
+    terminalOutcome(row, "skipped", row.reasons?.join("; ") || (row.classification === "duplicate" ? "Duplicate row in upload" : "Conflict requires review"));
+    return "skipped";
+  }
+
+  if (imported.kind === "students") {
+    const existing: any = await Student.findOne({ institution: actor.institution as any, $or: [{ studentId: row.studentId }, { email: row.email }, ...(row.nationalId ? [{ nationalId: row.nationalId }] : [])] });
+    if (existing) {
+      let changed = false;
+      if (row.nationalId) {
+        const currentNationalId = normalizeNationalId(existing.nationalId || "");
+        if (!currentNationalId) {
+          try {
+            const update = await Student.updateOne({ _id: existing._id, institution: actor.institution as any, $or: [{ nationalId: { $exists: false } }, { nationalId: null }, { nationalId: "" }] }, { $set: { nationalId: row.nationalId } });
+            if (update.modifiedCount === 1) changed = true;
+          } catch (error: any) {
+            if (String(error?.code) === "11000" || /duplicate/i.test(String(error?.message || ""))) {
+              terminalOutcome(row, "error", "National ID belongs to another student", error);
+              return "error";
             }
-            try {
-              const nidUpdate = await (Student as any).updateOne({ _id: existing._id, institution: actor.institution as any, $or: [{ nationalId: { $exists: false } }, { nationalId: null }, { nationalId: "" }] }, { $set: { nationalId: row.nationalId } });
-              if (nidUpdate.modifiedCount === 1) {
-                existing.nationalId = row.nationalId;
-                nationalIdsBackfilled += 1;
-                await recordAudit({ ...registryActor(actor), action: "registry.student.nationalId.backfilled", targetCollection: "Student", targetId: id(existing._id), details: { importId, rowNumber: row.rowNumber, studentId: existing.studentId, nationalId: row.nationalId } });
-              } else {
-                const refreshed: any = await (Student as any).findOne({ _id: existing._id, institution: actor.institution as any }).lean();
-                if (refreshed && normalizeNationalId(refreshed.nationalId || "") !== normalizeNationalId(row.nationalId)) {
-                  skipped.push({ rowNumber: row.rowNumber, reason: "Student National ID changed before it could be updated" });
-                  continue;
-                }
-                if (refreshed) existing.nationalId = refreshed.nationalId;
-              }
-            } catch (error: any) {
-              if (String(error?.code) === "11000" || /duplicate/i.test(String(error?.message || ""))) {
-                skipped.push({ rowNumber: row.rowNumber, reason: "National ID belongs to another student" });
-                continue;
-              }
-              throw error;
-            }
-          } else if (currentNationalId !== normalizeNationalId(row.nationalId)) {
-            skipped.push({ rowNumber: row.rowNumber, reason: "Existing National ID differs; explicit exception required" });
-            continue;
+            throw error;
           }
+        } else if (currentNationalId !== normalizeNationalId(row.nationalId)) {
+          terminalOutcome(row, "error", "Existing National ID differs; explicit correction required");
+          return "error";
         }
-        if (row.borrowerNumber && !existing.borrowerNumber && row.resolution?.action === "assignBorrower") {
-          const owner: any = await (Student as any).findOne({ institution: actor.institution as any, borrowerNumber: row.borrowerNumber, _id: { $ne: existing._id } });
-          if (owner) skipped.push({ rowNumber: row.rowNumber, reason: "Borrower number belongs to another student" });
-           else {
-             try {
-               const result = await assignBorrowerNumber({ institution: actor.institution, studentId: id(existing._id), borrowerNumber: row.borrowerNumber, actor, details: { importId, rowNumber: row.rowNumber } });
-               if (!result.alreadyAssigned) applied += 1;
-             } catch (error) {
-               skipped.push({ rowNumber: row.rowNumber, reason: error instanceof BorrowerAssignmentError ? error.message : "Borrower number assignment was not applied" });
-             }
-           }
-        } else skipped.push({ rowNumber: row.rowNumber, reason: "Student already exists; no approved change" });
-        continue;
       }
-       const owner: any = row.borrowerNumber ? await (Student as any).findOne({ institution: actor.institution as any, borrowerNumber: row.borrowerNumber }) : null;
-       if (owner) { skipped.push({ rowNumber: row.rowNumber, reason: "Borrower number belongs to another student" }); continue; }
-        const createdStudent: any = await (Student as any).create({ institution: actor.institution as any, studentId: row.studentId, email: row.email, name: row.name, surname: row.surname, studentStatus: row.studentStatus, ...(row.nationalId ? { nationalId: row.nationalId } : {}) });
-        await recordAudit({ action: "registry.student.created", actorId: id(actor._id), ...(actor.email ? { actorEmail: actor.email } : {}), actorRole: roleName(actor), targetCollection: "Student", details: { studentId: row.studentId, nationalId: row.nationalId } });
-       if (row.borrowerNumber) {
-         try { await assignBorrowerNumber({ institution: actor.institution, studentId: id(createdStudent._id), borrowerNumber: row.borrowerNumber, actor, details: { importId, rowNumber: row.rowNumber } }); }
-         catch (error) { skipped.push({ rowNumber: row.rowNumber, reason: error instanceof BorrowerAssignmentError ? error.message : "Borrower number assignment was not applied" }); }
-       }
-       applied += 1;
-      continue;
+      if (row.borrowerNumber && !existing.borrowerNumber && row.resolution?.action === "assignBorrower") {
+        try { await assignBorrowerNumber({ institution: actor.institution, studentId: id(existing._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber } }); changed = true; }
+        catch (error) { terminalOutcome(row, "error", error instanceof BorrowerAssignmentError ? error.message : "Borrower number assignment was not applied", error); return "error"; }
+      }
+      const sameRecord = String(existing.studentId || "").toLowerCase() === String(row.studentId || "").toLowerCase()
+        && String(existing.email || "").toLowerCase() === String(row.email || "").toLowerCase()
+        && (!row.nationalId || normalizeNationalId(existing.nationalId || "") === normalizeNationalId(row.nationalId))
+        && (!row.borrowerNumber || String(existing.borrowerNumber || "") === String(row.borrowerNumber));
+      terminalOutcome(row, changed || sameRecord ? "updated" : "skipped", changed || sameRecord ? undefined : "Student already exists; no approved change");
+      return changed || sameRecord ? "updated" : "skipped";
     }
-    const targetId = row.resolution?.action === "assignBorrower" ? row.resolution.targetStudentId : row.classification === "matched" ? row.targetStudentId : undefined;
-    if (!targetId || !row.borrowerNumber) {
-      const detail = Array.isArray(row.reasons) && row.reasons.length ? row.reasons.join("; ") : "";
-      let reason = detail || "Row could not be applied";
-      if (row.classification === "duplicate") reason = detail || "Duplicate row in upload";
-      else if (row.classification === "conflict") reason = detail || "Conflict requires review";
-      else if (row.classification === "missing/unmatched") reason = detail ? `${detail} (National ID: ${row.nationalId || "missing"})` : `Student's National ID (${row.nationalId || "missing"}) does not exist in Registered Students`;
-      else if (!row.borrowerNumber) reason = "Row has no borrower number";
-      skipped.push({ rowNumber: row.rowNumber, reason });
-      continue;
+    const owner: any = row.borrowerNumber ? await Student.findOne({ institution: actor.institution as any, borrowerNumber: row.borrowerNumber }) : null;
+    if (owner) { terminalOutcome(row, "error", "Borrower number belongs to another student"); return "error"; }
+    let createdStudent: any;
+    try {
+      createdStudent = await Student.create({ institution: actor.institution as any, studentId: row.studentId, email: row.email, name: row.name, surname: row.surname, studentStatus: row.studentStatus, ...(row.nationalId ? { nationalId: row.nationalId } : {}) });
+      if (row.borrowerNumber) await assignBorrowerNumber({ institution: actor.institution, studentId: id(createdStudent._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber } });
+    } catch (error: any) {
+      if (createdStudent?._id) await Student.deleteOne({ _id: createdStudent._id, institution: actor.institution as any, borrowerNumber: { $in: [null, ""] } });
+      if (String(error?.code) === "11000") { terminalOutcome(row, "error", "Student identifier already exists or conflicts with another student", error); return "error"; }
+      terminalOutcome(row, "error", error instanceof BorrowerAssignmentError ? error.message : "Student could not be created", error);
+      return "error";
     }
-     const student: any = await (Student as any).findOne({ _id: targetId, institution: actor.institution as any });
-     if (!student) { skipped.push({ rowNumber: row.rowNumber, reason: "Target student no longer exists" }); continue; }
+    await recordAudit({ ...registryActor(actor), action: "registry.student.created", targetCollection: "Student", targetId: id(createdStudent._id), details: { importId: id(imported._id), rowNumber: row.rowNumber, studentId: row.studentId, nationalId: row.nationalId } });
+    terminalOutcome(row, "inserted");
+    return "inserted";
+  }
+
+  const targetId = row.resolution?.action === "assignBorrower" ? row.resolution.targetStudentId : row.classification === "matched" ? row.targetStudentId : undefined;
+  if (!targetId || !row.borrowerNumber) {
+    const reason = row.reasons?.join("; ") || (!row.borrowerNumber ? "Row has no borrower number" : `Student's National ID (${row.nationalId || "missing"}) does not exist in Registered Students`);
+    terminalOutcome(row, "skipped", reason);
+    return "skipped";
+  }
+  const student: any = await Student.findOne({ _id: targetId, institution: actor.institution as any });
+  if (!student) { terminalOutcome(row, "error", "Target student no longer exists"); return "error"; }
+  try {
+    await assignBorrowerNumber({ institution: actor.institution, studentId: id(student._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber } });
+    const existingClearance: any = await RegistryFinancialClearance.findOne({ institution: actor.institution as any, $or: [{ borrowerNumber: row.borrowerNumber }, { accountNumber: row.accountNumber }] });
+    if (!existingClearance) await RegistryFinancialClearance.create({ institution: actor.institution as any, student: student._id, registryImport: imported._id, rowNumber: row.rowNumber, nationalId: row.nationalId, borrowerNumber: row.borrowerNumber, accountNumber: row.accountNumber, bankName: row.bankName, batchNumber: row.batchNumber || 0, courseOfStudy: row.courseOfStudy, fullnames: row.fullnames, graduating: Boolean(row.graduating), status: row.status || "pending" });
+    terminalOutcome(row, "inserted");
+    return "inserted";
+  } catch (error: any) {
+    if (String(error?.code) === "11000") {
+      const duplicate = await RegistryFinancialClearance.findOne({ institution: actor.institution as any, $or: [{ registryImport: imported._id, rowNumber: row.rowNumber }, { borrowerNumber: row.borrowerNumber }, { accountNumber: row.accountNumber }] });
+      if (duplicate) { terminalOutcome(row, "updated"); return "updated"; }
+    }
+    terminalOutcome(row, "error", error instanceof BorrowerAssignmentError ? error.message : "Financial clearance could not be persisted", error);
+    return "error";
+  }
+};
+
+export type RegistryApplyProgress = RegistryUploadProgress & { type?: "progress" | "completed" | "error" };
+
+export const applyRegistryImport = async (importId: string, actor: Actor, onProgress?: RegistryProgressCallback) => {
+  const now = new Date();
+  const stale = new Date(now.getTime() - 10 * 60 * 1000);
+  const imported: any = await (RegistryImport as any).findOneAndUpdate(
+    { _id: importId, institution: actor.institution as any, status: { $ne: "applied" }, $or: [{ processingStatus: { $in: ["staged", "failed", null] } }, { processingStatus: "processing", processingAt: { $lt: stale } }] },
+    { $set: { processingStatus: "processing", processingAt: now }, $setOnInsert: { totalRows: 0 } },
+    { new: true },
+  );
+  if (!imported) {
+    const current: any = await RegistryImport.findOne({ _id: importId, institution: actor.institution as any });
+    if (!current) throw new Error("Registry import not found");
+    if (current.processingStatus === "completed" || current.status === "applied") return { importId, applied: Number(current.inserted || 0) + Number(current.updated || 0), inserted: Number(current.inserted || 0), updated: Number(current.updated || 0), skipped: Number(current.skipped || 0), errors: Number(current.errors || 0), processed: Number(current.processed || 0), total: Number(current.totalRows || current.rows?.length || 0), status: "completed" };
+    throw new Error("Registry import is already being processed");
+  }
+  const rows: RegistryRow[] = imported.rows || [];
+  imported.totalRows = rows.length;
+  imported.processed = Number(imported.processed || 0);
+  imported.inserted = Number(imported.inserted || 0);
+  imported.updated = Number(imported.updated || 0);
+  imported.skipped = Number(imported.skipped || 0);
+  imported.errors = Number(imported.errors || 0);
+  const emit = (message: string) => onProgress?.({ processed: imported.processed, total: rows.length, inserted: imported.inserted, skipped: imported.skipped, errors: imported.errors, percent: rows.length ? Math.floor(25 + (imported.processed / rows.length) * 75) : 100, message });
+  try {
+    emit("Processing Registry records");
+    for (const row of rows) {
+      if (["inserted", "updated", "skipped", "error"].includes(String(row.outcome))) continue;
+      let result: string;
       try {
-        const assignment = await assignBorrowerNumber({ institution: actor.institution, studentId: id(student._id), borrowerNumber: row.borrowerNumber, actor, details: { importId, rowNumber: row.rowNumber } });
-        if (!assignment.alreadyAssigned) applied += 1;
+        result = await processRegistryRow(imported, row, actor);
       } catch (error) {
-        skipped.push({ rowNumber: row.rowNumber, reason: error instanceof BorrowerAssignmentError ? error.message : "Borrower number assignment was not applied" });
-        continue;
+        terminalOutcome(row, "error", "Unexpected row processing failure", error);
+        result = "error";
       }
-     const existingClearance: any = await (RegistryFinancialClearance as any).findOne({ institution: actor.institution as any, $or: [{ borrowerNumber: row.borrowerNumber }, { accountNumber: row.accountNumber }] });
-      if (!existingClearance) {
-         const created: any = await (RegistryFinancialClearance as any).create({ institution: actor.institution as any, student: student._id, registryImport: imported._id, rowNumber: row.rowNumber, nationalId: row.nationalId, borrowerNumber: row.borrowerNumber, accountNumber: row.accountNumber, bankName: row.bankName, batchNumber: row.batchNumber || 0, courseOfStudy: row.courseOfStudy, fullnames: row.fullnames, graduating: Boolean(row.graduating), status: row.status || "pending" });
-        await recordAudit({ ...registryActor(actor), action: "registry.financial.created", targetCollection: "RegistryFinancialClearance", targetId: id(created._id), details: { importId, rowNumber: row.rowNumber, borrowerNumber: row.borrowerNumber, accountNumber: row.accountNumber } });
-      }
+      imported.processed += 1;
+      if (result === "inserted") imported.inserted += 1;
+      else if (result === "updated") imported.updated += 1;
+      else if (result === "skipped") imported.skipped += 1;
+      else imported.errors += 1;
+      imported.summary = summarize(rows);
+      imported.markModified("rows");
+      await imported.save();
+      emit("Processing Registry records");
     }
-  imported.status = "applied"; imported.markModified("rows"); await imported.save();
-  await recordAudit({ action: "registry.assignments.applied", actorId: id(actor._id), ...(actor.email ? { actorEmail: actor.email } : {}), actorRole: roleName(actor), targetCollection: "RegistryImport", targetId: importId, details: { applied, skipped, nationalIdsBackfilled } });
-  return { importId, applied, skipped, status: imported.status };
+    imported.status = "applied";
+    imported.processingStatus = "completed";
+    imported.completedAt = new Date();
+    imported.processed = rows.length;
+    await imported.save();
+    const result = { importId, applied: imported.inserted + imported.updated, inserted: imported.inserted, updated: imported.updated, skipped: imported.skipped, errors: imported.errors, processed: imported.processed, total: rows.length, status: "completed" as const };
+    onProgress?.({ ...result, percent: 100, message: "Import completed" });
+    await recordAudit({ action: "registry.assignments.applied", actorId: id(actor._id), ...(actor.email ? { actorEmail: actor.email } : {}), actorRole: roleName(actor), targetCollection: "RegistryImport", targetId: importId, details: result });
+    return result;
+  } catch (error: any) {
+    imported.processingStatus = "failed";
+    imported.lastError = error?.message || String(error);
+    await imported.save();
+    onProgress?.({ processed: imported.processed, total: rows.length, inserted: imported.inserted, skipped: imported.skipped, errors: imported.errors, percent: rows.length ? Math.floor(25 + (imported.processed / rows.length) * 75) : 0, message: imported.lastError });
+    throw error;
+  }
 };
 
 export const getRegistryDashboard = async (actor: Actor) => {
@@ -344,16 +402,59 @@ export const deleteRegistryStudent = async (actor: Actor, studentId: string) => 
 };
 
 const exceptionRow = async (actor: Actor, importId: string, rowNumber: number) => {
-  const imported: any = await (RegistryImport as any).findOne({ _id: importId, institution: actor.institution as any, kind: "financial" });
-  if (!imported) throw new Error("Financial exception import not found");
+  const imported: any = await (RegistryImport as any).findOne({ _id: importId, institution: actor.institution as any });
+  if (!imported) throw new Error("Registry exception import not found");
   const row = (imported.rows as RegistryRow[]).find((candidate) => candidate.rowNumber === rowNumber);
   if (!row) throw new Error("Registry exception not found");
   return { imported, row };
 };
 
 export const listRegistryExceptions = async (actor: Actor) => {
-  const latest: any = await (RegistryImport as any).findOne({ institution: actor.institution as any, kind: "financial" }).sort({ createdAt: -1 }).lean();
-  return latest ? (latest.rows as RegistryRow[]).filter((row) => row.classification !== "matched").map((row) => ({ importId: latest._id, ...row })) : [];
+  const imports: any[] = await (RegistryImport as any).find({ institution: actor.institution as any }).sort({ createdAt: -1 }).limit(20).lean();
+  return imports.flatMap((imported) => (Array.isArray(imported.rows) ? imported.rows : [])
+    .filter((row: RegistryRow) => row.exceptionStatus === "open" || !["inserted", "updated"].includes(String(row.outcome)))
+    .map((row: RegistryRow) => ({ importId: imported._id, importKind: imported.kind, filename: imported.filename, ...row })));
+};
+
+export const reconcileImportCounts = (rows: RegistryRow[]) => ({
+  total: rows.length,
+  processed: rows.filter((row) => ["inserted", "updated", "skipped", "error"].includes(String(row.outcome))).length,
+  inserted: rows.filter((row) => row.outcome === "inserted").length,
+  updated: rows.filter((row) => row.outcome === "updated").length,
+  skipped: rows.filter((row) => row.outcome === "skipped").length,
+  errors: rows.filter((row) => row.outcome === "error").length,
+});
+
+const recountImport = (imported: any) => {
+  const rows: RegistryRow[] = imported.rows || [];
+  const counts = reconcileImportCounts(rows);
+  imported.totalRows = counts.total;
+  imported.processed = counts.processed;
+  imported.inserted = counts.inserted;
+  imported.updated = counts.updated;
+  imported.skipped = counts.skipped;
+  imported.errors = counts.errors;
+  imported.summary = summarize(rows);
+  imported.markModified("rows");
+  imported.markModified("summary");
+};
+
+const retryExceptionRow = async (actor: Actor, imported: any, row: RegistryRow) => {
+  row.outcome = "pending";
+  row.exceptionStatus = "open";
+  row.failure = null;
+  row.resolution = null;
+  if (imported.kind === "students") {
+    await reconcileRegistryImport(id(imported._id), actor);
+    const refreshed: any = await RegistryImport.findById(imported._id).lean();
+    const refreshedRow = refreshed?.rows?.find((candidate: RegistryRow) => candidate.rowNumber === row.rowNumber);
+    if (refreshedRow) Object.assign(row, refreshedRow, { outcome: "pending", exceptionStatus: "open", failure: null });
+  } else await reconcileExceptionRow(actor, imported, row);
+  const outcome = await processRegistryRow(imported, row, actor);
+  if (outcome === "inserted" || outcome === "updated") row.exceptionStatus = "resolved";
+  recountImport(imported);
+  await imported.save();
+  return outcome;
 };
 
 export type ExceptionReconciliation = {
@@ -441,19 +542,22 @@ export const findStudentByNationalId = async (actor: Actor, nationalId: unknown)
 
 export const editRegistryException = async (actor: Actor, importId: string, rowNumber: number, changes: RegistryRow, options?: { autoReconcile?: boolean }) => {
   const { imported, row } = await exceptionRow(actor, importId, rowNumber);
-  for (const key of ["fullnames", "nationalId", "borrowerNumber", "courseOfStudy", "bankName", "accountNumber"]) if (changes[key] !== undefined) row[key] = key === "nationalId" ? normalizeNationalId(changes[key]) : String(changes[key]).trim();
-  row.classification = "missing/unmatched"; row.reasons = ["Exception edited; reconciliation required"]; row.resolution = null; row.targetStudentId = undefined;
+  const fields = imported.kind === "students" ? ["name", "surname", "email", "nationalId", "studentId", "studentStatus", "borrowerNumber"] : ["fullnames", "nationalId", "borrowerNumber", "courseOfStudy", "bankName", "accountNumber"];
+  for (const key of fields) if (changes[key] !== undefined) row[key] = key === "nationalId" ? normalizeNationalId(changes[key]) : key === "email" ? String(changes[key]).trim().toLowerCase() : key === "studentStatus" ? Boolean(changes[key]) : String(changes[key]).trim();
+  row.classification = "missing/unmatched"; row.reasons = ["Exception edited; reconciliation required"]; row.targetStudentId = undefined;
   let reconciliation: ExceptionReconciliation | undefined;
-  if (options?.autoReconcile !== false) reconciliation = await reconcileExceptionRow(actor, imported, row);
-  imported.summary = summarize(imported.rows); imported.markModified("rows"); imported.markModified("summary"); await imported.save();
+  if (options?.autoReconcile !== false) {
+    const outcome = await retryExceptionRow(actor, imported, row);
+    reconciliation = { reconciled: outcome === "inserted" || outcome === "updated", assigned: outcome === "updated", message: outcome === "error" || outcome === "skipped" ? row.failure?.reason || row.reasons?.[0] || "Exception remains unresolved" : "Exception record successfully retried" };
+  } else { recountImport(imported); await imported.save(); }
   await recordAudit({ ...registryActor(actor), action: "registry.exception.updated", targetCollection: "RegistryImport", targetId: importId, details: { rowNumber, changes, reconciliation } });
   return { ...row, reconciliation };
 };
 
 export const reconcileException = async (actor: Actor, importId: string, rowNumber: number) => {
   const { imported, row } = await exceptionRow(actor, importId, rowNumber);
-  const reconciliation = await reconcileExceptionRow(actor, imported, row);
-  imported.summary = summarize(imported.rows); imported.markModified("rows"); imported.markModified("summary"); await imported.save();
+  const outcome = await retryExceptionRow(actor, imported, row);
+  const reconciliation = { reconciled: outcome === "inserted" || outcome === "updated", assigned: outcome === "updated", message: outcome === "error" || outcome === "skipped" ? row.failure?.reason || row.reasons?.[0] || "Exception remains unresolved" : "Exception record successfully retried" };
   await recordAudit({ ...registryActor(actor), action: "registry.exception.reconciled", targetCollection: "RegistryImport", targetId: importId, details: { rowNumber, reconciliation } });
   return { ...row, reconciliation };
 };

@@ -87,7 +87,7 @@ interface AccountExportResult {
 
 const safeString = (value: unknown): string => String(value ?? "").trim();
 
-const normalizeAccountStatus = (value: unknown): "pending" | "confirmed" | "erroneous" | "paid" => {
+export const normalizeAccountStatus = (value: unknown): "pending" | "confirmed" | "erroneous" | "paid" => {
   const status = String(value || "").trim().toLowerCase();
   if (status === "confirmed" || status === "erroneous" || status === "paid") {
     return status;

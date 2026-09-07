@@ -26,6 +26,15 @@ export interface RegistryRow {
   graduating?: boolean;
   status?: string;
   resolution?: { action: string; targetStudentId?: string } | null;
+  source?: Record<string, unknown>;
+  name?: string;
+  surname?: string;
+  email?: string;
+  studentId?: string;
+  studentStatus?: boolean;
+  outcome?: 'pending' | 'inserted' | 'updated' | 'skipped' | 'error';
+  exceptionStatus?: 'open' | 'resolved' | null;
+  failure?: { reason: string; error: string; at: string } | null;
 }
 
 export interface ExceptionReconciliation {
@@ -52,11 +61,24 @@ export interface RegistryImport {
 
 export interface RegistryException extends RegistryRow {
   importId: string;
+  importKind?: 'students' | 'financial';
+  filename?: string;
 }
 
 export interface RegistryDashboard {
   stats: { totalRegistered: number; assigned: number; missing: number; conflicts: number };
   latestReconciliation?: { importId: string; summary: Record<string, number> } | null;
+}
+
+interface RegistryApplyResult {
+  applied: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  processed: number;
+  total: number;
+  status: string;
 }
 
 export interface RegistryProgress {
@@ -66,6 +88,7 @@ export interface RegistryProgress {
   processed?: number;
   total?: number;
   inserted?: number;
+  updated?: number;
   skipped?: number;
   errors?: number;
 }
@@ -127,5 +150,15 @@ export const registryService = {
   addException: async (importId: string, rowNumber: number, data: Partial<RegistryStudent>) => (await apiClient.post<{ data: RegistryStudent }>(`/registry/exceptions/${importId}/${rowNumber}/add-to-registry`, data)).data.data,
   uploadStudents: (file: File, onProgress?: (progress: RegistryProgress) => void) => upload('/registry/uploads/students', file, onProgress),
   uploadFinancial: (file: File, onProgress?: (progress: RegistryProgress) => void) => upload('/registry/uploads/financial-clearance', file, onProgress),
-  applyImport: async (id: string) => (await apiClient.post<{ data: { applied: number; skipped: Array<{ rowNumber: number; reason: string }> } }>(`/registry/imports/${id}/apply`)).data.data,
+  applyImport: async (id: string, onProgress?: (progress: RegistryProgress) => void) => {
+    if (!onProgress) return (await apiClient.post<{ data: RegistryApplyResult }>(`/registry/imports/${id}/apply`)).data.data;
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_BASE_URL}/registry/imports/${id}/apply?stream=1`, { method: 'POST', headers: { Accept: 'application/x-ndjson', ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+    if (!response.ok || !response.body) throw new Error(parseStreamError(await response.text()));
+    const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ''; let completed: RegistryApplyResult | null = null;
+    const consume = (line: string) => { if (!line.trim()) return; const event = JSON.parse(line) as RegistryProgress & { result?: RegistryApplyResult }; if (event.type === 'error') throw new Error(event.message || 'Apply failed'); if (event.type === 'progress' || event.type === 'completed') onProgress(event); if (event.type === 'completed') completed = event.result || event as unknown as RegistryApplyResult; };
+    while (true) { const { value, done } = await reader.read(); buffer += decoder.decode(value, { stream: !done }); const lines = buffer.split('\n'); buffer = lines.pop() || ''; lines.forEach(consume); if (done) break; }
+    if (buffer.trim()) consume(buffer);
+    return completed || (() => { throw new Error('Apply completed without a result'); })();
+  },
 };

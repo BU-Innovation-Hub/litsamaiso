@@ -33,8 +33,20 @@ const studentSchema = new Schema<StudentDocument>(
   },
 );
 
-studentSchema.index({ institution: 1, nationalId: 1 }, { unique: true, sparse: true });
-studentSchema.index({ institution: 1, borrowerNumber: 1 }, { unique: true, sparse: true });
+studentSchema.index(
+  { institution: 1, nationalId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { nationalId: { $type: "string", $gt: "" } },
+  },
+);
+studentSchema.index(
+  { institution: 1, borrowerNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { borrowerNumber: { $type: "string", $gt: "" } },
+  },
+);
 
 export const Student = model<StudentDocument>("Student", studentSchema);
 export default Student;

@@ -33,19 +33,26 @@ const streamUpload = (req: Request, res: Response, kind: "students" | "financial
   write({ type: "started", processed: 0, total: 0, inserted: 0, skipped: 0, errors: 0, percent: 0, message: "Reading spreadsheet" });
   void stageRegistryUpload({ buffer: file.buffer, filename: file.originalname, kind, actor: scopedActor(req), onProgress: (progress: RegistryUploadProgress) => write({ type: "progress", ...progress }) })
     .then((result: any) => {
-      const summary = result.summary || {};
-      const total = Number(summary.total || result.rows?.length || 0);
-      write({ type: "completed", processed: total, total, inserted: Number(summary.matched || 0), skipped: Number(summary.duplicate || 0), errors: Number(summary.conflict || 0) + Number(summary["missing/unmatched"] || 0), percent: 100, message: "Import completed", result });
+      const total = Number(result.rows?.length || 0);
+      write({ type: "completed", processed: 0, total, inserted: 0, skipped: 0, errors: 0, percent: 25, message: "Spreadsheet staged; processing records", result });
       res.end();
     })
-    .catch((error: any) => { write({ type: "error", processed: 0, total: 0, inserted: 0, skipped: 0, errors: 1, percent: 100, message: error?.message || "Registry upload failed" }); res.end(); });
+    .catch((error: any) => { write({ type: "error", processed: 0, total: 0, inserted: 0, skipped: 0, errors: 1, percent: 0, message: error?.message || "Registry upload failed" }); res.end(); });
 };
 export const uploadRegistryStudents = (req: Request, res: Response) => streamUpload(req, res, "students");
 export const uploadRegistryFinancial = (req: Request, res: Response) => streamUpload(req, res, "financial");
 export const dashboard = (req: Request, res: Response) => void handle(res, () => getRegistryDashboard(scopedActor(req)));
 export const getImport = (req: Request, res: Response) => void handle(res, () => reconcileRegistryImport(req.params.id as string, scopedActor(req)));
 export const resolveRow = (req: Request, res: Response) => void handle(res, () => resolveRegistryRow(req.params.id as string, Number(req.body?.rowNumber), req.body || {}, scopedActor(req)));
-export const applyImport = (req: Request, res: Response) => void handle(res, () => applyRegistryImport(req.params.id as string, scopedActor(req)));
+export const applyImport = (req: Request, res: Response) => {
+  if (!wantsStream(req)) { void handle(res, () => applyRegistryImport(req.params.id as string, scopedActor(req))); return; }
+  const write = (event: Record<string, unknown>) => res.write(`${JSON.stringify(event)}\n`);
+  res.status(200).setHeader("Content-Type", "application/x-ndjson").setHeader("Cache-Control", "no-cache").setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+  void applyRegistryImport(req.params.id as string, scopedActor(req), (progress) => write({ type: "progress", ...progress }))
+    .then((result: any) => { write({ type: "completed", ...result, percent: 100, message: "Import completed", result }); res.end(); })
+    .catch((error: any) => { write({ type: "error", percent: 0, message: error?.message || "Registry apply failed" }); res.end(); });
+};
 export const listStudents = (req: Request, res: Response) => void handle(res, () => listRegistryStudents(scopedActor(req), { search: String(req.query.search || ""), status: String(req.query.status || ""), borrower: String(req.query.borrower || ""), page: Number(req.query.page), limit: Number(req.query.limit) }));
 export const addStudent = (req: Request, res: Response) => void handle(res, () => addRegistryStudent(scopedActor(req), req.body || {}));
 export const editStudent = (req: Request, res: Response) => void handle(res, () => editRegistryStudent(scopedActor(req), req.params.id as string, req.body || {}));

@@ -16,6 +16,16 @@ export interface RegistryImportDocument {
   rows: any;
   summary: Record<string, number>;
   status: "staged" | "applied";
+  processingStatus?: "staged" | "processing" | "completed" | "failed";
+  totalRows?: number;
+  processed?: number;
+  inserted?: number;
+  updated?: number;
+  skipped?: number;
+  errors?: number;
+  processingAt?: Date;
+  completedAt?: Date;
+  lastError?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -29,8 +39,18 @@ const registryImportSchema = new Schema<RegistryImportDocument>(
     rows: { type: Schema.Types.Mixed, default: [] },
     summary: { type: Schema.Types.Mixed, default: {} },
     status: { type: String, enum: ["staged", "applied"], default: "staged" },
+    processingStatus: { type: String, enum: ["staged", "processing", "completed", "failed"], default: "staged" },
+    totalRows: { type: Number, default: 0 },
+    processed: { type: Number, default: 0 },
+    inserted: { type: Number, default: 0 },
+    updated: { type: Number, default: 0 },
+    skipped: { type: Number, default: 0 },
+    errors: { type: Number, default: 0 },
+    processingAt: { type: Date },
+    completedAt: { type: Date },
+    lastError: { type: String },
   },
-  { timestamps: true },
+  { timestamps: true, suppressReservedKeysWarning: true },
 );
 
 registryImportSchema.index({ institution: 1, createdAt: -1 });
