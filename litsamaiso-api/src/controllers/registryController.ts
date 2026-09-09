@@ -20,7 +20,7 @@ const scopedActor = (req: Request): any => {
     institution: role === "appadmin" && requested ? requested : current.institution,
   };
 };
-const handle = async (res: Response, action: () => Promise<unknown>) => { try { res.json({ data: await action() }); } catch (error: any) { res.status(400).json({ message: error?.message || "Registry request failed" }); } };
+const handle = async (res: Response, action: () => Promise<unknown>) => { try { res.json({ data: await action() }); } catch (error: any) { const status = Number(error?.statusCode) === 409 ? 409 : 400; res.status(status).json({ message: error?.message || "Registry request failed" }); } };
 
 const wantsStream = (req: Request) => req.query.stream === "1" || String(req.headers.accept || "").includes("application/x-ndjson");
 const streamUpload = (req: Request, res: Response, kind: "students" | "financial") => {

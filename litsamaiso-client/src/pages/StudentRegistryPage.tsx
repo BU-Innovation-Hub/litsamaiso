@@ -10,6 +10,31 @@ type UploadState = RegistryProgress & { kind: 'students' | 'financial'; fileName
 
 const emptyForm: StudentForm = { name: '', surname: '', email: '', studentId: '', nationalId: '', studentStatus: true, borrowerNumber: '' };
 const tabFromUrl = (): Tab => new URLSearchParams(window.location.search).get('tab') === 'exceptions' ? 'exceptions' : 'records';
+const classificationLabel = (classification?: string) => ({
+  matched: 'Resolved',
+  conflict: 'Conflict',
+  duplicate: 'Duplicate record',
+  'missing/unmatched': 'Needs review',
+  'possible/review': 'Needs review',
+}[classification || ''] || 'Needs review');
+const formatExceptionReason = (reason: string, exception: RegistryException | RegistryExceptionResult) => {
+  if (reason === 'No existing student matches student ID or email') {
+    const identifiers = [
+      exception.studentId ? `Student ID "${exception.studentId}"` : '',
+      exception.email ? `email "${exception.email}"` : '',
+      exception.nationalId ? `National ID "${exception.nationalId}"` : '',
+    ].filter(Boolean);
+    return identifiers.length ? `No registered student matches ${identifiers.join(', ')}. Verify these values before saving.` : 'No student identifiers were provided. Enter a Student ID, email, and National ID.';
+  }
+  if (reason === 'Borrower number belongs to another student' || reason === 'Borrower number belongs to a different student') {
+    return exception.borrowerNumber ? `Borrower number "${exception.borrowerNumber}" is already assigned to another student.` : 'This borrower number is already assigned to another student.';
+  }
+  if (reason === 'Existing borrower number differs') {
+    return exception.borrowerNumber ? `The matched student already has a different borrower number. Verify borrower number "${exception.borrowerNumber}" before saving.` : 'The matched student already has a different borrower number. Verify the borrower number before saving.';
+  }
+  return reason;
+};
+const exceptionReasons = (exception: RegistryException | RegistryExceptionResult) => (exception.reasons || []).map((reason) => formatExceptionReason(reason, exception));
 
 const UploadAction: React.FC<{ label: string; disabled: boolean; onChoose: (file: File) => void }> = ({ label, disabled, onChoose }) => {
   const input = useRef<HTMLInputElement>(null);
@@ -95,7 +120,8 @@ const ExceptionModal: React.FC<{ exception: RegistryException; onClose: () => vo
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [result, setResult] = useState<RegistryExceptionResult | null>(null);
   const set = (key: keyof ExceptionForm, value: string | boolean) => setForm((current) => ({ ...current, [key]: value }));
-  const status = result ? { classification: result.classification, reasons: result.reasons } : { classification: exception.classification, reasons: exception.reasons };
+   const statusRecord = result ? { ...exception, ...result } : exception;
+   const status = { classification: statusRecord.classification, reasons: exceptionReasons(statusRecord) };
   const reconciliation = result?.reconciliation;
   const statusTone = status.classification === 'matched' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : status.classification === 'conflict' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200';
 
@@ -146,7 +172,7 @@ const ExceptionModal: React.FC<{ exception: RegistryException; onClose: () => vo
           <button type="button" onClick={onClose} className="rounded-md p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
         </div>
          <div className={`mt-4 rounded-md border px-3 py-2.5 text-sm ${statusTone}`}>
-          <span className="font-semibold capitalize">{String(status.classification).replace('/', ' / ')}</span>
+           <span className="font-semibold">{classificationLabel(status.classification)}</span>
           <span className="ml-2">{status.reasons?.join(', ')}</span>
          </div>
          {exception.source && <details className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3"><summary className="cursor-pointer text-sm font-semibold text-slate-700">Original spreadsheet row</summary><pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-xs text-slate-600">{JSON.stringify(exception.source, null, 2)}</pre></details>}

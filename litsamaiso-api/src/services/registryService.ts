@@ -1,4 +1,5 @@
 import XLSX from "xlsx";
+import mongoose from "mongoose";
 import { RegistryImport, type RegistryClassification, type RegistryImportKind } from "../models/RegistryImport.js";
 import { Student } from "../models/Student.js";
 import { User } from "../models/User.js";
@@ -8,6 +9,21 @@ import { assignBorrowerNumber, BorrowerAssignmentError } from "./borrowerAssignm
 
 type RegistryRow = Record<string, any>;
 type Actor = { _id: unknown; email?: string; role?: any; institution: unknown };
+type DbSession = mongoose.ClientSession | undefined;
+
+export class RegistryConcurrencyError extends Error {
+  statusCode = 409;
+
+  constructor(message = "This Registry exception was changed by another request; reload it and try again") {
+    super(message);
+    this.name = "RegistryConcurrencyError";
+  }
+}
+
+const isTransactionUnsupported = (error: unknown) => {
+  const message = String((error as Error)?.message || error).toLowerCase();
+  return message.includes("transaction") || message.includes("replica set") || message.includes("topology");
+};
 
 const normalizeHeader = (value: unknown): string => String(value ?? "").toLowerCase().replace(/[\s_-]+/g, "").replace(/[^a-z0-9]/g, "");
 const value = (row: RegistryRow, aliases: string[]): string => {
@@ -19,6 +35,20 @@ const validStatus = (input: string): boolean => ["true", "false", "1", "0", "yes
 const roleName = (actor: Actor): string => String((actor.role && actor.role.name) || actor.role || "");
 const id = (input: unknown): string => String(input);
 export const normalizeNationalId = (input: unknown): string => String(input ?? "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+export const missingStudentFields = (row: RegistryRow): string[] => ["name", "surname", "email", "studentId", "nationalId"].filter((field) => !String(row[field] ?? "").trim());
+const quoted = (input: unknown) => `"${String(input ?? "").trim()}"`;
+export const borrowerConflictMessage = (borrowerNumber: unknown, owner?: any) => {
+  const ownerReference = owner?.studentId ? ` Student ID ${quoted(owner.studentId)} already owns it.` : " It is already assigned to another student.";
+  return `Borrower number ${quoted(borrowerNumber)} is already assigned to another student.${ownerReference}`;
+};
+export const missingStudentMatchMessage = (row: RegistryRow) => {
+  const identifiers = [
+    row.studentId ? `Student ID ${quoted(row.studentId)}` : "",
+    row.email ? `email ${quoted(row.email)}` : "",
+    row.nationalId ? `National ID ${quoted(row.nationalId)}` : "",
+  ].filter(Boolean);
+  return identifiers.length ? `No registered student matches ${identifiers.join(", ")}. Verify these values before saving.` : "No student identifiers were provided. Enter a Student ID, email, and National ID.";
+};
 
 const requiredHeaders: Record<RegistryImportKind, string[][]> = {
   students: [["name"], ["surname"], ["email"], ["nationalid", "national id", "personalid", "personal id"].map(normalizeHeader), ["studentid"].map(normalizeHeader), ["studentstatus"], ["borrowernumber", "borrower number", "borrowers number"].map(normalizeHeader)],
@@ -85,12 +115,12 @@ export const stageRegistryUpload = async (input: { buffer: Buffer; filename: str
   return RegistryImport.findById(imported._id).lean();
 };
 
-export const reconcileRegistryImport = async (importId: string, actor: Actor) => {
-  const imported: any = await (RegistryImport as any).findOne({ _id: importId, institution: actor.institution as any });
-  if (!imported) throw new Error("Registry import not found");
+const reconcileRegistryDocument = async (imported: any, actor: Actor, session?: DbSession) => {
   const rows: RegistryRow[] = imported.rows as RegistryRow[];
   if (imported.kind === "students") {
-    const students: any[] = await (Student as any).find({ institution: actor.institution as any }).lean();
+    let studentQuery = (Student as any).find({ institution: actor.institution as any });
+    if (session) studentQuery = studentQuery.session(session);
+    const students: any[] = await studentQuery.lean();
     for (const row of rows) {
       if (row.classification === "duplicate" || row.classification === "conflict") continue;
         const byNationalId = row.nationalId && students.find((student) => Boolean(student.nationalId) && normalizeNationalId(student.nationalId) === row.nationalId);
@@ -99,31 +129,41 @@ export const reconcileRegistryImport = async (importId: string, actor: Actor) =>
        if (byNationalId && ((byId && id(byNationalId._id) !== id(byId._id)) || (byEmail && id(byNationalId._id) !== id(byEmail._id)))) { row.classification = "conflict"; row.reasons = ["National ID conflicts with another student identifier"]; continue; }
        if (byId && byEmail && id(byId._id) !== id(byEmail._id)) { row.classification = "conflict"; row.reasons = ["Student ID and email identify different students"]; continue; }
        const match = byNationalId || byId || byEmail;
-      if (!match) { row.classification = "missing/unmatched"; row.reasons = ["No existing student matches student ID or email"]; continue; }
+       if (!match) { row.classification = "missing/unmatched"; row.reasons = [missingStudentMatchMessage(row)]; continue; }
       row.targetStudentId = id(match._id);
       const borrowerOwner = row.borrowerNumber ? students.find((student) => student.borrowerNumber === row.borrowerNumber) : undefined;
-      if (borrowerOwner && id(borrowerOwner._id) !== id(match._id)) { row.classification = "conflict"; row.reasons = ["Borrower number belongs to a different student"]; }
-      else if (match.borrowerNumber && row.borrowerNumber && match.borrowerNumber !== row.borrowerNumber) { row.classification = "conflict"; row.reasons = ["Existing borrower number differs; explicit exception required"]; }
+       if (borrowerOwner && id(borrowerOwner._id) !== id(match._id)) { row.classification = "conflict"; row.reasons = [borrowerConflictMessage(row.borrowerNumber, borrowerOwner)]; }
+       else if (match.borrowerNumber && row.borrowerNumber && match.borrowerNumber !== row.borrowerNumber) { row.classification = "conflict"; row.reasons = [`Student ID ${quoted(match.studentId)} already has borrower number ${quoted(match.borrowerNumber)}, but the imported value is ${quoted(row.borrowerNumber)}.`]; }
       else if (row.borrowerNumber && !match.borrowerNumber) { row.classification = "possible/review"; row.reasons = ["Borrower number assignment requires explicit approval"]; }
       else row.classification = "matched";
     }
   } else {
-    const students: any[] = await (Student as any).find({ institution: actor.institution as any }).lean();
+    let studentQuery = (Student as any).find({ institution: actor.institution as any });
+    if (session) studentQuery = studentQuery.session(session);
+    const students: any[] = await studentQuery.lean();
     for (const row of rows) {
       if (row.classification === "duplicate" || row.classification === "conflict") continue;
        const byNationalId = row.nationalId && students.find((student) => Boolean(student.nationalId) && normalizeNationalId(student.nationalId) === row.nationalId);
         const matches = byNationalId ? [byNationalId] : [];
       const borrowerOwner = students.find((student) => student.borrowerNumber === row.borrowerNumber);
-      if (borrowerOwner && matches.length && id(borrowerOwner._id) !== id(matches[0]._id)) { row.classification = "conflict"; row.reasons = ["Borrower number belongs to a different student"]; }
+       if (borrowerOwner && matches.length && id(borrowerOwner._id) !== id(matches[0]._id)) { row.classification = "conflict"; row.reasons = [borrowerConflictMessage(row.borrowerNumber, borrowerOwner)]; }
        else if (matches.length === 1) {
         row.targetStudentId = id(matches[0]._id);
-        if (matches[0].borrowerNumber && matches[0].borrowerNumber !== row.borrowerNumber) { row.classification = "conflict"; row.reasons = ["Existing borrower number differs; explicit exception required"]; }
+         if (matches[0].borrowerNumber && matches[0].borrowerNumber !== row.borrowerNumber) { row.classification = "conflict"; row.reasons = [`Student ID ${quoted(matches[0].studentId)} already has borrower number ${quoted(matches[0].borrowerNumber)}, but the imported value is ${quoted(row.borrowerNumber)}.`]; }
           else { row.classification = "matched"; row.reasons = ["Exact normalized National ID match"]; }
        } else if (!row.nationalId) { row.classification = "conflict"; row.reasons = ["Financial Clearance row has no Student's National ID"]; }
        else { row.classification = "missing/unmatched"; row.reasons = ["Student's National ID does not exist in Registered Students"]; }
     }
   }
-  imported.summary = summarize(rows); imported.markModified("rows"); imported.markModified("summary"); await imported.save();
+  imported.summary = summarize(rows); imported.markModified("rows"); imported.markModified("summary");
+  return imported.toObject();
+};
+
+export const reconcileRegistryImport = async (importId: string, actor: Actor) => {
+  const imported: any = await (RegistryImport as any).findOne({ _id: importId, institution: actor.institution as any });
+  if (!imported) throw new Error("Registry import not found");
+  await reconcileRegistryDocument(imported, actor);
+  await imported.save();
   return imported.toObject();
 };
 
@@ -159,7 +199,7 @@ const terminalOutcome = (row: RegistryRow, outcome: "inserted" | "updated" | "sk
   return { rowNumber: row.rowNumber, reason };
 };
 
-const processRegistryRow = async (imported: any, row: RegistryRow, actor: Actor) => {
+const processRegistryRow = async (imported: any, row: RegistryRow, actor: Actor, session?: DbSession) => {
   if (["inserted", "updated", "skipped", "error"].includes(String(row.outcome))) return row.outcome;
   if (row.classification === "conflict" || row.classification === "duplicate") {
     terminalOutcome(row, "skipped", row.reasons?.join("; ") || (row.classification === "duplicate" ? "Duplicate row in upload" : "Conflict requires review"));
@@ -167,14 +207,21 @@ const processRegistryRow = async (imported: any, row: RegistryRow, actor: Actor)
   }
 
   if (imported.kind === "students") {
-    const existing: any = await Student.findOne({ institution: actor.institution as any, $or: [{ studentId: row.studentId }, { email: row.email }, ...(row.nationalId ? [{ nationalId: row.nationalId }] : [])] });
+    const missing = missingStudentFields(row);
+    if (missing.length) {
+      terminalOutcome(row, "skipped", `Missing required student identifier or field: ${missing.join(", ")}`);
+      return "skipped";
+    }
+    let existingQuery = Student.findOne({ institution: actor.institution as any, $or: [{ studentId: row.studentId }, { email: row.email }, ...(row.nationalId ? [{ nationalId: row.nationalId }] : [])] });
+    if (session) existingQuery = existingQuery.session(session);
+    const existing: any = await existingQuery;
     if (existing) {
       let changed = false;
       if (row.nationalId) {
         const currentNationalId = normalizeNationalId(existing.nationalId || "");
         if (!currentNationalId) {
           try {
-            const update = await Student.updateOne({ _id: existing._id, institution: actor.institution as any, $or: [{ nationalId: { $exists: false } }, { nationalId: null }, { nationalId: "" }] }, { $set: { nationalId: row.nationalId } });
+            const update = await Student.updateOne({ _id: existing._id, institution: actor.institution as any, $or: [{ nationalId: { $exists: false } }, { nationalId: null }, { nationalId: "" }] }, { $set: { nationalId: row.nationalId } }, session ? { session } : undefined);
             if (update.modifiedCount === 1) changed = true;
           } catch (error: any) {
             if (String(error?.code) === "11000" || /duplicate/i.test(String(error?.message || ""))) {
@@ -189,7 +236,7 @@ const processRegistryRow = async (imported: any, row: RegistryRow, actor: Actor)
         }
       }
       if (row.borrowerNumber && !existing.borrowerNumber && row.resolution?.action === "assignBorrower") {
-        try { await assignBorrowerNumber({ institution: actor.institution, studentId: id(existing._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber } }); changed = true; }
+        try { await assignBorrowerNumber({ institution: actor.institution, studentId: id(existing._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber }, ...(session ? { session } : {}) }); changed = true; }
         catch (error) { terminalOutcome(row, "error", error instanceof BorrowerAssignmentError ? error.message : "Borrower number assignment was not applied", error); return "error"; }
       }
       const sameRecord = String(existing.studentId || "").toLowerCase() === String(row.studentId || "").toLowerCase()
@@ -199,15 +246,40 @@ const processRegistryRow = async (imported: any, row: RegistryRow, actor: Actor)
       terminalOutcome(row, changed || sameRecord ? "updated" : "skipped", changed || sameRecord ? undefined : "Student already exists; no approved change");
       return changed || sameRecord ? "updated" : "skipped";
     }
-    const owner: any = row.borrowerNumber ? await Student.findOne({ institution: actor.institution as any, borrowerNumber: row.borrowerNumber }) : null;
-    if (owner) { terminalOutcome(row, "error", "Borrower number belongs to another student"); return "error"; }
+    let ownerQuery = row.borrowerNumber ? Student.findOne({ institution: actor.institution as any, borrowerNumber: row.borrowerNumber }) : null;
+    if (ownerQuery && session) ownerQuery = ownerQuery.session(session);
+    const owner: any = ownerQuery ? await ownerQuery : null;
+    if (owner) { terminalOutcome(row, "error", borrowerConflictMessage(row.borrowerNumber, owner)); return "error"; }
     let createdStudent: any;
     try {
-      createdStudent = await Student.create({ institution: actor.institution as any, studentId: row.studentId, email: row.email, name: row.name, surname: row.surname, studentStatus: row.studentStatus, ...(row.nationalId ? { nationalId: row.nationalId } : {}) });
-      if (row.borrowerNumber) await assignBorrowerNumber({ institution: actor.institution, studentId: id(createdStudent._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber } });
+      createdStudent = new Student({ institution: actor.institution as any, studentId: row.studentId, email: row.email, name: row.name, surname: row.surname, studentStatus: row.studentStatus, ...(row.nationalId ? { nationalId: row.nationalId } : {}) });
+      await createdStudent.save(session ? { session } : undefined);
+      if (row.borrowerNumber) await assignBorrowerNumber({ institution: actor.institution, studentId: id(createdStudent._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber }, ...(session ? { session } : {}) });
     } catch (error: any) {
-      if (createdStudent?._id) await Student.deleteOne({ _id: createdStudent._id, institution: actor.institution as any, borrowerNumber: { $in: [null, ""] } });
-      if (String(error?.code) === "11000") { terminalOutcome(row, "error", "Student identifier already exists or conflicts with another student", error); return "error"; }
+      if (createdStudent?._id && !session) await Student.deleteOne({ _id: createdStudent._id, institution: actor.institution as any });
+      if (String(error?.code) === "11000") {
+        let winnerQuery = Student.findOne({ institution: actor.institution as any, $or: [{ studentId: row.studentId }, { email: row.email }, ...(row.nationalId ? [{ nationalId: row.nationalId }] : [])] });
+        if (session) winnerQuery = winnerQuery.session(session);
+        const winner: any = await winnerQuery;
+        const sameIdentity = winner
+          && String(winner.studentId || "").trim().toLowerCase() === String(row.studentId || "").trim().toLowerCase()
+          && String(winner.email || "").trim().toLowerCase() === String(row.email || "").trim().toLowerCase()
+          && (!row.nationalId || normalizeNationalId(winner.nationalId || "") === normalizeNationalId(row.nationalId));
+        if (sameIdentity) {
+          try {
+            if (row.borrowerNumber) await assignBorrowerNumber({ institution: actor.institution, studentId: id(winner._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber }, ...(session ? { session } : {}) });
+            row.targetStudentId = id(winner._id);
+            terminalOutcome(row, "updated");
+            return "updated";
+          } catch (winnerError) {
+            terminalOutcome(row, "error", winnerError instanceof BorrowerAssignmentError ? winnerError.message : "Student could not be finalized", winnerError);
+            return "error";
+          }
+        }
+        if (session && !winner) throw error;
+        terminalOutcome(row, "error", "Student identifier already exists or conflicts with another student", error);
+        return "error";
+      }
       terminalOutcome(row, "error", error instanceof BorrowerAssignmentError ? error.message : "Student could not be created", error);
       return "error";
     }
@@ -222,12 +294,16 @@ const processRegistryRow = async (imported: any, row: RegistryRow, actor: Actor)
     terminalOutcome(row, "skipped", reason);
     return "skipped";
   }
-  const student: any = await Student.findOne({ _id: targetId, institution: actor.institution as any });
+  let studentQuery = Student.findOne({ _id: targetId, institution: actor.institution as any });
+  if (session) studentQuery = studentQuery.session(session);
+  const student: any = await studentQuery;
   if (!student) { terminalOutcome(row, "error", "Target student no longer exists"); return "error"; }
   try {
-    await assignBorrowerNumber({ institution: actor.institution, studentId: id(student._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber } });
-    const existingClearance: any = await RegistryFinancialClearance.findOne({ institution: actor.institution as any, $or: [{ borrowerNumber: row.borrowerNumber }, { accountNumber: row.accountNumber }] });
-    if (!existingClearance) await RegistryFinancialClearance.create({ institution: actor.institution as any, student: student._id, registryImport: imported._id, rowNumber: row.rowNumber, nationalId: row.nationalId, borrowerNumber: row.borrowerNumber, accountNumber: row.accountNumber, bankName: row.bankName, batchNumber: row.batchNumber || 0, courseOfStudy: row.courseOfStudy, fullnames: row.fullnames, graduating: Boolean(row.graduating), status: row.status || "pending" });
+    await assignBorrowerNumber({ institution: actor.institution, studentId: id(student._id), borrowerNumber: row.borrowerNumber, actor, details: { importId: id(imported._id), rowNumber: row.rowNumber }, ...(session ? { session } : {}) });
+    let clearanceQuery = RegistryFinancialClearance.findOne({ institution: actor.institution as any, $or: [{ borrowerNumber: row.borrowerNumber }, { accountNumber: row.accountNumber }] });
+    if (session) clearanceQuery = clearanceQuery.session(session);
+    const existingClearance: any = await clearanceQuery;
+    if (!existingClearance) await RegistryFinancialClearance.create([{ institution: actor.institution as any, student: student._id, registryImport: imported._id, rowNumber: row.rowNumber, nationalId: row.nationalId, borrowerNumber: row.borrowerNumber, accountNumber: row.accountNumber, bankName: row.bankName, batchNumber: row.batchNumber || 0, courseOfStudy: row.courseOfStudy, fullnames: row.fullnames, graduating: Boolean(row.graduating), status: row.status || "pending" }], session ? { session } : undefined);
     terminalOutcome(row, "inserted");
     return "inserted";
   } catch (error: any) {
@@ -439,22 +515,101 @@ const recountImport = (imported: any) => {
   imported.markModified("summary");
 };
 
-const retryExceptionRow = async (actor: Actor, imported: any, row: RegistryRow) => {
+const applyExceptionChanges = (imported: any, row: RegistryRow, changes?: RegistryRow) => {
+  if (changes) {
+    const fields = imported.kind === "students" ? ["name", "surname", "email", "nationalId", "studentId", "studentStatus", "borrowerNumber"] : ["fullnames", "nationalId", "borrowerNumber", "courseOfStudy", "bankName", "accountNumber"];
+    for (const key of fields) if (changes[key] !== undefined) row[key] = key === "nationalId" ? normalizeNationalId(changes[key]) : key === "email" ? String(changes[key]).trim().toLowerCase() : key === "studentStatus" ? Boolean(changes[key]) : String(changes[key]).trim();
+  }
   row.outcome = "pending";
   row.exceptionStatus = "open";
   row.failure = null;
   row.resolution = null;
+  row.classification = "missing/unmatched";
+  row.reasons = ["Exception edited; reconciliation required"];
+  row.targetStudentId = undefined;
+};
+
+const sameStudent = (left: RegistryRow, right: RegistryRow) => {
+  const keys: Array<keyof RegistryRow> = ["studentId", "email", "nationalId"];
+  return keys.some((key) => {
+    const a = key === "nationalId" ? normalizeNationalId(left[key]) : String(left[key] || "").trim().toLowerCase();
+    const b = key === "nationalId" ? normalizeNationalId(right[key]) : String(right[key] || "").trim().toLowerCase();
+    return Boolean(a) && a === b;
+  });
+};
+
+export const hasUnresolvedStudentConflict = (imported: { rows: RegistryRow[] }, row: RegistryRow) => imported.rows.some((candidate) => candidate !== row && sameStudent(candidate, row) && (candidate.classification === "conflict" || candidate.exceptionStatus === "open"));
+
+const retryExceptionRowInStore = async (actor: Actor, importId: string, rowNumber: number, changes?: RegistryRow, session?: DbSession) => {
+  let importQuery = (RegistryImport as any).findOne({ _id: importId, institution: actor.institution as any });
+  if (session) importQuery = importQuery.session(session);
+  const imported: any = await importQuery;
+  if (!imported) throw new Error("Registry exception import not found");
+  const row = (imported.rows as RegistryRow[]).find((candidate) => candidate.rowNumber === rowNumber);
+  if (!row) throw new Error("Registry exception not found");
+
+  applyExceptionChanges(imported, row, changes);
   if (imported.kind === "students") {
-    await reconcileRegistryImport(id(imported._id), actor);
-    const refreshed: any = await RegistryImport.findById(imported._id).lean();
-    const refreshedRow = refreshed?.rows?.find((candidate: RegistryRow) => candidate.rowNumber === row.rowNumber);
-    if (refreshedRow) Object.assign(row, refreshedRow, { outcome: "pending", exceptionStatus: "open", failure: null });
-  } else await reconcileExceptionRow(actor, imported, row);
-  const outcome = await processRegistryRow(imported, row, actor);
+    await reconcileRegistryDocument(imported, actor, session);
+    if (hasUnresolvedStudentConflict(imported, row)) {
+      terminalOutcome(row, "skipped", "Another conflict for this imported student remains unresolved");
+    }
+  } else {
+    await reconcileExceptionRow(actor, imported, row, session);
+  }
+  const outcome = ["skipped", "error"].includes(String(row.outcome)) ? row.outcome : await processRegistryRow(imported, row, actor, session);
   if (outcome === "inserted" || outcome === "updated") row.exceptionStatus = "resolved";
   recountImport(imported);
-  await imported.save();
-  return outcome;
+  imported.markModified("rows");
+  imported.markModified("summary");
+  try {
+    await imported.save(session ? { session } : undefined);
+  } catch (error: any) {
+    if (error?.name === "VersionError" || error?.code === 11000) throw new RegistryConcurrencyError();
+    throw error;
+  }
+  return { imported, row, outcome };
+};
+
+export const canReuseCompletedRetry = (row: RegistryRow, changes?: RegistryRow) => {
+  if (!(["inserted", "updated"].includes(String(row.outcome)))) return false;
+  if (!changes) return true;
+  const fields: Array<keyof RegistryRow> = ["name", "surname", "email", "nationalId", "studentId", "studentStatus", "borrowerNumber", "fullnames", "courseOfStudy", "bankName", "accountNumber"];
+  return fields.every((field) => {
+    if (changes[field] === undefined) return true;
+    if (field === "nationalId") return normalizeNationalId(row[field]) === normalizeNationalId(changes[field]);
+    if (field === "studentStatus") return Boolean(row[field]) === Boolean(changes[field]);
+    return String(row[field] ?? "").trim().toLowerCase() === String(changes[field] ?? "").trim().toLowerCase();
+  });
+};
+
+const reuseCompletedRetry = async (actor: Actor, importId: string, rowNumber: number, changes?: RegistryRow) => {
+  const imported: any = await RegistryImport.findOne({ _id: importId, institution: actor.institution as any }).lean();
+  const row = imported?.rows?.find((candidate: RegistryRow) => candidate.rowNumber === rowNumber);
+  if (!imported || !row || !canReuseCompletedRetry(row, changes)) return null;
+  return { imported, row, outcome: "updated" };
+};
+
+const retryExceptionRow = async (actor: Actor, importId: string, rowNumber: number, changes?: RegistryRow) => {
+  const session = await mongoose.startSession();
+  try {
+    try {
+      let result: { imported: any; row: RegistryRow; outcome: string } | undefined;
+      await session.withTransaction(async () => {
+        result = await retryExceptionRowInStore(actor, importId, rowNumber, changes, session);
+      });
+      return result!;
+    } catch (error) {
+      if (error instanceof RegistryConcurrencyError) {
+        const completed = await reuseCompletedRetry(actor, importId, rowNumber, changes);
+        if (completed) return completed;
+      }
+      if (!isTransactionUnsupported(error) && String((error as any)?.code) !== "11000") throw error;
+      return await retryExceptionRowInStore(actor, importId, rowNumber, changes);
+    }
+  } finally {
+    await session.endSession();
+  }
 };
 
 export type ExceptionReconciliation = {
@@ -465,7 +620,7 @@ export type ExceptionReconciliation = {
   message: string;
 };
 
-const reconcileExceptionRow = async (actor: Actor, imported: any, row: RegistryRow): Promise<ExceptionReconciliation> => {
+const reconcileExceptionRow = async (actor: Actor, imported: any, row: RegistryRow, session?: DbSession): Promise<ExceptionReconciliation> => {
   const fail = (message: string, classification: "missing/unmatched" | "conflict" = "missing/unmatched"): ExceptionReconciliation => {
     row.classification = classification;
     row.reasons = [message];
@@ -478,31 +633,38 @@ const reconcileExceptionRow = async (actor: Actor, imported: any, row: RegistryR
   if (!row.nationalId) return fail("Financial Clearance row has no Student's National ID", "conflict");
   if (!row.borrowerNumber) return fail("Exception has no borrower number to assign", "conflict");
 
-  const student: any = await (Student as any).findOne({ institution: actor.institution as any, nationalId: row.nationalId }).lean();
+  let studentQuery = (Student as any).findOne({ institution: actor.institution as any, nationalId: row.nationalId });
+  if (session) studentQuery = studentQuery.session(session);
+  const student: any = await studentQuery.lean();
   if (!student) return fail(`Student's National ID (${row.nationalId}) does not exist in Registered Students`);
 
-  const borrowerOwner: any = await (Student as any).findOne({ institution: actor.institution as any, borrowerNumber: row.borrowerNumber, _id: { $ne: student._id } }).lean();
+  let borrowerOwnerQuery = (Student as any).findOne({ institution: actor.institution as any, borrowerNumber: row.borrowerNumber, _id: { $ne: student._id } });
+  if (session) borrowerOwnerQuery = borrowerOwnerQuery.session(session);
+  const borrowerOwner: any = await borrowerOwnerQuery.lean();
   if (borrowerOwner) {
     row.classification = "conflict";
-    row.reasons = ["Borrower number belongs to a different student"];
+    row.reasons = [borrowerConflictMessage(row.borrowerNumber, borrowerOwner)];
     row.targetStudentId = id(student._id);
     row.resolution = null;
-    return { reconciled: false, assigned: false, studentId: id(student._id), message: "Borrower number belongs to a different student" };
+    return { reconciled: false, assigned: false, studentId: id(student._id), message: borrowerConflictMessage(row.borrowerNumber, borrowerOwner) };
   }
   if (student.borrowerNumber && String(student.borrowerNumber).trim() !== String(row.borrowerNumber).trim()) {
     row.classification = "conflict";
-    row.reasons = ["Existing borrower number differs; explicit exception required"];
+    row.reasons = [`Student ID ${quoted(student.studentId)} already has borrower number ${quoted(student.borrowerNumber)}, but the imported value is ${quoted(row.borrowerNumber)}.`];
     row.targetStudentId = id(student._id);
     row.resolution = null;
-    return { reconciled: false, assigned: false, studentId: id(student._id), message: "Student already has a different borrower number" };
+    return { reconciled: false, assigned: false, studentId: id(student._id), message: `Student ID ${quoted(student.studentId)} already has borrower number ${quoted(student.borrowerNumber)}, but the imported value is ${quoted(row.borrowerNumber)}.` };
   }
 
   try {
-    const assignment = await assignBorrowerNumber({ institution: actor.institution, studentId: id(student._id), borrowerNumber: row.borrowerNumber, actor, details: { source: "exception_reconcile", importId: id(imported._id), rowNumber: row.rowNumber } });
+    const assignment = await assignBorrowerNumber({ institution: actor.institution, studentId: id(student._id), borrowerNumber: row.borrowerNumber, actor, details: { source: "exception_reconcile", importId: id(imported._id), rowNumber: row.rowNumber }, ...(session ? { session } : {}) });
     try {
-      const existingClearance: any = await (RegistryFinancialClearance as any).findOne({ institution: actor.institution as any, $or: [{ borrowerNumber: row.borrowerNumber }, { accountNumber: row.accountNumber }] });
+      let clearanceQuery = (RegistryFinancialClearance as any).findOne({ institution: actor.institution as any, $or: [{ borrowerNumber: row.borrowerNumber }, { accountNumber: row.accountNumber }] });
+      if (session) clearanceQuery = clearanceQuery.session(session);
+      const existingClearance: any = await clearanceQuery;
       if (!existingClearance) {
-        const created: any = await (RegistryFinancialClearance as any).create({ institution: actor.institution as any, student: student._id, registryImport: imported._id, rowNumber: row.rowNumber, nationalId: row.nationalId, borrowerNumber: row.borrowerNumber, accountNumber: row.accountNumber, bankName: row.bankName, batchNumber: row.batchNumber || 0, courseOfStudy: row.courseOfStudy, fullnames: row.fullnames, graduating: Boolean(row.graduating), status: row.status || "pending" });
+        const createdRows: any[] = await (RegistryFinancialClearance as any).create([{ institution: actor.institution as any, student: student._id, registryImport: imported._id, rowNumber: row.rowNumber, nationalId: row.nationalId, borrowerNumber: row.borrowerNumber, accountNumber: row.accountNumber, bankName: row.bankName, batchNumber: row.batchNumber || 0, courseOfStudy: row.courseOfStudy, fullnames: row.fullnames, graduating: Boolean(row.graduating), status: row.status || "pending" }], session ? { session } : undefined);
+        const created: any = createdRows[0];
         await recordAudit({ ...registryActor(actor), action: "registry.financial.created", targetCollection: "RegistryFinancialClearance", targetId: id(created._id), details: { importId: id(imported._id), rowNumber: row.rowNumber, borrowerNumber: row.borrowerNumber, accountNumber: row.accountNumber } });
       }
     } catch (clearanceError: any) {
@@ -541,25 +703,27 @@ export const findStudentByNationalId = async (actor: Actor, nationalId: unknown)
 };
 
 export const editRegistryException = async (actor: Actor, importId: string, rowNumber: number, changes: RegistryRow, options?: { autoReconcile?: boolean }) => {
-  const { imported, row } = await exceptionRow(actor, importId, rowNumber);
-  const fields = imported.kind === "students" ? ["name", "surname", "email", "nationalId", "studentId", "studentStatus", "borrowerNumber"] : ["fullnames", "nationalId", "borrowerNumber", "courseOfStudy", "bankName", "accountNumber"];
-  for (const key of fields) if (changes[key] !== undefined) row[key] = key === "nationalId" ? normalizeNationalId(changes[key]) : key === "email" ? String(changes[key]).trim().toLowerCase() : key === "studentStatus" ? Boolean(changes[key]) : String(changes[key]).trim();
-  row.classification = "missing/unmatched"; row.reasons = ["Exception edited; reconciliation required"]; row.targetStudentId = undefined;
   let reconciliation: ExceptionReconciliation | undefined;
   if (options?.autoReconcile !== false) {
-    const outcome = await retryExceptionRow(actor, imported, row);
-    reconciliation = { reconciled: outcome === "inserted" || outcome === "updated", assigned: outcome === "updated", message: outcome === "error" || outcome === "skipped" ? row.failure?.reason || row.reasons?.[0] || "Exception remains unresolved" : "Exception record successfully retried" };
-  } else { recountImport(imported); await imported.save(); }
+    const result = await retryExceptionRow(actor, importId, rowNumber, changes);
+    reconciliation = { reconciled: result.outcome === "inserted" || result.outcome === "updated", assigned: result.outcome === "updated", message: result.outcome === "error" || result.outcome === "skipped" ? result.row.failure?.reason || result.row.reasons?.[0] || "This exception could not be resolved. Review the highlighted values and try again." : "Exception record resolved successfully." };
+    await recordAudit({ ...registryActor(actor), action: "registry.exception.updated", targetCollection: "RegistryImport", targetId: importId, details: { rowNumber, changes, reconciliation } });
+    return { ...result.row, reconciliation };
+  }
+
+  const { imported, row } = await exceptionRow(actor, importId, rowNumber);
+  applyExceptionChanges(imported, row, changes);
+  recountImport(imported);
+  await imported.save();
   await recordAudit({ ...registryActor(actor), action: "registry.exception.updated", targetCollection: "RegistryImport", targetId: importId, details: { rowNumber, changes, reconciliation } });
   return { ...row, reconciliation };
 };
 
 export const reconcileException = async (actor: Actor, importId: string, rowNumber: number) => {
-  const { imported, row } = await exceptionRow(actor, importId, rowNumber);
-  const outcome = await retryExceptionRow(actor, imported, row);
-  const reconciliation = { reconciled: outcome === "inserted" || outcome === "updated", assigned: outcome === "updated", message: outcome === "error" || outcome === "skipped" ? row.failure?.reason || row.reasons?.[0] || "Exception remains unresolved" : "Exception record successfully retried" };
+  const result = await retryExceptionRow(actor, importId, rowNumber);
+  const reconciliation = { reconciled: result.outcome === "inserted" || result.outcome === "updated", assigned: result.outcome === "updated", message: result.outcome === "error" || result.outcome === "skipped" ? result.row.failure?.reason || result.row.reasons?.[0] || "This exception could not be resolved. Review the highlighted values and try again." : "Exception record resolved successfully." };
   await recordAudit({ ...registryActor(actor), action: "registry.exception.reconciled", targetCollection: "RegistryImport", targetId: importId, details: { rowNumber, reconciliation } });
-  return { ...row, reconciliation };
+  return { ...result.row, reconciliation };
 };
 
 export const deleteRegistryException = async (actor: Actor, importId: string, rowNumber: number) => {

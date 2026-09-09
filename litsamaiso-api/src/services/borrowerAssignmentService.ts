@@ -39,16 +39,16 @@ const assertAssignment = async (institution: unknown, student: any, borrowerNumb
   let ownerQuery = (Student as any).findOne({ institution, borrowerNumber, _id: { $ne: student._id } });
   if (session) ownerQuery = ownerQuery.session(session);
   if (await ownerQuery.lean()) {
-    throw new BorrowerAssignmentError("borrower_conflict", "Borrower number belongs to another student");
+    throw new BorrowerAssignmentError("borrower_conflict", `Borrower number "${borrowerNumber}" is already assigned to another student.`);
   }
 
   if (student.borrowerNumber && String(student.borrowerNumber).trim() !== borrowerNumber) {
-    throw new BorrowerAssignmentError("borrower_conflict", "Student already has a different borrower number");
+    throw new BorrowerAssignmentError("borrower_conflict", `This student already has borrower number "${String(student.borrowerNumber).trim()}"; it cannot be changed to "${borrowerNumber}" here.`);
   }
 
   const user = await findStudentUser(institution, String(student.studentId), session);
   if (user?.borrowerNumber && String(user.borrowerNumber).trim() !== borrowerNumber) {
-    throw new BorrowerAssignmentError("user_conflict", "Student user already has a different borrower number");
+    throw new BorrowerAssignmentError("user_conflict", `The student account already has borrower number "${String(user.borrowerNumber).trim()}"; it cannot be changed to "${borrowerNumber}" here.`);
   }
 
   return user;
@@ -115,9 +115,25 @@ const assignWithoutTransaction = async (institution: unknown, studentId: string,
   return { studentId: asId(student._id), borrowerNumber, ...(user ? { userId: asId(user._id) } : {}), userSynchronized, alreadyAssigned };
 };
 
-export const assignBorrowerNumber = async (input: { institution: unknown; studentId: string; borrowerNumber: string; actor?: Actor; details?: Record<string, unknown> }): Promise<AssignmentResult> => {
+export const assignBorrowerNumber = async (input: { institution: unknown; studentId: string; borrowerNumber: string; actor?: Actor; details?: Record<string, unknown>; session?: mongoose.ClientSession }): Promise<AssignmentResult> => {
   const borrowerNumber = String(input.borrowerNumber || "").trim();
   if (!borrowerNumber) throw new BorrowerAssignmentError("borrower_conflict", "Borrower number is required");
+
+  if (input.session) {
+    const result = await assignInSession(input.institution, input.studentId, borrowerNumber, input.session);
+    if (input.actor) {
+      await recordAudit({
+        action: "registry.borrower.synchronized",
+        actorId: asId(input.actor._id),
+        ...(input.actor.email ? { actorEmail: input.actor.email } : {}),
+        actorRole: actorRole(input.actor),
+        targetCollection: "Student",
+        targetId: result.studentId,
+        details: { borrowerNumber, userId: result.userId, userSynchronized: result.userSynchronized, alreadyAssigned: result.alreadyAssigned, ...(input.details || {}) },
+      });
+    }
+    return result;
+  }
 
   const session = await mongoose.startSession();
   try {
