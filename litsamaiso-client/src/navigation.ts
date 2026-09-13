@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   MailPlus,
   MessageSquareWarning,
+  ClipboardList,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -43,6 +44,13 @@ export const navigationItems: NavigationItem[] = [
     href: '/accounts',
     roles: roleAccess.accounts,
     icon: Banknote,
+  },
+  {
+    id: 'student-registry',
+    label: 'Student Registry',
+    href: '/student-registry',
+    roles: roleAccess.registry,
+    icon: ClipboardList,
   },
   {
     id: 'student-issues',
@@ -102,7 +110,7 @@ export const navigationItems: NavigationItem[] = [
   },
 ];
 
-export const adminDashboardRoles: RoleName[] = ['AppAdmin', 'InstitutionAdmin', 'Finance'];
+export const adminDashboardRoles: RoleName[] = ['AppAdmin', 'InstitutionAdmin', 'Finance', 'Registry'];
 
 export const getVisibleNavItems = (roleName: string) =>
   navigationItems.filter((item) => canAccess(roleName, item.roles));

@@ -1,6 +1,7 @@
 import { model, Schema, type Types } from "mongoose";
 
 export interface FinancialClearanceDocument {
+  nationalId?: string;
   borrowerNumber: string;
   accountNumber: string;
   bankName: string;
@@ -19,6 +20,7 @@ export interface FinancialClearanceDocument {
 
 const financialClearanceSchema = new Schema<FinancialClearanceDocument>(
   {
+    nationalId: { type: String, trim: true },
     borrowerNumber: { type: String, required: true, trim: true },
     accountNumber: { type: String, required: true, trim: true },
     bankName: { type: String, required: true, trim: true },

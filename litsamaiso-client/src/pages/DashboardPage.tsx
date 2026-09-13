@@ -25,6 +25,7 @@ import { accountService, type AccountReports } from '../services/accountService'
 import { electionService } from '../services/electionService';
 import { institutionService } from '../services/institutionService';
 import { issueService } from '../services/issueService';
+import { registryService, type RegistryDashboard } from '../services/registryService';
 import { userService } from '../services/userService';
 import { canAccess, roleAccess, type RoleName } from '../utils/roleAccess';
 import { isAdminDashboardRole } from '../navigation';
@@ -216,6 +217,7 @@ const DashboardPage: React.FC = () => {
   const [adminIssues, setAdminIssues] = useState<AdminIssue[]>([]);
   const [studentIssues, setStudentIssues] = useState<StudentIssue[]>([]);
   const [confirmation, setConfirmation] = useState<ConfirmationStatus | null>(null);
+  const [registryDashboard, setRegistryDashboard] = useState<RegistryDashboard | null>(null);
 
   const canViewElections = canAccess(roleName, dashboardElectionRoles);
   const canViewReports = canAccess(roleName, roleAccess.accounts) && roleName !== 'Student';
@@ -223,6 +225,7 @@ const DashboardPage: React.FC = () => {
   const canViewInstitutions = canAccess(roleName, roleAccess.institutions);
   const canViewAdminIssues = roleName === 'Finance';
   const canViewStudentActions = roleName === 'Student';
+  const canViewRegistry = roleName === 'Registry';
 
   useEffect(() => {
     let isMounted = true;
@@ -260,6 +263,7 @@ const DashboardPage: React.FC = () => {
         nextAdminIssues,
         nextStudentIssues,
         nextConfirmation,
+        nextRegistryDashboard,
       ] = await Promise.all([
         load(canViewElections, () => electionService.getElections({ limit: 10 }), [] as Election[]),
         load(
@@ -273,6 +277,7 @@ const DashboardPage: React.FC = () => {
         load(canViewAdminIssues, () => adminIssueService.listIssues() as Promise<AdminIssue[]>, [] as AdminIssue[]),
         load(canViewStudentActions, () => issueService.listIssues({ limit: 5 }) as Promise<StudentIssue[]>, [] as StudentIssue[]),
         load(canViewStudentActions, () => accountService.getConfirmationStatus(), null as ConfirmationStatus | null),
+        load(canViewRegistry, () => registryService.getDashboard(), null as RegistryDashboard | null),
       ]);
 
       if (!isMounted) return;
@@ -285,6 +290,7 @@ const DashboardPage: React.FC = () => {
       setAdminIssues(nextAdminIssues);
       setStudentIssues(nextStudentIssues);
       setConfirmation(nextConfirmation);
+      setRegistryDashboard(nextRegistryDashboard);
       setLoadError(errors.length > 0 ? 'Some dashboard data could not be loaded.' : '');
       setIsLoading(false);
 
@@ -311,6 +317,7 @@ const DashboardPage: React.FC = () => {
     canViewReports,
     canViewStudentActions,
     canViewUsers,
+    canViewRegistry,
     roleName,
   ]);
 
@@ -380,6 +387,16 @@ const DashboardPage: React.FC = () => {
           tone: 'bg-amber-50 text-amber-700',
           accent: 'from-amber-400 to-active-clr',
         },
+      ];
+    }
+
+    if (roleName === 'Registry') {
+      const stats = registryDashboard?.stats ?? { totalRegistered: 0, assigned: 0, missing: 0, conflicts: 0 };
+      return [
+        { label: 'Total Registered Students', value: stats.totalRegistered, description: 'Students in the Registry', icon: Users, tone: 'bg-gray-100 text-active-clr', accent: 'from-active-clr to-sky-500' },
+        { label: 'Borrower Numbers Assigned', value: stats.assigned, description: 'Students with borrower numbers', icon: BadgeCheck, tone: 'bg-gray-100 text-active-clr', accent: 'from-emerald-500 to-active-clr' },
+        { label: 'Missing Borrower Numbers', value: stats.missing, description: 'Students awaiting a Financial Clearance match', icon: AlertCircle, tone: 'bg-gray-100 text-active-clr', accent: 'from-amber-400 to-active-clr' },
+        { label: 'Conflicts', value: stats.conflicts, description: 'Financial Clearance records requiring attention', icon: FileWarning, tone: 'bg-gray-100 text-active-clr', accent: 'from-rose-500 to-active-clr' },
       ];
     }
 
@@ -518,6 +535,7 @@ const DashboardPage: React.FC = () => {
     pendingIssues,
     rejectedIssues,
     roleName,
+    registryDashboard,
     scheduledElections,
     studentIssues.length,
     userTotal,
@@ -576,6 +594,10 @@ const DashboardPage: React.FC = () => {
           icon: CheckCircle2,
         },
       ];
+    }
+
+    if (roleName === 'Registry') {
+      return [{ label: 'Open Student Registry', description: 'Upload lists and review reconciliation results', to: '/student-registry', icon: Users, primary: true }];
     }
 
     const actions: ActionItem[] = [];
@@ -666,6 +688,10 @@ const DashboardPage: React.FC = () => {
           icon: AlertCircle,
         },
       ];
+    }
+
+    if (roleName === 'Registry') {
+      return [];
     }
 
     return [
@@ -806,7 +832,7 @@ const DashboardPage: React.FC = () => {
             </div>
 
             <div className="mt-6">
-              {canViewReports && hasStatusBreakdown ? (
+                  {canViewReports && hasStatusBreakdown ? (
                 <div className="space-y-5">
                   {accountReports?.reports.statusBreakdown?.map((item) => {
                     const percent = totalStatusCount > 0 ? Math.round((item.count / totalStatusCount) * 100) : 0;

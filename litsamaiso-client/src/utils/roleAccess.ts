@@ -3,7 +3,8 @@ import type { Role } from '../types';
 export type RoleName = Role['name'];
 
 export const roleAccess = {
-  dashboard: ['AppAdmin', 'InstitutionAdmin', 'Finance', 'SAAD', 'Student'],
+  dashboard: ['AppAdmin', 'InstitutionAdmin', 'Finance', 'SAAD', 'Student', 'Registry'],
+  registry: ['Registry'],
   accounts: ['AppAdmin', 'InstitutionAdmin', 'Finance'],
   accountConfirmation: ['Student'],
   elections: ['Student'],

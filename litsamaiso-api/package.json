@@ -6,9 +6,12 @@
     "scripts": {
         "dev": "tsx watch src/index.ts",
         "seed:src": "tsx src/scripts/seedSrcPositions.ts",
+        "cleanup:registry-financial": "tsx src/scripts/cleanupRegistryFinancialClearance.ts",
+        "backfill:user-borrowers": "tsx src/scripts/backfillUserBorrowerNumbers.ts",
+        "migrate:national-id": "tsx src/scripts/migrateNationalId.ts",
         "build": "tsc",
         "start": "node ./dist/index.js",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "node --import tsx --test src/services/*.test.ts"
     },
     "keywords": [],
     "author": "",
