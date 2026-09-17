@@ -13,6 +13,37 @@ This service supports three main workflows:
 
 Every request is also written to the audit log through a global audit middleware.
 
+## API Versioning
+
+The current API is available under `/api/v1`. The version prefix is applied to
+all application routes, including authentication, account workflows, registry
+imports, elections, uploads, reports, and streaming endpoints.
+
+Examples:
+
+```text
+POST /api/v1/auth/login
+GET  /api/v1/accounts
+GET  /api/v1/elections
+```
+
+The original unversioned paths, such as `/auth/login` and `/accounts`, remain
+available indefinitely for compatibility with existing clients. Both route
+forms use the same routers and therefore have the same authentication,
+authorization, validation, response formats, and business behavior.
+
+The health endpoint remains unversioned at `/health` because it describes the
+service rather than an API contract.
+
+New frontend or application integrations should use `/api/v1`. For the bundled
+frontend, set `VITE_API_URL` to the backend origin, for example
+`https://api.example.com`; the frontend appends `/api/v1` automatically. If the
+configured value already ends in `/api/v1`, it is used unchanged.
+
+When a future breaking contract is required, a new version should be added
+alongside the existing version. Existing versions must not change behavior
+without an explicit compatibility decision.
+
 ## Requirements
 
 - Node.js 20+ recommended

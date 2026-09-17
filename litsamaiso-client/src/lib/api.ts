@@ -6,6 +6,7 @@ import axios, {
 } from 'axios';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:5000';
+const API_V1_PATH = '/api/v1';
 const AUTH_EXPIRED_EVENT = 'litsamaiso:auth-expired';
 const API_DIAGNOSTICS_KEY = '__litsamaisoApiDiagnostics';
 const API_DIAGNOSTICS_WINDOW_MS = 10_000;
@@ -33,9 +34,14 @@ declare module 'axios' {
   }
 }
 
-export const API_BASE_URL = (
+const configuredApiBaseUrl = (
   import.meta.env.VITE_API_URL || DEFAULT_API_BASE_URL
 ).replace(/\/+$/, '');
+
+// Keep configuration flexible for deployments that already include the version.
+export const API_BASE_URL = configuredApiBaseUrl.endsWith(API_V1_PATH)
+  ? configuredApiBaseUrl
+  : `${configuredApiBaseUrl}${API_V1_PATH}`;
 
 const getAuthToken = () => {
   try {

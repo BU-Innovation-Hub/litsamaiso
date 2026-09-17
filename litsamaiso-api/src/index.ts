@@ -121,26 +121,35 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Audit middleware: record an audit log for every request/response
 app.use(auditMiddleware);
 
-app.use("/auth", authRoutes);
-app.use("/profile", profileRoutes);
-app.use("/users", userRoutes);
-app.use("/students", studentRoutes);
-app.use("/accounts", accountRoutes);
-app.use("/reports", reportRoutes);
-app.use("/feedback", feedbackRoutes);
-app.use("/elections", electionRoutes);
-app.use("/vote", voteRoutes);
-app.use("/results", resultRoutes);
-app.use("/ai", aiRoutes);
-app.use("/ocr", ocrRoutes);
-app.use("/upload", uploadRoutes);
-app.use("/issues", issueRoutes);
-app.use("/admin/issues", adminIssueRoutes);
-app.use("/audit-logs", auditLogRoutes);
-app.use("/branch-codes", branchCodeRoutes);
-app.use("/institutions", institutionRoutes);
-app.use("/admin/email-composer", administrativeEmailRoutes);
-app.use("/registry", registryRoutes);
+const API_V1_PREFIX = "/api/v1";
+
+// Keep the legacy paths and expose the same routers under the versioned prefix.
+// Using the same router instances ensures both paths have identical behavior.
+const registerApiRoutes = (prefix: string): void => {
+  app.use(`${prefix}/auth`, authRoutes);
+  app.use(`${prefix}/profile`, profileRoutes);
+  app.use(`${prefix}/users`, userRoutes);
+  app.use(`${prefix}/students`, studentRoutes);
+  app.use(`${prefix}/accounts`, accountRoutes);
+  app.use(`${prefix}/reports`, reportRoutes);
+  app.use(`${prefix}/feedback`, feedbackRoutes);
+  app.use(`${prefix}/elections`, electionRoutes);
+  app.use(`${prefix}/vote`, voteRoutes);
+  app.use(`${prefix}/results`, resultRoutes);
+  app.use(`${prefix}/ai`, aiRoutes);
+  app.use(`${prefix}/ocr`, ocrRoutes);
+  app.use(`${prefix}/upload`, uploadRoutes);
+  app.use(`${prefix}/issues`, issueRoutes);
+  app.use(`${prefix}/admin/issues`, adminIssueRoutes);
+  app.use(`${prefix}/audit-logs`, auditLogRoutes);
+  app.use(`${prefix}/branch-codes`, branchCodeRoutes);
+  app.use(`${prefix}/institutions`, institutionRoutes);
+  app.use(`${prefix}/admin/email-composer`, administrativeEmailRoutes);
+  app.use(`${prefix}/registry`, registryRoutes);
+};
+
+registerApiRoutes(API_V1_PREFIX);
+registerApiRoutes("");
 
 app.get("/", (req: Request, res: Response) => {
   res.json({
