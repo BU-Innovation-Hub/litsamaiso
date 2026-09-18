@@ -10,26 +10,7 @@ import { randomUUID } from "crypto";
 import { connectDatabase } from "./config/database.js";
 import { getPosthogClient, shutdownPosthog } from "./services/posthogService.js";
 import { setupExpressRequestContext, setupExpressErrorHandler } from "posthog-node";
-import authRoutes from "./routes/authRoutes.js";
-import userRoutes from "./routes/userRoutes.js";
-import studentRoutes from "./routes/studentRoutes.js";
-import accountRoutes from "./routes/accountRoutes.js";
-import reportRoutes from "./routes/reportRoutes.js";
-import feedbackRoutes from "./routes/feedbackRoutes.js";
-import electionRoutes from "./routes/electionRoutes.js";
-import voteRoutes from "./routes/voteRoutes.js";
-import resultRoutes from "./routes/resultRoutes.js";
-import aiRoutes from "./routes/aiRoutes.js";
-import ocrRoutes from "./routes/ocrRoutes.js";
-import uploadRoutes from "./routes/uploadRoutes.js";
-import issueRoutes from "./routes/issueRoutes.js";
-import institutionRoutes from "./routes/institutionRoutes.js";
-import adminIssueRoutes from "./routes/adminIssueRoutes.js";
-import profileRoutes from "./routes/profileRoutes.js";
-import auditLogRoutes from "./routes/auditLogRoutes.js";
-import branchCodeRoutes from "./routes/branchCodeRoutes.js";
-import administrativeEmailRoutes from "./routes/administrativeEmailRoutes.js";
-import registryRoutes from "./routes/registryRoutes.js";
+import { API_V1_PREFIX, apiNotFoundHandler, registerApiRoutes } from "./routes/apiRoutes.js";
 import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
@@ -121,39 +102,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Audit middleware: record an audit log for every request/response
 app.use(auditMiddleware);
 
-const API_V1_PREFIX = "/api/v1";
-
-// Keep the legacy paths and expose the same routers under the versioned prefix.
-// Using the same router instances ensures both paths have identical behavior.
-const registerApiRoutes = (prefix: string): void => {
-  app.use(`${prefix}/auth`, authRoutes);
-  app.use(`${prefix}/profile`, profileRoutes);
-  app.use(`${prefix}/users`, userRoutes);
-  app.use(`${prefix}/students`, studentRoutes);
-  app.use(`${prefix}/accounts`, accountRoutes);
-  app.use(`${prefix}/reports`, reportRoutes);
-  app.use(`${prefix}/feedback`, feedbackRoutes);
-  app.use(`${prefix}/elections`, electionRoutes);
-  app.use(`${prefix}/vote`, voteRoutes);
-  app.use(`${prefix}/results`, resultRoutes);
-  app.use(`${prefix}/ai`, aiRoutes);
-  app.use(`${prefix}/ocr`, ocrRoutes);
-  app.use(`${prefix}/upload`, uploadRoutes);
-  app.use(`${prefix}/issues`, issueRoutes);
-  app.use(`${prefix}/admin/issues`, adminIssueRoutes);
-  app.use(`${prefix}/audit-logs`, auditLogRoutes);
-  app.use(`${prefix}/branch-codes`, branchCodeRoutes);
-  app.use(`${prefix}/institutions`, institutionRoutes);
-  app.use(`${prefix}/admin/email-composer`, administrativeEmailRoutes);
-  app.use(`${prefix}/registry`, registryRoutes);
-};
-
-registerApiRoutes(API_V1_PREFIX);
-registerApiRoutes("");
+registerApiRoutes(app);
 
 app.get("/", (req: Request, res: Response) => {
   res.json({
     message: "Express TypeScript API running",
+    apiVersions: { v1: API_V1_PREFIX },
   });
 });
 
@@ -176,6 +130,8 @@ app.get("/health", (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use(apiNotFoundHandler);
 
 setupExpressErrorHandler(posthog, app);
 

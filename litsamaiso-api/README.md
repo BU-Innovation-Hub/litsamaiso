@@ -27,22 +27,54 @@ GET  /api/v1/accounts
 GET  /api/v1/elections
 ```
 
+The version prefix is case-sensitive: `/API/V1/...` returns `404`. `GET /api/v1`
+returns `{ "version": "v1" }`, and `GET /` lists the available versions.
+
+### Legacy unversioned paths
+
 The original unversioned paths, such as `/auth/login` and `/accounts`, remain
-available indefinitely for compatibility with existing clients. Both route
-forms use the same routers and therefore have the same authentication,
-authorization, validation, response formats, and business behavior.
+available for compatibility with existing clients. They are **deprecated**, and
+**pinned to v1**: they will keep v1 behavior when later versions are added. Both
+route forms use the same router instances, so authentication, authorization,
+validation, response formats, business behavior, and rate limits are shared (a
+client cannot double its rate limit by alternating between the two forms).
+
+Legacy responses carry deprecation headers ([RFC 9745](https://www.rfc-editor.org/rfc/rfc9745)):
+
+```text
+Deprecation: @1789689600
+Link: </api/v1/accounts>; rel="successor-version"
+```
+
+No `Sunset` header is sent because no removal date has been decided. To find out
+who still uses the legacy paths before deciding one, filter audit logs on
+`details.apiVersion`, which is `"legacy"` for unversioned requests and `"v1"`
+for versioned ones.
 
 The health endpoint remains unversioned at `/health` because it describes the
-service rather than an API contract.
+service rather than an API contract. Unknown paths, including unknown versions,
+return `404` with a JSON body: `{ "message": "Not found" }`.
+
+### Client configuration
 
 New frontend or application integrations should use `/api/v1`. For the bundled
 frontend, set `VITE_API_URL` to the backend origin, for example
-`https://api.example.com`; the frontend appends `/api/v1` automatically. If the
-configured value already ends in `/api/v1`, it is used unchanged.
+`https://api.example.com`; the frontend appends `/api/v1` automatically. A value
+that already ends in a version path, such as `https://api.example.com/api/v1`, is
+used unchanged. Any other path (for example `/api`) still gets `/api/v1`
+appended, and the frontend logs a console warning, since that is usually a
+misconfiguration.
 
-When a future breaking contract is required, a new version should be added
-alongside the existing version. Existing versions must not change behavior
-without an explicit compatibility decision.
+### Adding a version
+
+When a future breaking contract is required, add a new version alongside the
+existing one. Existing versions must not change behavior without an explicit
+compatibility decision.
+
+Routes are registered in `src/routes/apiRoutes.ts`. To add `v2`, create a
+separate route table and prefix for it. Do not point the legacy paths at the new
+table; they stay on `apiV1Routes`. Route tests live in
+`src/routes/apiRoutes.test.ts` and run with `npm test`.
 
 ## Requirements
 
@@ -146,9 +178,9 @@ Seeded roles are case-insensitive:
   If startup fails with a `querySrv ECONNREFUSED` error for MongoDB Atlas, the machine cannot resolve or reach the Atlas SRV record. Use a reachable MongoDB host, check your Atlas IP allowlist, or switch to a standard `mongodb://` connection string instead of `mongodb+srv://`.
 
 - Where emails are sent from in the app:
-  - When a confirmation mismatch is detected during `POST /accounts/confirm`, an `Issue` is created and Finance users are notified.
-  - When a student submits `POST /accounts/resolve` (student-side), Finance users are notified of the updated or new `Issue`.
-  - When Finance applies a resolution via `POST /accounts/finance-resolve`, the affected student is emailed to notify them the issue was resolved.
+  - When a confirmation mismatch is detected during `POST /api/v1/accounts/confirm`, an `Issue` is created and Finance users are notified.
+  - When a student submits `POST /api/v1/accounts/resolve` (student-side), Finance users are notified of the updated or new `Issue`.
+  - When Finance applies a resolution via `POST /api/v1/accounts/finance-resolve`, the affected student is emailed to notify them the issue was resolved.
 
 - Testing: set the SMTP variables in `.env` and exercise the endpoints above. For Gmail, use an app password and ensure `EMAIL_SMTP_PORT` and `EMAIL_SMTP_HOST` are correct.
 
@@ -157,8 +189,8 @@ Seeded roles are case-insensitive:
 - Purpose: Collect 1–5 star ratings and optional text feedback from users. Feedback submissions are public (no auth required). Only `AppAdmin` can view stored feedback.
 - Model: `src/models/Feedback.ts` — fields: `rating` (Number, 1..5), `comment` (optional String), timestamps.
 - Endpoints:
-  - `POST /feedback` — public. Body: `{ "rating": 1..5, "comment": "optional text" }`. Returns `201` on success. Records audit action `feedback.submit` (or `feedback.submit.failed`).
-  - `GET /feedback` — protected. Role: `AppAdmin` only. Returns an array of feedback records and records audit action `feedback.view`.
+  - `POST /api/v1/feedback` — public. Body: `{ "rating": 1..5, "comment": "optional text" }`. Returns `201` on success. Records audit action `feedback.submit` (or `feedback.submit.failed`).
+  - `GET /api/v1/feedback` — protected. Role: `AppAdmin` only. Returns an array of feedback records and records audit action `feedback.view`.
 - Sample cURL (submit):
 ```bash
 curl -X POST "http://<HOST>/feedback" \
@@ -356,7 +388,7 @@ Fields:
 
 ### Authentication
 
-`POST /auth/register`
+`POST /api/v1/auth/register`
 
 Registers users. The payload depends on the role.
 
@@ -371,7 +403,7 @@ Student example:
 }
 ```
 
-`POST /auth/login`
+`POST /api/v1/auth/login`
 
 Returns a JWT token.
 
@@ -382,7 +414,7 @@ Returns a JWT token.
 }
 ```
 
-`POST /auth/forgot-password`
+`POST /api/v1/auth/forgot-password`
 
 Public endpoint. Sends a password reset email when the account exists.
 
@@ -392,7 +424,7 @@ Public endpoint. Sends a password reset email when the account exists.
 }
 ```
 
-`POST /auth/reset-password`
+`POST /api/v1/auth/reset-password`
 
 Public endpoint. Completes the reset using the token from the email.
 
@@ -406,7 +438,7 @@ Public endpoint. Completes the reset using the token from the email.
 
 ### Students
 
-`POST /students/upload`
+`POST /api/v1/students/upload`
 
 Roles: `AppAdmin`, `InstitutionAdmin`
 
@@ -433,7 +465,7 @@ Rules:
 
 ### Accounts
 
-`POST /accounts/upload`
+`POST /api/v1/accounts/upload`
 
 Role: `Finance`
 
@@ -478,7 +510,7 @@ Example response:
 }
 ```
 
-`POST /accounts/confirm`
+`POST /api/v1/accounts/confirm`
 
 Role: `Student`
 
@@ -499,7 +531,7 @@ Behavior:
 - If bank name and account number match, the account is marked as confirmed.
 - If there is a mismatch, an `Issue` is created or updated for the student.
 
-`POST /accounts/resolve`
+`POST /api/v1/accounts/resolve`
 
 Role: `Student`
 
@@ -516,7 +548,7 @@ Behavior:
 - `borrowerNumber` is optional for this submission.
 - Finance later uses the issue to apply the correction.
 
-`POST /accounts/finance-resolve`
+`POST /api/v1/accounts/finance-resolve`
 
 Role: `Finance`
 
@@ -537,7 +569,7 @@ Behavior:
 
 If the issue does not contain `borrowerNumber`, the endpoint returns `400`.
 
-`POST /accounts/load_payed_students`
+`POST /api/v1/accounts/load_payed_students`
 
 Role: `Finance`
 
@@ -561,7 +593,7 @@ Behavior:
 
 ### Account Reports
 
-`GET /reports/accounts`
+`GET /api/v1/reports/accounts`
 
 Role: `AppAdmin`, `InstitutionAdmin`, `Finance`
 
@@ -573,7 +605,7 @@ Query params:
 - `stuckDays` - optional threshold for the stuck-confirmed report, default `14`
 - `recentDays` - optional window for recent payments, default `30`
 
-`GET /reports/accounts/:reportKey`
+`GET /api/v1/reports/accounts/:reportKey`
 
 Role: `AppAdmin`, `InstitutionAdmin`, `Finance`
 
@@ -606,13 +638,13 @@ Implementation notes:
 
 ### Profile
 
-`GET /profile`
+`GET /api/v1/profile`
 
 Role: Any authenticated user
 
 Returns the current user's profile.
 
-`PUT /profile`
+`PUT /api/v1/profile`
 
 Role: Any authenticated user
 
@@ -622,27 +654,27 @@ Updates the current user's profile (name, surname, email, password).
 
 All routes require `AppAdmin` or `InstitutionAdmin`.
 
-`GET /users`
+`GET /api/v1/users`
 
 Lists users. Supports filtering by role and institution.
 
-`GET /users/roles`
+`GET /api/v1/users/roles`
 
 Lists available roles.
 
-`GET /users/:id`
+`GET /api/v1/users/:id`
 
 Gets a single user.
 
-`PUT /users/:id`
+`PUT /api/v1/users/:id`
 
 Updates a user (name, surname, email, role, institution, `isActive`).
 
-`DELETE /users/:id`
+`DELETE /api/v1/users/:id`
 
 Deletes a user.
 
-`GET /users/:id/status`
+`GET /api/v1/users/:id/status`
 
 Toggles a user's `isActive` status.
 
@@ -650,35 +682,35 @@ Toggles a user's `isActive` status.
 
 All routes require `AppAdmin`.
 
-`GET /institutions`
+`GET /api/v1/institutions`
 
 Lists all institutions.
 
-`POST /institutions`
+`POST /api/v1/institutions`
 
 Creates an institution.
 
-`PUT /institutions/:id`
+`PUT /api/v1/institutions/:id`
 
 Updates an institution.
 
-`DELETE /institutions/:id`
+`DELETE /api/v1/institutions/:id`
 
 Deletes an institution.
 
-`POST /institutions/:id/lock`
+`POST /api/v1/institutions/:id/lock`
 
 Locks an institution.
 
-`POST /institutions/:id/unlock`
+`POST /api/v1/institutions/:id/unlock`
 
 Unlocks an institution.
 
-`GET /institutions/:id/users`
+`GET /api/v1/institutions/:id/users`
 
 Lists users for an institution (any authenticated user).
 
-`POST /institutions/:id/users`
+`POST /api/v1/institutions/:id/users`
 
 Creates a user scoped to the institution. Role: `AppAdmin` or `InstitutionAdmin`.
 
@@ -686,23 +718,23 @@ Creates a user scoped to the institution. Role: `AppAdmin` or `InstitutionAdmin`
 
 All routes require authentication.
 
-`GET /issues`
+`GET /api/v1/issues`
 
 Lists issues for the authenticated student.
 
-`POST /issues`
+`POST /api/v1/issues`
 
 Creates an issue.
 
-`DELETE /issues`
+`DELETE /api/v1/issues`
 
 Deletes all issues for the authenticated student.
 
-`GET /issues/:id`
+`GET /api/v1/issues/:id`
 
 Gets a single issue.
 
-`PUT /issues/:id`
+`PUT /api/v1/issues/:id`
 
 Updates an issue.
 
@@ -710,31 +742,31 @@ Updates an issue.
 
 All routes require `Finance`.
 
-`GET /admin/issues`
+`GET /api/v1/admin/issues`
 
 Lists all issues across students.
 
-`GET /admin/issues/:id`
+`GET /api/v1/admin/issues/:id`
 
 Gets a single issue.
 
-`PUT /admin/issues/:id/approve`
+`PUT /api/v1/admin/issues/:id/approve`
 
 Approves an issue — applies corrected bank/account from the issue to the matching account, then deletes the issue.
 
-`PUT /admin/issues/:id/reject`
+`PUT /api/v1/admin/issues/:id/reject`
 
 Rejects an issue — sets its status to `rejected`.
 
 ### AI / OCR
 
-`POST /ai/validate-account`
+`POST /api/v1/ai/validate-account`
 
 Role: `Student`
 
 Uses Google Gemini to validate account details. Sends an image (base64 JSON payload) and receives back structured account info extracted by AI.
 
-`POST /ocr/server-ocr`
+`POST /api/v1/ocr/server-ocr`
 
 Role: `Student`
 
@@ -742,7 +774,7 @@ Uploads a document image file (multipart, field name `file`) for server-side OCR
 
 ### Upload
 
-`POST /upload`
+`POST /api/v1/upload`
 
 Role: Any authenticated user
 
@@ -752,15 +784,15 @@ Uploads an image file (multipart, field name `file`) to Cloudinary. Returns the 
 
 All routes require authentication.
 
-`POST /vote/submit`
+`POST /api/v1/vote/submit`
 
 Role: `Student`
 
 Rate limited: 5 req / 60s
 
-Submits a ballot. Also available at `POST /elections/:electionId/vote`.
+Submits a ballot. Also available at `POST /api/v1/elections/:electionId/vote`.
 
-`GET /vote/status`
+`GET /api/v1/vote/status`
 
 Role: `Student`
 
@@ -768,7 +800,7 @@ Rate limited: 30 req / 60s
 
 Returns whether the student has already voted in a given election.
 
-`GET /vote/receipt/:id`
+`GET /api/v1/vote/receipt/:id`
 
 Role: `Student` or `SAAD`
 
@@ -792,6 +824,7 @@ The middleware records an audit entry for every request with these details:
 - method
 - status code
 - duration
+- `apiVersion` (`v1` or `legacy`) for API routes
 - `requestId` when available
 - request body keys
 - query keys
@@ -850,7 +883,7 @@ It does not log full sensitive payloads.
 
 ### Audit log endpoints
 
-`GET /audit-logs`
+`GET /api/v1/audit-logs`
 
 Role: `AppAdmin`
 
@@ -867,7 +900,7 @@ Query params (all optional):
 | `startDate` | Filter from this date (ISO) |
 | `endDate` | Filter to this date (inclusive) |
 
-`GET /audit-logs/export`
+`GET /api/v1/audit-logs/export`
 
 Role: `AppAdmin`
 
@@ -888,7 +921,7 @@ db.auditlogs.find().sort({ createdAt: -1 }).limit(50);
 Finance upload in Postman:
 
 - Method: `POST`
-- URL: `http://localhost:5000/accounts/upload`
+- URL: `http://localhost:5000/api/v1/accounts/upload`
 - Headers: `Authorization: Bearer <FINANCE_JWT>`
 - Body: `form-data`
   - key: `file`
@@ -898,7 +931,7 @@ Finance upload in Postman:
 Student resolve in Postman:
 
 - Method: `POST`
-- URL: `http://localhost:5000/accounts/resolve`
+- URL: `http://localhost:5000/api/v1/accounts/resolve`
 - Headers: `Authorization: Bearer <STUDENT_JWT>`
 - Body: `form-data`
   - `correctedBankName`
@@ -908,7 +941,7 @@ Student resolve in Postman:
 Finance resolve in Postman:
 
 - Method: `POST`
-- URL: `http://localhost:5000/accounts/finance-resolve`
+- URL: `http://localhost:5000/api/v1/accounts/finance-resolve`
 - Headers: `Authorization: Bearer <FINANCE_JWT>`
 - Body: `application/json`
   - `studentId`
@@ -925,7 +958,7 @@ Log in as both the Admin (SAAD) and any students to obtain their JWT tokens.
 
 **1.1 Admin Login**
 
-`POST /auth/login`
+`POST /api/v1/auth/login`
 
 ```json
 {
@@ -937,7 +970,7 @@ Log in as both the Admin (SAAD) and any students to obtain their JWT tokens.
 
 **1.2 Student Login**
 
-`POST /auth/login`
+`POST /api/v1/auth/login`
 
 Repeat for each student (e.g. Khothatso, Thato, Mpho), saving each token for use in the voting phase.
 
@@ -955,7 +988,7 @@ Role: `SAAD`
 
 **2.1 Create an Election**
 
-`POST /elections`
+`POST /api/v1/elections`
 
 Save the returned `election._id` as `<ELECTION_ID>`.
 
@@ -976,7 +1009,7 @@ Save the returned `election._id` as `<ELECTION_ID>`.
 
 **2.2 Create a Position**
 
-`POST /elections/<ELECTION_ID>/positions`
+`POST /api/v1/elections/<ELECTION_ID>/positions`
 
 ```json
 {
@@ -989,7 +1022,7 @@ Save the returned `election._id` as `<ELECTION_ID>`.
 
 **2.3 Create Candidates**
 
-`POST /elections/<ELECTION_ID>/positions/<POSITION_ID>/candidates`
+`POST /api/v1/elections/<ELECTION_ID>/positions/<POSITION_ID>/candidates`
 
 > **Note:** This endpoint uses `multipart/form-data`. Configure the Body tab accordingly in Postman.
 
@@ -1003,7 +1036,7 @@ Form-data fields:
 
 **2.4 Approve Candidate**
 
-`POST /elections/candidates/<CANDIDATE_ID>/approve`
+`POST /api/v1/elections/candidates/<CANDIDATE_ID>/approve`
 
 Candidates must be approved before they are eligible for voting. No request body required.
 
@@ -1013,7 +1046,7 @@ Role: `SAAD`
 
 **3.1 Schedule the Election**
 
-`POST /elections/<ELECTION_ID>/schedule`
+`POST /api/v1/elections/<ELECTION_ID>/schedule`
 
 > **Tip:** Set `startTime` to the past or present to open voting immediately. The Agenda background worker will transition the election status within 5 seconds.
 
@@ -1031,13 +1064,13 @@ Role: `Student`
 
 **4.1 Check Available Elections**
 
-`GET /elections`
+`GET /api/v1/elections`
 
 Confirm the target election is visible and its status is `OPEN`. No request body required.
 
 **4.2 Cast a Vote**
 
-`POST /elections/<ELECTION_ID>/vote`
+`POST /api/v1/elections/<ELECTION_ID>/vote`
 
 Replace `<POSITION_ID>` and `<CANDIDATE_ID>` with the IDs created during the setup phase.
 
@@ -1061,7 +1094,7 @@ After voting ends (or `endTime` passes), the system automatically closes the ele
 
 Role: `SAAD`
 
-`POST /elections/<ELECTION_ID>/publish-results`
+`POST /api/v1/elections/<ELECTION_ID>/publish-results`
 
 No request body required.
 
@@ -1069,7 +1102,7 @@ No request body required.
 
 Role: `SAAD`, `Student`
 
-`GET /elections/<ELECTION_ID>/results`
+`GET /api/v1/elections/<ELECTION_ID>/results`
 
 No request body required.
 
@@ -1077,7 +1110,7 @@ No request body required.
 
 Role: `SAAD`, `Student`
 
-`GET /elections/<ELECTION_ID>/results/winners`
+`GET /api/v1/elections/<ELECTION_ID>/results/winners`
 
 No request body required.
 
@@ -1087,7 +1120,7 @@ No request body required.
 - Student document uploads (issue resolution) are stored as base64 in the database. Cloudinary is used for candidate photo uploads when configured.
 - `req.user` is attached by `requireAuth` and `requireRole` enforces role access.
 - Controllers guard against undefined `req.body` before destructuring.
-- Audit logs are accessible to `AppAdmin` only via `GET /audit-logs` (paginated) and `GET /audit-logs/export` (full download).
+- Audit logs are accessible to `AppAdmin` only via `GET /api/v1/audit-logs` (paginated) and `GET /api/v1/audit-logs/export` (full download).
 - Ballot hashing uses HMAC-SHA256 with `ELECTION_HMAC_SECRET` for integrity verification.
 - Rate limiting is applied globally via `express-rate-limit` and separately for auth routes to mitigate brute-force attacks.
 
