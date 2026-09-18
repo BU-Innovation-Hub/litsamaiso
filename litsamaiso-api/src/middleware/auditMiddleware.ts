@@ -30,6 +30,8 @@ export const auditMiddleware = (
       status: res.statusCode,
       durationMs: duration,
     };
+    // Set by the API route mounts; lets legacy (unversioned) traffic be measured.
+    if (res.locals.apiVersion) details.apiVersion = res.locals.apiVersion;
     if (requestId) details.requestId = requestId;
     if (queryKeys.length) details.queryKeys = queryKeys;
     if (bodyKeys.length) details.bodyKeys = bodyKeys;

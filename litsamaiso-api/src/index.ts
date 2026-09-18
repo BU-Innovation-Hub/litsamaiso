@@ -10,26 +10,7 @@ import { randomUUID } from "crypto";
 import { connectDatabase } from "./config/database.js";
 import { getPosthogClient, shutdownPosthog } from "./services/posthogService.js";
 import { setupExpressRequestContext, setupExpressErrorHandler } from "posthog-node";
-import authRoutes from "./routes/authRoutes.js";
-import userRoutes from "./routes/userRoutes.js";
-import studentRoutes from "./routes/studentRoutes.js";
-import accountRoutes from "./routes/accountRoutes.js";
-import reportRoutes from "./routes/reportRoutes.js";
-import feedbackRoutes from "./routes/feedbackRoutes.js";
-import electionRoutes from "./routes/electionRoutes.js";
-import voteRoutes from "./routes/voteRoutes.js";
-import resultRoutes from "./routes/resultRoutes.js";
-import aiRoutes from "./routes/aiRoutes.js";
-import ocrRoutes from "./routes/ocrRoutes.js";
-import uploadRoutes from "./routes/uploadRoutes.js";
-import issueRoutes from "./routes/issueRoutes.js";
-import institutionRoutes from "./routes/institutionRoutes.js";
-import adminIssueRoutes from "./routes/adminIssueRoutes.js";
-import profileRoutes from "./routes/profileRoutes.js";
-import auditLogRoutes from "./routes/auditLogRoutes.js";
-import branchCodeRoutes from "./routes/branchCodeRoutes.js";
-import administrativeEmailRoutes from "./routes/administrativeEmailRoutes.js";
-import registryRoutes from "./routes/registryRoutes.js";
+import { API_V1_PREFIX, apiNotFoundHandler, registerApiRoutes } from "./routes/apiRoutes.js";
 import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
@@ -121,30 +102,12 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Audit middleware: record an audit log for every request/response
 app.use(auditMiddleware);
 
-app.use("/auth", authRoutes);
-app.use("/profile", profileRoutes);
-app.use("/users", userRoutes);
-app.use("/students", studentRoutes);
-app.use("/accounts", accountRoutes);
-app.use("/reports", reportRoutes);
-app.use("/feedback", feedbackRoutes);
-app.use("/elections", electionRoutes);
-app.use("/vote", voteRoutes);
-app.use("/results", resultRoutes);
-app.use("/ai", aiRoutes);
-app.use("/ocr", ocrRoutes);
-app.use("/upload", uploadRoutes);
-app.use("/issues", issueRoutes);
-app.use("/admin/issues", adminIssueRoutes);
-app.use("/audit-logs", auditLogRoutes);
-app.use("/branch-codes", branchCodeRoutes);
-app.use("/institutions", institutionRoutes);
-app.use("/admin/email-composer", administrativeEmailRoutes);
-app.use("/registry", registryRoutes);
+registerApiRoutes(app);
 
 app.get("/", (req: Request, res: Response) => {
   res.json({
     message: "Express TypeScript API running",
+    apiVersions: { v1: API_V1_PREFIX },
   });
 });
 
@@ -167,6 +130,8 @@ app.get("/health", (req: Request, res: Response) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+app.use(apiNotFoundHandler);
 
 setupExpressErrorHandler(posthog, app);
 

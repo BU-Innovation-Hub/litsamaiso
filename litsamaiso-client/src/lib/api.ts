@@ -6,6 +6,7 @@ import axios, {
 } from 'axios';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:5000';
+const API_V1_PATH = '/api/v1';
 const AUTH_EXPIRED_EVENT = 'litsamaiso:auth-expired';
 const API_DIAGNOSTICS_KEY = '__litsamaisoApiDiagnostics';
 const API_DIAGNOSTICS_WINDOW_MS = 10_000;
@@ -33,9 +34,33 @@ declare module 'axios' {
   }
 }
 
-export const API_BASE_URL = (
+const API_VERSION_SUFFIX = /\/api\/v\d+$/i;
+
+// VITE_API_URL is normally the backend origin, and `/api/v1` is appended. A URL that
+// already ends in a version path (any version) is used as-is, so a deployment can
+// target a different version. The server only accepts a lowercase version prefix.
+const resolveApiBaseUrl = (configured: string): string => {
+  const url = configured.trim().replace(/\/+$/, '');
+  if (API_VERSION_SUFFIX.test(url)) {
+    return url.replace(API_VERSION_SUFFIX, (suffix) => suffix.toLowerCase());
+  }
+
+  const path = new URL(url, 'http://placeholder').pathname.replace(/\/+$/, '');
+  if (path) {
+    console.warn(
+      `[litsamaiso-api] VITE_API_URL "${configured}" has the path "${path}"; ` +
+        `requests will go to "${url}${API_V1_PATH}". Set VITE_API_URL to the backend ` +
+        `origin, or to a URL ending in "${API_V1_PATH}".`
+    );
+  }
+  return `${url}${API_V1_PATH}`;
+};
+
+// The versioned API root (origin + version path), not the bare backend origin: only
+// use it to build API route URLs.
+export const API_BASE_URL = resolveApiBaseUrl(
   import.meta.env.VITE_API_URL || DEFAULT_API_BASE_URL
-).replace(/\/+$/, '');
+);
 
 const getAuthToken = () => {
   try {
