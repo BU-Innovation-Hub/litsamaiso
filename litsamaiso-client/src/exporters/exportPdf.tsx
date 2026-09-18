@@ -28,10 +28,9 @@ export const exportPdf = async ({ data, meta, filename, logoSrc }: { data: unkno
     const body = rows.map((r) => head.map((c) => (r as any)[c] ?? ''));
 
     // dynamic import to keep bundle light
-    const jsPDFModule = await import('jspdf');
-    await import('jspdf-autotable');
-    // @ts-ignore
-    const jsPDF = (jsPDFModule && (jsPDFModule.jsPDF || jsPDFModule.default)) as any;
+    const { jsPDF } = await import('jspdf');
+    // jspdf-autotable v5 only patches doc.autoTable onto a global (UMD) jsPDF, so call it as a function.
+    const { autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF({ unit: 'pt', format: 'a4' }) as any;
 
     const pageWidth = doc.internal.pageSize.getWidth ? doc.internal.pageSize.getWidth() : doc.internal.pageSize.width;
@@ -48,7 +47,7 @@ export const exportPdf = async ({ data, meta, filename, logoSrc }: { data: unkno
     const marginRight = 40;
 
     // Render table with header callback to draw page header for every page
-    doc.autoTable({
+    autoTable(doc, {
       head: [head],
       body,
       startY: 80,
