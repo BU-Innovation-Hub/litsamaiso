@@ -1,3 +1,5 @@
+import type { InstitutionTheme } from '../theme/palette';
+
 // User and Authentication Types
 export interface User {
   _id?: string;
@@ -12,8 +14,15 @@ export interface User {
   faceDescriptor?: number[];
   faceImageUrl?: string;
   financialInfoConsentAt?: string;
+  tour?: TourProgress;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface TourProgress {
+  completedAt?: string;
+  dismissedAt?: string;
+  version?: number;
 }
 
 export interface Role {
@@ -32,8 +41,24 @@ export interface Institution {
   locked?: boolean;
   lockedAt?: string;
   lockedReason?: string;
+  theme?: InstitutionTheme;
+  billing?: InstitutionBilling;
+  onboardedAt?: string;
   createdAt?: string;
 }
+
+export type PlanKey = 'starter' | 'professional' | 'enterprise';
+
+export type BillingStatus = 'active' | 'grace' | 'canceled' | 'manual';
+
+export interface InstitutionBilling {
+  plan?: PlanKey;
+  status: BillingStatus;
+  currentPeriodEnd?: string;
+  graceEndsAt?: string;
+}
+
+export type { InstitutionTheme } from '../theme/palette';
 
 export interface AuthResponse {
   message: string;

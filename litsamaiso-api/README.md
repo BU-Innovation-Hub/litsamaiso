@@ -110,6 +110,11 @@ Configure environment variables:
 | `CLOUDINARY_API_SECRET` | No | — | Cloudinary API secret |
 | `CLOUDINARY_FOLDER` | No | `litsamaiso` | Cloudinary upload folder |
 | `AGENDA_COLLECTION` | No | `agendaJobs` | MongoDB collection name for Agenda scheduled jobs |
+| `STRIPE_SECRET_KEY` | For billing | — | Stripe secret key (`sk_test_…` until the live account exists) |
+| `STRIPE_WEBHOOK_SECRET` | For billing | — | Signing secret for `POST /api/v1/webhooks/stripe` |
+| `CLIENT_BASE_URL` | For billing | `http://localhost:5173` | Client origin for Checkout and Customer Portal redirects |
+| `BILLING_GRACE_DAYS` | No | `14` | Days an institution keeps access after a failed or cancelled payment |
+| `ONBOARDING_RATE_LIMIT_MAX` | No | `60` | Onboarding requests allowed per IP per 15 minutes |
 | `APP_NAME` | No | `Litsamaiso` | Application name for email branding |
 | `EMAIL_ACCENT_COLOR` | No | `#535BC0` | Accent color for email templates |
 | `EMAIL_LOGO_URL` | No | — | Logo URL for email templates |
@@ -138,6 +143,28 @@ Run the built app:
 ```powershell
 npm start
 ```
+
+## Billing & Self-Serve Onboarding
+
+Institutions can onboard themselves from the client's `/pricing` → `/onboarding` flow and pay an
+annual subscription through Stripe Checkout. Stripe charges in **ZAR**; the client shows Maluti
+prices, which are equal because the Loti is pegged 1:1 to the Rand. Plans, amounts and student
+caps live in `src/config/plans.ts`.
+
+1. Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` and `CLIENT_BASE_URL`.
+2. Create the Stripe Products and Prices (idempotent): `npm run stripe:sync-plans`.
+3. Forward webhooks locally: `stripe listen --forward-to localhost:5000/api/v1/webhooks/stripe`
+   (in production, register the same path in the Stripe dashboard for `checkout.session.completed`,
+   `customer.subscription.*`, `invoice.paid` and `invoice.payment_failed`).
+4. Mark institutions that existed before billing as manually billed: `npm run backfill:billing -- --apply`.
+5. Configure the Customer Portal in the Stripe dashboard (plan switching between the three prices,
+   cancellation at period end).
+
+Lifecycle: a paid Checkout provisions the institution and its InstitutionAdmin. A failed or
+cancelled payment starts a grace period (`BILLING_GRACE_DAYS`); an hourly Agenda job then locks the
+institution (`lockedBy: "billing"`), and a successful payment unlocks it. AppAdmin can switch any
+institution to manual billing with `PATCH /institutions/:id/billing`. Manual institutions are never
+locked by billing.
 
 ## Project Structure
 

@@ -38,7 +38,15 @@ export const initAgenda = async (): Promise<Agenda> => {
     await service.computeElectionResults(electionId, { source: "job" });
   });
 
+  // Lock institutions whose billing grace period has ended.
+  agenda.define("billing.enforce-grace", async () => {
+    const service = await import("../services/billingService.js");
+    const locked = await service.enforceGracePeriods();
+    if (locked) console.info(`[billing] locked ${locked} institution(s) after grace period`);
+  });
+
   await agenda.start();
+  await agenda.every("1 hour", "billing.enforce-grace");
 
   return agenda;
 };

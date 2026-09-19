@@ -14,6 +14,7 @@ import { API_V1_PREFIX, apiNotFoundHandler, registerApiRoutes } from "./routes/a
 import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
+import { stripeWebhook } from "./controllers/webhookController.js";
 
 
 const app = express();
@@ -37,6 +38,9 @@ const parseTrustProxy = (value: string | undefined): boolean | number | string =
 app.set("trust proxy", parseTrustProxy(process.env.TRUST_PROXY));
 app.set("etag", false);
 app.use(cors());
+// Stripe webhooks are verified against the raw body, so this route must be
+// registered before the JSON parser. It is mounted once, outside the v1 table.
+app.post(`${API_V1_PREFIX}/webhooks/stripe`, express.raw({ type: "application/json" }), stripeWebhook);
 // Allow larger JSON payloads (base64 images for AI validation)
 app.use(express.json({ limit: "10mb" }));
 

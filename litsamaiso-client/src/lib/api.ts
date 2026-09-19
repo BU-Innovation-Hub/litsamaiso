@@ -8,6 +8,7 @@ import axios, {
 const DEFAULT_API_BASE_URL = 'http://localhost:5000';
 const API_V1_PATH = '/api/v1';
 const AUTH_EXPIRED_EVENT = 'litsamaiso:auth-expired';
+const INSTITUTION_LOCKED_EVENT = 'litsamaiso:institution-locked';
 const API_DIAGNOSTICS_KEY = '__litsamaisoApiDiagnostics';
 const API_DIAGNOSTICS_WINDOW_MS = 10_000;
 
@@ -101,6 +102,24 @@ export const onAuthExpired = (handler: () => void) => {
   return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handler);
 };
 
+export interface InstitutionLockDetail {
+  reason?: string;
+  lockedBy?: 'manual' | 'billing';
+}
+
+export const notifyInstitutionLocked = (detail: InstitutionLockDetail) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(INSTITUTION_LOCKED_EVENT, { detail }));
+};
+
+export const onInstitutionLocked = (handler: (detail: InstitutionLockDetail) => void) => {
+  if (typeof window === 'undefined') return () => undefined;
+  const listener = (event: Event) =>
+    handler((event as CustomEvent<InstitutionLockDetail>).detail ?? {});
+  window.addEventListener(INSTITUTION_LOCKED_EVENT, listener);
+  return () => window.removeEventListener(INSTITUTION_LOCKED_EVENT, listener);
+};
+
 export const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -141,6 +160,12 @@ api.interceptors.response.use(
     });
     if (error.response?.status === 401 && !isAuthEndpoint) {
       notifyAuthExpired();
+    }
+    const lockedBody = error.response?.data as
+      | { locked?: boolean; lockedReason?: string; lockedBy?: 'manual' | 'billing' }
+      | undefined;
+    if (error.response?.status === 403 && lockedBody?.locked && !isAuthEndpoint) {
+      notifyInstitutionLocked({ reason: lockedBody.lockedReason, lockedBy: lockedBody.lockedBy });
     }
     return Promise.reject(error);
   }

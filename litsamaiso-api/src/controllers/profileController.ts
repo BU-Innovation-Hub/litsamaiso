@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { User } from "../models/User.js";
+import { SESSION_INSTITUTION_FIELDS } from "../utils/sessionUser.js";
 
 const getRoleName = (role: any): string =>
   String((role && role.name) || role || "Student");
@@ -15,6 +16,7 @@ const serializeProfile = (user: any) => ({
   faceImageUrl: user.faceImageUrl || "",
   role: getRoleName(user.role),
   institution: user.institution,
+  tour: user.tour,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
@@ -28,7 +30,7 @@ export const getProfile = async (
 
   const user = await User.findById(currentUser._id)
     .populate("role", "name")
-    .populate("institution", "name email")
+    .populate("institution", SESSION_INSTITUTION_FIELDS)
     .select("-password");
 
   if (!user) {
@@ -88,7 +90,7 @@ export const updateProfile = async (
     { new: true, runValidators: true },
   )
     .populate("role", "name")
-    .populate("institution", "name email")
+    .populate("institution", SESSION_INSTITUTION_FIELDS)
     .select("-password");
 
   if (!updatedUser) {
@@ -100,4 +102,31 @@ export const updateProfile = async (
     message: "Profile updated successfully",
     data: serializeProfile(updatedUser),
   });
+};
+
+// PATCH /profile/tour - records that the guided tour was completed or skipped.
+export const updateTourProgress = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const currentUser = (req as any).user;
+  const { action, version } = req.body as { action?: string; version?: number };
+
+  if (action !== "completed" && action !== "dismissed" && action !== "reset") {
+    res.status(400).json({ message: "action must be completed, dismissed or reset" });
+    return;
+  }
+
+  const update =
+    action === "reset"
+      ? { $unset: { tour: 1 } }
+      : {
+          $set: {
+            [`tour.${action === "completed" ? "completedAt" : "dismissedAt"}`]: new Date(),
+            "tour.version": Number.isInteger(version) ? version : 1,
+          },
+        };
+
+  const user = await User.findByIdAndUpdate(currentUser._id, update, { new: true }).select("tour");
+  res.json({ tour: user?.tour ?? null });
 };

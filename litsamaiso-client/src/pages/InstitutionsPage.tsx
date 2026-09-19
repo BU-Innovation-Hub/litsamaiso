@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, ChevronUp, KeyRound, Lock, Pencil, LayersPlus, Search, Trash2, Unlock, Users } from 'lucide-react';
+import { Building2, ChevronUp, CreditCard, KeyRound, Lock, Pencil, LayersPlus, Search, Trash2, Unlock, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Institution, User } from '../types';
+import type { BillingStatus, Institution, PlanKey, User } from '../types';
+import { billingService } from '../services/billingService';
+import { PLANS, getPlan } from '../config/plans';
 import { institutionService, type InstitutionUsersResponse } from '../services/institutionService';
 import { userService } from '../services/userService';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -19,6 +21,13 @@ const emptyForm = {
 
 const getUserId = (user: User) => user.id || user._id || '';
 
+const billingBadges: Record<BillingStatus, { label: string; className: string }> = {
+  active: { label: 'Subscribed', className: 'bg-emerald-100 text-emerald-700' },
+  grace: { label: 'Payment overdue', className: 'bg-amber-100 text-amber-800' },
+  canceled: { label: 'Subscription ended', className: 'bg-red-100 text-red-700' },
+  manual: { label: 'Manual billing', className: 'bg-gray-100 text-gray-700' },
+};
+
 const InstitutionsPage: React.FC = () => {
   const [institutions, setInstitutions] = useState<Institution[]>([]);
   const [form, setForm] = useState(emptyForm);
@@ -28,6 +37,9 @@ const InstitutionsPage: React.FC = () => {
   const [lockTarget, setLockTarget] = useState<Institution | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Institution | null>(null);
   const [lockReason, setLockReason] = useState('');
+  const [billingTarget, setBillingTarget] = useState<Institution | null>(null);
+  const [billingPlan, setBillingPlan] = useState<PlanKey | ''>('');
+  const [billingSaving, setBillingSaving] = useState(false);
   const [openActionsId, setOpenActionsId] = useState('');
   const [usersTarget, setUsersTarget] = useState<Institution | null>(null);
   const [institutionUsers, setInstitutionUsers] = useState<InstitutionUsersResponse | null>(null);
@@ -120,6 +132,27 @@ const InstitutionsPage: React.FC = () => {
       name: institution.name,
       email: institution.email,
     });
+  };
+
+  const openBilling = (institution: Institution) => {
+    setOpenActionsId('');
+    setBillingTarget(institution);
+    setBillingPlan(institution.billing?.plan ?? '');
+  };
+
+  const handleBillingOverride = async (manual: boolean) => {
+    if (!billingTarget) return;
+    setBillingSaving(true);
+    try {
+      await billingService.overrideBilling(billingTarget._id, { manual, plan: billingPlan || null });
+      toast.success(manual ? 'Billing set to manual' : 'Billing returned to the Stripe subscription');
+      setBillingTarget(null);
+      await loadInstitutions();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to update billing'));
+    } finally {
+      setBillingSaving(false);
+    }
   };
 
   const handleLock = async () => {
@@ -403,6 +436,14 @@ const InstitutionsPage: React.FC = () => {
                           >
                             {institution.locked ? 'Locked' : 'Active'}
                           </span>
+                          {institution.billing && (
+                            <span
+                              className={`rounded px-2 py-0.5 text-xs font-semibold ${billingBadges[institution.billing.status]?.className ?? ''}`}
+                            >
+                              {institution.billing.plan ? `${getPlan(institution.billing.plan).name} · ` : ''}
+                              {billingBadges[institution.billing.status]?.label ?? institution.billing.status}
+                            </span>
+                          )}
                         </div>
                         {institution.locked && institution.lockedReason && (
                           <p className="mt-1 text-xs text-red-600">
@@ -454,6 +495,14 @@ const InstitutionsPage: React.FC = () => {
                           </button>
                           <button
                             type="button"
+                            onClick={() => openBilling(institution)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            <CreditCard className="h-4 w-4" />
+                            Billing
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => beginEdit(institution)}
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50"
                           >
@@ -494,6 +543,83 @@ const InstitutionsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {billingTarget && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Billing · {billingTarget.name}</h2>
+            <dl className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Status</dt>
+                <dd className="font-medium text-gray-900">
+                  {billingTarget.billing ? billingBadges[billingTarget.billing.status]?.label : 'Manual billing'}
+                </dd>
+              </div>
+              {billingTarget.billing?.currentPeriodEnd && (
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Current period ends</dt>
+                  <dd className="font-medium text-gray-900">
+                    {new Date(billingTarget.billing.currentPeriodEnd).toLocaleDateString()}
+                  </dd>
+                </div>
+              )}
+              {billingTarget.billing?.graceEndsAt && (
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Grace period ends</dt>
+                  <dd className="font-medium text-amber-700">
+                    {new Date(billingTarget.billing.graceEndsAt).toLocaleDateString()}
+                  </dd>
+                </div>
+              )}
+            </dl>
+            <div className="mt-5">
+              <label htmlFor="billing-plan" className="mb-1 block text-sm font-medium text-gray-700">
+                Plan (sets the student limit)
+              </label>
+              <select
+                id="billing-plan"
+                value={billingPlan}
+                onChange={(event) => setBillingPlan(event.target.value as PlanKey | '')}
+                className="w-full rounded-md border border-gray-300 px-3 py-2"
+              >
+                <option value="">No plan (unlimited students)</option>
+                {PLANS.map((plan) => (
+                  <option key={plan.key} value={plan.key}>
+                    {plan.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="mt-4 text-xs text-gray-500">
+              Manual billing stops Stripe from changing this institution&apos;s status and lifts any billing lock.
+              Returning to Stripe re-applies the live subscription state.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button type="button" onClick={() => setBillingTarget(null)} className="rounded-md border px-4 py-2 font-semibold">
+                Cancel
+              </button>
+              {billingTarget.billing?.status === 'manual' && (
+                <button
+                  type="button"
+                  disabled={billingSaving}
+                  onClick={() => handleBillingOverride(false)}
+                  className="rounded-md border border-gray-300 px-4 py-2 font-semibold text-gray-800 disabled:opacity-50"
+                >
+                  Return to Stripe
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={billingSaving}
+                onClick={() => handleBillingOverride(true)}
+                className="rounded-md bg-button px-4 py-2 font-semibold text-white disabled:opacity-50"
+              >
+                {billingTarget.billing?.status === 'manual' ? 'Save plan' : 'Set to manual billing'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {lockTarget && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">

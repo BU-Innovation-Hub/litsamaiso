@@ -772,7 +772,7 @@ const AccountsPage: React.FC = () => {
   return (
     <div className="global-bg min-h-screen pt-5 pb-14">
       <div className="mx-auto max-w-6xl px-4 space-y-8">
-        <div>
+        <div data-tour="accounts-header">
           <h1 className="text-3xl font-bold text-primary-clr">Accounts</h1>
           <p className="text-muted-foreground">
             Confirm student account details, import lists, and resolve payment
@@ -1738,6 +1738,7 @@ const AccountsPage: React.FC = () => {
                     <div>
                       <button
                         type="button"
+                        data-tour="accounts-import-students"
                         onClick={() => studentsFileRef.current?.click()}
                         disabled={
                           studentImport?.status === "running" ||
