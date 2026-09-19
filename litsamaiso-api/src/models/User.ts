@@ -14,6 +14,11 @@ export interface UserDocument {
   financialInfoConsentAt?: Date;
   passwordResetTokenHash?: string;
   passwordResetTokenExpiresAt?: Date;
+  tour?: {
+    completedAt?: Date;
+    dismissedAt?: Date;
+    version?: number;
+  };
 }
 
 const userSchema = new Schema<UserDocument>(
@@ -35,6 +40,12 @@ const userSchema = new Schema<UserDocument>(
     financialInfoConsentAt: { type: Date },
     passwordResetTokenHash: { type: String, select: false },
     passwordResetTokenExpiresAt: { type: Date, select: false },
+    // Guided product tour progress (per user, so it follows them across devices).
+    tour: {
+      completedAt: { type: Date },
+      dismissedAt: { type: Date },
+      version: { type: Number },
+    },
   },
   {
     timestamps: true,

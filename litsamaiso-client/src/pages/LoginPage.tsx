@@ -1,5 +1,6 @@
-import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { AxiosError } from "axios";
 import { toast } from "sonner";
 import { useAuth } from "../hooks/useAuth";
 import { getApiErrorMessage } from "../utils/apiError";
@@ -7,7 +8,14 @@ import PasswordInput from "../components/ui/PasswordInput";
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { login, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (searchParams.get("renewed") === "1") {
+      toast.success("Thanks! Once the payment is confirmed your institution will be unlocked. Please sign in.");
+    }
+  }, [searchParams]);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -30,6 +38,11 @@ const LoginPage: React.FC = () => {
       toast.success("Signed in successfully!");
       navigate("/dashboard");
     } catch (error: unknown) {
+      const locked = error instanceof AxiosError ? error.response?.data : undefined;
+      if (error instanceof AxiosError && error.response?.status === 403 && locked?.locked) {
+        navigate("/locked", { state: { reason: locked.lockedReason, lockedBy: locked.lockedBy } });
+        return;
+      }
       toast.error(getApiErrorMessage(error, "Login failed"));
     }
   };

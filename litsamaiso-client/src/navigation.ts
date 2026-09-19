@@ -10,6 +10,8 @@ import {
   MailPlus,
   MessageSquareWarning,
   ClipboardList,
+  CreditCard,
+  Palette,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -107,6 +109,20 @@ export const navigationItems: NavigationItem[] = [
     href: '/branch-codes',
     roles: roleAccess.branchCodes,
     icon: GitBranch,
+  },
+  {
+    id: 'branding',
+    label: 'Branding',
+    href: '/settings/branding',
+    roles: roleAccess.institutionSettings,
+    icon: Palette,
+  },
+  {
+    id: 'billing',
+    label: 'Billing',
+    href: '/settings/billing',
+    roles: roleAccess.institutionSettings,
+    icon: CreditCard,
   },
 ];
 

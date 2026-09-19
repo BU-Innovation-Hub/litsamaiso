@@ -5,7 +5,7 @@ import { authService } from '../services/authService';
 import { accountService } from '../services/accountService';
 import { feedbackService } from '../services/feedbackService';
 import { AuthContext } from './authContextValue';
-import { onAuthExpired } from '../lib/api';
+import { onAuthExpired, onInstitutionLocked } from '../lib/api';
 import posthog from 'posthog-js';
 
 const clearStoredAuth = () => {
@@ -55,6 +55,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     });
   }, [location.pathname, navigate]);
+
+  useEffect(() => {
+    return onInstitutionLocked((detail) => {
+      clearStoredAuth();
+      setUser(null);
+      posthog.reset();
+      navigate('/locked', { replace: true, state: detail });
+    });
+  }, [navigate]);
 
   useEffect(() => {
     if (user) {
