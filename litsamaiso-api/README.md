@@ -154,6 +154,51 @@ npm start
 - `src/scripts/` - CLI utility scripts
 - `src/types/` - TypeScript type declarations
 
+## Scripts
+
+### Importing borrower numbers from a clearance list
+
+Students can't confirm until a borrower number is linked to their account. When a financial clearance list arrives, `import:borrowers` copies each student's borrower number from the spreadsheet onto their `Student` record and their student `User` account.
+
+By default the script only does a dry run: it prints a preview and writes nothing. Check the preview, then run it again with `--apply`:
+
+```bash
+# Preview (writes nothing)
+npm run import:borrowers -- --file "../NEW INTAKE LIST.xlsx"
+
+# Write the changes
+npm run import:borrowers -- --file "../NEW INTAKE LIST.xlsx" --apply
+```
+
+| Option | Description |
+| --- | --- |
+| `--file <path>` | Spreadsheet to read (required). Uses the first sheet and finds the header row that has a `Borrower` column, plus `Student Name` and `Student No` columns. |
+| `--institution <id>` | Institution to match within. If omitted, the script uses the institution that most of the sheet's student numbers belong to. |
+| `--apply` | Write the changes. Without it, the script only previews. |
+
+The script connects with `MONGO_URI` from `.env`. To target another database, set the variable for that one command, for example `MONGO_URI='<uri>' npm run import:borrowers -- ...`. The first line of output shows which database the script is connected to, so check it before you use `--apply`.
+
+**Matching.** The `Student No` column is often wrong, and sometimes holds a national ID or passport number instead. The script never trusts it on its own. It reads names as `Surname, Name Middle Middle` (the comma is optional, and apostrophes and accents are ignored). The `matchedBy` column shows how each row was matched:
+
+| `matchedBy` | Meaning |
+| --- | --- |
+| `id+name` | Student number (or national ID) matches, and surname and first name agree |
+| `id+name~` | Student number and surname match, and the first name is a near spelling. The note shows the name stored in the database. |
+| `name` | The number didn't match, but surname and first name identify exactly one student |
+
+Check the `name` and `id+name~` rows in the preview before you apply.
+
+**Result groups:**
+
+- `WILL ASSIGN` / `WILL SYNC USER`: these rows are written on `--apply`.
+- `ALREADY DONE`: the student, and their account if they have one, already has this number. Rerunning the script is safe.
+- `CONFLICT`: the row is skipped. Either the student or their account already has a different number, the number belongs to another student, the name is ambiguous, or two sheet rows match the same student.
+- `NOT FOUND` / `INVALID ROW`: the row is skipped. The note lists students with the same surname to help you fix it by hand.
+
+The script never overwrites an existing borrower number. Clear a wrong value first, then rerun. If a student hasn't registered yet, only their `Student` record is updated, and registration copies the number onto the new account. Each `--apply` run writes one `registry.borrower.import` audit log entry that lists every change.
+
+Clearance spreadsheets contain students' bank details, so don't commit them.
+
 ## Roles
 
 Seeded roles are case-insensitive:
