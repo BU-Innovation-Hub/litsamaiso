@@ -7,10 +7,14 @@ export interface ResultRanking {
   rank: number;
 }
 
+// WINNER: one clear leader. TIE: two or more share the top vote count. NO_VOTES: nobody received a vote.
+export type ResultOutcome = "WINNER" | "TIE" | "NO_VOTES";
+
 export interface ResultPositionSnapshot {
   positionId: Types.ObjectId;
   rankings: ResultRanking[];
   winnerId?: Types.ObjectId | null;
+  outcome?: ResultOutcome;
 }
 
 export interface ResultSnapshotDocument {
@@ -36,6 +40,7 @@ const resultPositionSchema = new Schema<ResultPositionSnapshot>(
     positionId: { type: Schema.Types.ObjectId, ref: "Position", required: true },
     rankings: { type: [resultRankingSchema], default: [] },
     winnerId: { type: Schema.Types.ObjectId, ref: "Candidate" },
+    outcome: { type: String, enum: ["WINNER", "TIE", "NO_VOTES"] },
   },
   { _id: false },
 );

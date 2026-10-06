@@ -4,7 +4,11 @@ import { Election } from "../models/Election.js";
 import { Position } from "../models/Position.js";
 import { Candidate } from "../models/Candidate.js";
 import { Ballot } from "../models/Ballot.js";
-import { ResultSnapshot, type ResultSnapshotDocument } from "../models/ResultSnapshot.js";
+import {
+  ResultSnapshot,
+  type ResultOutcome,
+  type ResultSnapshotDocument,
+} from "../models/ResultSnapshot.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 
@@ -27,7 +31,10 @@ export const computeElectionResults = async (
   const election = await Election.findOne(query);
   if (!election) throw new AppError("Election not found", 404);
 
-  if (!["CLOSED", "COUNTING", "RESULTS_PUBLISHED"].includes(election.status)) {
+  if (["RESULTS_PUBLISHED", "ARCHIVED"].includes(election.status)) {
+    throw new AppError("Results are already published and can no longer be recounted", 400);
+  }
+  if (!["CLOSED", "COUNTING"].includes(election.status)) {
     throw new AppError("Election must be closed before counting", 400);
   }
 
@@ -64,7 +71,7 @@ export const computeElectionResults = async (
   const countMap = new Map<string, number>();
 
   const counts = await Ballot.aggregate([
-    { $match: { electionId: new Types.ObjectId(election._id), deletedAt: null } },
+    { $match: { electionId: new Types.ObjectId(election._id) } },
     { $unwind: "$selections" },
     {
       $group: {
@@ -100,19 +107,25 @@ export const computeElectionResults = async (
 
     const totalVotes = rankings.reduce((sum, r) => sum + r.votes, 0);
 
-    const enriched = rankings.map((rank, index) => ({
+    // Candidates with equal votes share a rank (1, 1, 3)
+    const enriched = rankings.map((rank) => ({
       candidateId: rank.candidateId,
       votes: rank.votes,
       percentage: totalVotes > 0 ? Number(((rank.votes / totalVotes) * 100).toFixed(2)) : 0,
-      rank: index + 1,
+      rank: 1 + rankings.filter((other) => other.votes > rank.votes).length,
     }));
 
-    const winner = enriched[0]?.candidateId || null;
+    const topVotes = enriched[0]?.votes || 0;
+    const leaders = enriched.filter((rank) => rank.votes === topVotes);
+    const outcome: ResultOutcome =
+      topVotes === 0 ? "NO_VOTES" : leaders.length > 1 ? "TIE" : "WINNER";
+    const winner = outcome === "WINNER" ? enriched[0]!.candidateId : null;
 
     return {
       positionId: position._id,
       rankings: enriched,
       winnerId: winner,
+      outcome,
     };
   });
 
@@ -123,6 +136,7 @@ export const computeElectionResults = async (
     positions: positionsSnapshot.map((p) => ({
       positionId: p.positionId.toString(),
       winnerId: p.winnerId ? p.winnerId.toString() : null,
+      outcome: p.outcome,
       rankings: p.rankings.map((r) => ({
         candidateId: r.candidateId.toString(),
         votes: r.votes,
@@ -227,6 +241,7 @@ export const getResultsWinners = async (params: {
     const res: any = {
       positionId,
       candidateId: winnerId,
+      outcome: position.outcome,
     };
     const title = positionMap.get(positionId)?.title;
     if (title) res.positionTitle = title;
@@ -291,6 +306,8 @@ export const getResultsByPosition = async (params: {
   const res: any = {
     generatedAt: snapshot.generatedAt,
     positionId: params.positionId,
+    outcome: positionSnapshot.outcome,
+    winnerId: positionSnapshot.winnerId ? positionSnapshot.winnerId.toString() : null,
     rankings,
   };
   if (position?.title) res.positionTitle = position.title;

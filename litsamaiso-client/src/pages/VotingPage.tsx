@@ -9,28 +9,23 @@ type PositionWithCandidates = Position & { candidates: Candidate[] };
 
 const getPositionTitle = (position: Position) => position.title || position.name || 'Position';
 const getCandidateName = (candidate: Candidate) => candidate.fullName || candidate.name || 'Candidate';
-const canSkipPosition = (position: PositionWithCandidates) => position.candidates.length <= 1;
-
+// The server keeps the status current, so it decides availability rather than the device clock
 const getBallotUnavailableMessage = (election: Election) => {
-  const now = Date.now();
-  const startTime = election.startTime ? new Date(election.startTime).getTime() : null;
-  const endTime = election.endTime ? new Date(election.endTime).getTime() : null;
-
-  if (startTime && now < startTime) {
-    return `This ballot opens on ${new Date(startTime).toLocaleString()}.`;
+  switch (election.status) {
+    case 'OPEN':
+      return '';
+    case 'SCHEDULED':
+      return election.startTime
+        ? `This ballot opens on ${new Date(election.startTime).toLocaleString()}.`
+        : 'This ballot is not open yet.';
+    case 'RESULTS_PUBLISHED':
+      return 'Voting has ended and the results have been published.';
+    case 'CLOSED':
+    case 'COUNTING':
+      return 'Voting has ended and the election results are being reviewed.';
+    default:
+      return 'This ballot is not open yet.';
   }
-
-  if (endTime && now >= endTime) {
-    return election.resultsPublished
-      ? 'Voting has ended and the results have been published.'
-      : 'Voting has ended and the election results are being reviewed.';
-  }
-
-  if (election.status !== 'OPEN') {
-    return 'This ballot is not open yet.';
-  }
-
-  return '';
 };
 
 const VotingPage: React.FC = () => {
@@ -41,6 +36,8 @@ const VotingPage: React.FC = () => {
   const [selectedCandidates, setSelectedCandidates] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // One key per ballot visit, so a retried submit returns the same receipt instead of failing
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     const loadBallot = async () => {
@@ -67,7 +64,8 @@ const VotingPage: React.FC = () => {
         );
 
         setElection(electionData);
-        setPositions(positionsWithCandidates);
+        // Positions without approved candidates aren't on the ballot
+        setPositions(positionsWithCandidates.filter((position) => position.candidates.length > 0));
       } catch (error: unknown) {
         toast.error(getApiErrorMessage(error, 'Failed to load ballot'));
       } finally {
@@ -80,30 +78,27 @@ const VotingPage: React.FC = () => {
 
   const handleSubmitVotes = async () => {
     if (!id) return;
-    const missing = positions.filter((position) => (
-      position._id && !selectedCandidates[position._id] && !canSkipPosition(position)
-    ));
+    const missing = positions.filter((position) => position._id && !selectedCandidates[position._id]);
 
     if (missing.length > 0) {
-      toast.error(`Please select candidates for: ${missing.map(getPositionTitle).join(', ')}`);
+      toast.error(`Please select a candidate for: ${missing.map(getPositionTitle).join(', ')}`);
       return;
     }
 
     setSubmitting(true);
     try {
-      await electionService.castVote(id, {
-        selections: positions
-          .filter((position) => position._id && selectedCandidates[position._id])
-          .map((position) => ({
-            positionId: position._id as string,
-            candidateId: selectedCandidates[position._id as string],
-          })),
-        idempotencyKey: `vote-${id}-${Date.now()}`,
+      const receipt = await electionService.castVote(id, {
+        selections: positions.map((position) => ({
+          positionId: position._id as string,
+          candidateId: selectedCandidates[position._id as string],
+        })),
+        idempotencyKey,
       });
       navigate('/elections', {
         replace: true,
         state: {
           electionCompletedMessage: `You have completed the election for ${election?.academicYear || 'this year'}.`,
+          receipt,
         },
       });
     } catch (error: unknown) {
@@ -161,13 +156,11 @@ const VotingPage: React.FC = () => {
                   <div className="mb-6 border-b-2 border-gray-200 pb-4">
                     <h2 className="mb-1 text-2xl font-bold text-gray-900">{getPositionTitle(position)}</h2>
                     {position.description && <p className="text-gray-600">{position.description}</p>}
+                    <p className="mt-1 text-sm text-gray-500">Choose one candidate.</p>
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    {position.candidates.length === 0 ? (
-                      <p className="text-sm text-gray-500">No candidates available for this position.</p>
-                    ) : (
-                      position.candidates.map((candidate) => (
+                    {position.candidates.map((candidate) => (
                         <button
                           key={candidate._id || getCandidateName(candidate)}
                           onClick={(event) => {
@@ -198,14 +191,8 @@ const VotingPage: React.FC = () => {
                             </div>
                           </div>
                         </button>
-                      ))
-                    )}
+                    ))}
                   </div>
-                  {canSkipPosition(position) && (
-                    <p className="mt-4 text-sm text-gray-500">
-                      You may leave this position unselected if you do not want to vote for this candidate.
-                    </p>
-                  )}
                 </div>
               ))}
             </div>
@@ -219,7 +206,7 @@ const VotingPage: React.FC = () => {
                     <div key={position._id || getPositionTitle(position)} className="flex items-center justify-between">
                       <span className="font-medium text-gray-700">{getPositionTitle(position)}:</span>
                       <span className={`font-semibold ${selected ? 'text-green-600' : 'text-red-600'}`}>
-                        {selected ? getCandidateName(selected) : canSkipPosition(position) ? 'No vote' : 'Not selected'}
+                        {selected ? getCandidateName(selected) : 'Not selected'}
                       </span>
                     </div>
                   );

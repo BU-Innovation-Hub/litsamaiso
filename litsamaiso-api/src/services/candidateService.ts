@@ -2,6 +2,7 @@ import { Types } from "mongoose";
 import { Election } from "../models/Election.js";
 import { Position } from "../models/Position.js";
 import { Candidate, type CandidateDocument } from "../models/Candidate.js";
+import { Student } from "../models/Student.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 import { optionalString, requireString } from "../utils/validation.js";
@@ -11,6 +12,16 @@ const ensureEditable = (status: string): void => {
     throw new AppError("Election is frozen and candidates cannot be edited", 400);
   }
 };
+// Candidates must be active students in the institution's registry
+const requireRegistryStudentId = async (institution: any, value: unknown): Promise<string> => {
+  const studentId = requireString(value, "studentId", { min: 1 });
+  const student = await Student.exists({ institution, studentId, studentStatus: true });
+  if (!student) {
+    throw new AppError(`Student ${studentId} is not an active student in the registry`, 400);
+  }
+  return studentId;
+};
+
 /* Service functions for managing candidates, including creating, updating, approving,
  disqualifying, and listing candidates for positions within an election. 
  These functions also include necessary checks for election status and user
@@ -43,7 +54,7 @@ export const createCandidate = async (params: {
 
   const party = optionalString(params.party);
   const manifesto = optionalString(params.manifesto);
-  const studentId = optionalString(params.studentId);
+  const studentId = await requireRegistryStudentId(params.user.institution, params.studentId);
 
   const candidate = await Candidate.create({
     electionId: election._id,
@@ -51,7 +62,7 @@ export const createCandidate = async (params: {
     fullName: requireString(params.fullName, "fullName", { min: 3 }),
     ...(party !== undefined && { party }),
     ...(manifesto !== undefined && { manifesto }),
-    ...(studentId !== undefined && { studentId }),
+    studentId,
     ...(params.imageUrl !== undefined && { imageUrl: params.imageUrl }),
     approved: false,
     disqualified: false,
@@ -92,6 +103,12 @@ export const updateCandidate = async (params: {
 
   if (params.updates.fullName !== undefined) {
     candidate.fullName = requireString(params.updates.fullName, "fullName", { min: 3 });
+  }
+  if (params.updates.studentId !== undefined) {
+    candidate.studentId = await requireRegistryStudentId(
+      params.user.institution,
+      params.updates.studentId,
+    );
   }
   if (params.updates.party !== undefined) {
     const v = optionalString(params.updates.party);

@@ -14,6 +14,7 @@ import { API_V1_PREFIX, apiNotFoundHandler, registerApiRoutes } from "./routes/a
 import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
+import { syncDueElections } from "./services/electionService.js";
 
 
 const app = express();
@@ -149,6 +150,10 @@ const startServer = async (): Promise<void> => {
     await connectDatabase();
     await seedRolesAndAdmin();
     await initAgenda();
+    // Catch up elections whose open/close time passed while the server was down or asleep
+    await syncDueElections().catch((error) => {
+      console.error("Failed to sync due elections on startup", error);
+    });
 
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
