@@ -21,7 +21,6 @@ type CandidateImportRecord = {
   party?: string;
   manifesto?: string;
   imageUrl?: string;
-  approved?: boolean;
 };
 
 type ImportWarning = {
@@ -45,6 +44,8 @@ const FIELD_ALIASES: Record<PositionField, string[]> = {
   party: ["party", "organization", "organisation", "movement", "association"],
   manifesto: ["manifesto", "description", "bio", "profile", "statement"],
   imageUrl: ["image", "image url", "photo", "photo url", "candidate photo"],
+  // Recognised so an approval column isn't mistaken for candidate names; its value is ignored
+  // because every imported candidate is approved
   approved: ["approved", "approval", "status"],
 };
 
@@ -62,19 +63,6 @@ const optionalCellString = (value: unknown): string | undefined => {
   if (value === undefined || value === null) return undefined;
   const str = String(value).trim();
   return str ? str : undefined;
-};
-
-const parseBooleanCell = (value: unknown): boolean | undefined => {
-  const str = optionalCellString(value);
-  if (!str) return undefined;
-  const normalized = normalizeHeader(str);
-  if (["true", "yes", "y", "1", "approved", "approve"].includes(normalized)) {
-    return true;
-  }
-  if (["false", "no", "n", "0", "pending", "rejected", "not approved"].includes(normalized)) {
-    return false;
-  }
-  return undefined;
 };
 
 const splitCandidateNames = (value: unknown): string[] => {
@@ -169,7 +157,6 @@ const parseLongRows = (params: {
   const partyColumn = findColumn(headers, FIELD_ALIASES.party);
   const manifestoColumn = findColumn(headers, FIELD_ALIASES.manifesto);
   const imageUrlColumn = findColumn(headers, FIELD_ALIASES.imageUrl);
-  const approvedColumn = findColumn(headers, FIELD_ALIASES.approved);
 
   params.rows.forEach((row, index) => {
     const rowNumber = index + 2;
@@ -195,12 +182,10 @@ const parseLongRows = (params: {
       const party = partyColumn ? optionalCellString(row[partyColumn]) : undefined;
       const manifesto = manifestoColumn ? optionalCellString(row[manifestoColumn]) : undefined;
       const imageUrl = imageUrlColumn ? optionalCellString(row[imageUrlColumn]) : undefined;
-      const approved = approvedColumn ? parseBooleanCell(row[approvedColumn]) : undefined;
       if (studentId !== undefined) record.studentId = studentId;
       if (party !== undefined) record.party = party;
       if (manifesto !== undefined) record.manifesto = manifesto;
       if (imageUrl !== undefined) record.imageUrl = imageUrl;
-      if (approved !== undefined) record.approved = approved;
       records.push(record);
     });
   });
@@ -266,12 +251,10 @@ const parseWideRows = (params: {
         const party = group.columns.party ? optionalCellString(row[group.columns.party]) : undefined;
         const manifesto = group.columns.manifesto ? optionalCellString(row[group.columns.manifesto]) : undefined;
         const imageUrl = group.columns.imageUrl ? optionalCellString(row[group.columns.imageUrl]) : undefined;
-        const approved = group.columns.approved ? parseBooleanCell(row[group.columns.approved]) : undefined;
         if (studentId !== undefined && candidateNames.length === 1) record.studentId = studentId;
         if (party !== undefined && candidateNames.length === 1) record.party = party;
         if (manifesto !== undefined && candidateNames.length === 1) record.manifesto = manifesto;
         if (imageUrl !== undefined && candidateNames.length === 1) record.imageUrl = imageUrl;
-        if (approved !== undefined) record.approved = approved;
         records.push(record);
       });
     });
@@ -345,7 +328,6 @@ export const importCandidatesFromSpreadsheet = async (params: {
   electionId: string;
   fileBuffer: Buffer;
   fileName?: string;
-  approveImported?: boolean;
 }): Promise<{
   summary: {
     rowsRead: number;
@@ -482,7 +464,7 @@ export const importCandidatesFromSpreadsheet = async (params: {
       electionId: election._id,
       positionId: position._id,
       fullName: record.fullName.trim(),
-      approved: Boolean(params.approveImported || record.approved),
+      approved: true,
       disqualified: false,
     };
     payload.studentId = record.studentId;

@@ -321,7 +321,7 @@ export const closeElectionNow = async (params: {
       status: "OPEN",
     },
     { $set: { status: "CLOSED", endTime: now } },
-    { new: true },
+    { returnDocument: "after" },
   );
   if (!election) throw new AppError("Only open elections can be closed", 400);
 

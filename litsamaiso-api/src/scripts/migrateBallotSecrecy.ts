@@ -5,6 +5,7 @@ import { connectDatabase } from "../config/database.js";
 import { Ballot } from "../models/Ballot.js";
 import { VoterRecord } from "../models/VoterRecord.js";
 import { buildBallotHash } from "../utils/ballotHash.js";
+import { supportsTransactions, withOptionalTransaction } from "../utils/transaction.js";
 
 // Splits legacy ballots (which stored studentId next to the selections) into a VoterRecord
 // (who voted) and an anonymous Ballot (what was voted), then removes the legacy ballot.
@@ -25,6 +26,14 @@ const migrateBallotSecrecy = async (): Promise<void> => {
   await connectDatabase();
   await Promise.all([Ballot.syncIndexes(), VoterRecord.syncIndexes()]);
 
+  if (shouldApply && !(await supportsTransactions())) {
+    console.warn(
+      "Warning: this MongoDB server does not support transactions (standalone). " +
+        "Each election is migrated without one, so an interruption mid-run can leave ballots half-migrated. " +
+        "Prefer running against a replica set such as Atlas.",
+    );
+  }
+
   const legacy = mongoose.connection.collection("ballots");
   const electionIds = await legacy.distinct("electionId", { deletedAt: null });
   console.log(
@@ -38,66 +47,61 @@ const migrateBallotSecrecy = async (): Promise<void> => {
     console.log(`Election ${String(electionId)}: ${legacyBallots.length} legacy ballot(s)`);
     if (!shouldApply || legacyBallots.length === 0) continue;
 
-    const session = await mongoose.startSession();
-    try {
-      await session.withTransaction(async () => {
-        const existingVoters = await VoterRecord.find({ electionId })
-          .select("studentId")
-          .session(session)
-          .lean();
-        const alreadyRecorded = new Set(existingVoters.map((record) => record.studentId));
+    await withOptionalTransaction(async (session) => {
+      const existingVoters = await VoterRecord.find({ electionId })
+        .select("studentId")
+        .session(session)
+        .lean();
+      const alreadyRecorded = new Set(existingVoters.map((record) => record.studentId));
 
-        const toMigrate = legacyBallots.filter((ballot) => !alreadyRecorded.has(ballot.studentId));
+      const toMigrate = legacyBallots.filter((ballot) => !alreadyRecorded.has(ballot.studentId));
 
-        if (toMigrate.length > 0) {
-          await VoterRecord.insertMany(
-            toMigrate.map((ballot) => ({
-              electionId,
-              studentId: ballot.studentId,
-              receiptId: ballot.receiptId,
-              submittedAt: ballot.submittedAt,
-              ...(ballot.idempotencyKey && { idempotencyKey: ballot.idempotencyKey }),
-              ...(ballot.ipAddress && { ipAddress: ballot.ipAddress }),
-              ...(ballot.userAgent && { userAgent: ballot.userAgent }),
-            })),
-            { session },
-          );
-
-          // Shuffle so the anonymous ballots' insertion order doesn't mirror the voters'
-          await Ballot.insertMany(
-            shuffle(toMigrate).map((ballot) => {
-              const ballotId = randomUUID();
-              const selections = (ballot.selections || []).map((s: any) => ({
-                positionId: s.positionId,
-                candidateId: s.candidateId,
-              }));
-              return {
-                _id: ballotId,
-                electionId,
-                selections,
-                ballotHash: buildBallotHash({
-                  electionId: String(electionId),
-                  ballotId,
-                  selections: selections.map((s: any) => ({
-                    positionId: String(s.positionId),
-                    candidateId: String(s.candidateId),
-                  })),
-                }).hash,
-              };
-            }),
-            { session },
-          );
-        }
-
-        await legacy.deleteMany(
-          { _id: { $in: legacyBallots.map((ballot) => ballot._id) } },
+      if (toMigrate.length > 0) {
+        await VoterRecord.insertMany(
+          toMigrate.map((ballot) => ({
+            electionId,
+            studentId: ballot.studentId,
+            receiptId: ballot.receiptId,
+            submittedAt: ballot.submittedAt,
+            ...(ballot.idempotencyKey && { idempotencyKey: ballot.idempotencyKey }),
+            ...(ballot.ipAddress && { ipAddress: ballot.ipAddress }),
+            ...(ballot.userAgent && { userAgent: ballot.userAgent }),
+          })),
           { session },
         );
-        totalMigrated += toMigrate.length;
-      });
-    } finally {
-      await session.endSession();
-    }
+
+        // Shuffle so the anonymous ballots' insertion order doesn't mirror the voters'
+        await Ballot.insertMany(
+          shuffle(toMigrate).map((ballot) => {
+            const ballotId = randomUUID();
+            const selections = (ballot.selections || []).map((s: any) => ({
+              positionId: s.positionId,
+              candidateId: s.candidateId,
+            }));
+            return {
+              _id: ballotId,
+              electionId,
+              selections,
+              ballotHash: buildBallotHash({
+                electionId: String(electionId),
+                ballotId,
+                selections: selections.map((s: any) => ({
+                  positionId: String(s.positionId),
+                  candidateId: String(s.candidateId),
+                })),
+              }).hash,
+            };
+          }),
+          { session },
+        );
+      }
+
+      await legacy.deleteMany(
+        { _id: { $in: legacyBallots.map((ballot) => ballot._id) } },
+        session ? { session } : {},
+      );
+      totalMigrated += toMigrate.length;
+    });
   }
 
   if (shouldApply) {

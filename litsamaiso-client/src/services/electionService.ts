@@ -187,16 +187,9 @@ export const electionService = {
     return response.data.candidates;
   },
 
-  importCandidates: async (
-    electionId: string,
-    file: File,
-    options?: { approveImported?: boolean }
-  ) => {
+  importCandidates: async (electionId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    if (options?.approveImported) {
-      formData.append('approveImported', 'true');
-    }
 
     const response = await apiClient.post<CandidateImportResult>(
       `/elections/${electionId}/candidates/import`,

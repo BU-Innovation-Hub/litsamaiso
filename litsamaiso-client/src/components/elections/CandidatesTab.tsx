@@ -136,7 +136,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({ election, positions, onCh
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Add Candidate</h2>
               <p className="text-sm text-gray-500">
-                The student ID must belong to an active student in the registry. Candidates start as pending.
+                The student ID must belong to an active student in the registry. Candidates are approved when added.
               </p>
             </div>
             <select
@@ -206,7 +206,7 @@ const CandidatesTab: React.FC<CandidatesTabProps> = ({ election, positions, onCh
       <div className="rounded-lg bg-white shadow">
         <div className="border-b border-gray-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-gray-900">Candidates by Position</h2>
-          <p className="text-sm text-gray-500">Students only see approved candidates.</p>
+          <p className="text-sm text-gray-500">Students see every approved candidate. Disqualified candidates are hidden.</p>
         </div>
         {positions.length === 0 ? (
           <p className="p-6 text-sm text-gray-500">No positions yet.</p>

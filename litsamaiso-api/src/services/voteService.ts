@@ -10,6 +10,7 @@ import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 import { buildBallotHash, type BallotSelection } from "../utils/ballotHash.js";
 import { syncDueElections } from "./electionService.js";
+import { withOptionalTransaction } from "../utils/transaction.js";
 
 type VoteReceipt = { receiptId: string; submittedAt: Date };
 
@@ -137,18 +138,16 @@ export const castVote = async (params: {
     );
   }
 
-  const session = await mongoose.startSession();
   let receipt: VoteReceipt | null = null;
 
   try {
-    await session.withTransaction(async () => {
+    receipt = await withOptionalTransaction(async (session) => {
       const existing = await VoterRecord.findOne({ electionId: election._id, studentId })
         .session(session)
         .lean();
       if (existing) {
         if (params.idempotencyKey && existing.idempotencyKey === params.idempotencyKey) {
-          receipt = toReceipt(existing);
-          return;
+          return toReceipt(existing);
         }
         throw new AppError("You have already voted", 409);
       }
@@ -162,7 +161,8 @@ export const castVote = async (params: {
         selections: normalizedSelections,
       });
 
-      await VoterRecord.create(
+      // The voter record goes first: its unique (election, student) index is what stops a double vote
+      const [voterRecord] = await VoterRecord.create(
         [
           {
             electionId: election._id,
@@ -177,22 +177,28 @@ export const castVote = async (params: {
         { session },
       );
 
-      await Ballot.create(
-        [
-          {
-            _id: ballotId,
-            electionId: election._id,
-            selections: normalizedSelections.map((s) => ({
-              positionId: new mongoose.Types.ObjectId(s.positionId),
-              candidateId: new mongoose.Types.ObjectId(s.candidateId),
-            })),
-            ballotHash: hash,
-          },
-        ],
-        { session },
-      );
+      try {
+        await Ballot.create(
+          [
+            {
+              _id: ballotId,
+              electionId: election._id,
+              selections: normalizedSelections.map((s) => ({
+                positionId: new mongoose.Types.ObjectId(s.positionId),
+                candidateId: new mongoose.Types.ObjectId(s.candidateId),
+              })),
+              ballotHash: hash,
+            },
+          ],
+          { session },
+        );
+      } catch (err) {
+        // Without a transaction, undo the voter record so the student isn't marked as voted with no ballot
+        if (!session) await VoterRecord.deleteOne({ _id: voterRecord!._id });
+        throw err;
+      }
 
-      receipt = { receiptId, submittedAt };
+      return { receiptId, submittedAt };
     });
   } catch (err) {
     if (isDuplicateKeyError(err)) {
@@ -205,8 +211,6 @@ export const castVote = async (params: {
     }
 
     if (!receipt) throw err;
-  } finally {
-    session.endSession();
   }
 
   await recordAudit({

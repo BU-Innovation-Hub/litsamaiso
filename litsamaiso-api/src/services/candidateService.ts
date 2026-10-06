@@ -64,7 +64,8 @@ export const createCandidate = async (params: {
     ...(manifesto !== undefined && { manifesto }),
     studentId,
     ...(params.imageUrl !== undefined && { imageUrl: params.imageUrl }),
-    approved: false,
+    // Candidates are approved on creation; SAAD can disqualify them later
+    approved: true,
     disqualified: false,
   });
 
