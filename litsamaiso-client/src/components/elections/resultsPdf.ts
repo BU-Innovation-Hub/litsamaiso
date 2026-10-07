@@ -5,6 +5,7 @@ import {
   getCandidateName,
   getPositionId,
   getPositionTitle,
+  makeFileSafeName,
   type PositionWithCandidates,
 } from './electionHelpers';
 
@@ -192,4 +193,16 @@ export const createStyledResultsPdfBlob = (params: {
   pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`;
 
   return new Blob([pdf], { type: 'application/pdf' });
+};
+
+export const exportResultsPdf = (election: Election, snapshot: ResultSnapshot, positions: PositionWithCandidates[]) => {
+  const blob = createStyledResultsPdfBlob({ election, snapshot, positions });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${makeFileSafeName(`${election.title} Results`) || 'election-results'}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 };

@@ -1,17 +1,37 @@
-import React, { useRef, useState } from 'react';
-import { Edit, Loader2, Trash2, Upload } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Ban,
+  CircleCheck,
+  FileSpreadsheet,
+  ImagePlus,
+  Lock,
+  Pencil,
+  RotateCcw,
+  Search,
+  Trash2,
+  TriangleAlert,
+  UploadCloud,
+  UserPlus,
+  UsersRound,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { electionService } from '../../services/electionService';
 import type { Candidate, CandidateImportSummary, Election } from '../../types';
 import { getApiErrorMessage } from '../../utils/apiError';
-import ConfirmDialog from './ConfirmDialog';
+import { cn } from '../../lib/utils';
+import { getCandidateName, getPositionId, getPositionTitle, isEditable, type PositionWithCandidates } from './electionHelpers';
 import {
-  getCandidateName,
-  getPositionId,
-  getPositionTitle,
-  isEditable,
-  type PositionWithCandidates,
-} from './electionHelpers';
+  Avatar,
+  Button,
+  Card,
+  ConfirmModal,
+  EmptyState,
+  Field,
+  IconButton,
+  Modal,
+  Pill,
+  inputClass,
+} from './ui';
 
 type CandidatesTabProps = {
   election: Election;
@@ -19,15 +39,7 @@ type CandidatesTabProps = {
   onChanged: () => Promise<void>;
 };
 
-type CandidateForm = {
-  fullName: string;
-  studentId: string;
-  party: string;
-  manifesto: string;
-  image: File | null;
-};
-
-const emptyCandidateForm: CandidateForm = { fullName: '', studentId: '', party: '', manifesto: '', image: null };
+type CandidateForm = { fullName: string; studentId: string; party: string; manifesto: string; image: File | null };
 
 const toFormData = (form: CandidateForm) => {
   const formData = new FormData();
@@ -39,435 +51,525 @@ const toFormData = (form: CandidateForm) => {
   return formData;
 };
 
-const candidateBadge = (candidate: Candidate) => {
-  if (candidate.disqualified) return { label: 'Disqualified', className: 'bg-red-100 text-red-700' };
-  if (candidate.approved) return { label: 'Approved', className: 'bg-green-100 text-green-800' };
-  return { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' };
-};
-
 const CandidatesTab: React.FC<CandidatesTabProps> = ({ election, positions, onChanged }) => {
   const editable = isEditable(election);
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
-  const importInputRef = useRef<HTMLInputElement | null>(null);
-  const [positionId, setPositionId] = useState('');
-  const [form, setForm] = useState<CandidateForm>(emptyCandidateForm);
-  const [isAdding, setIsAdding] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [importSummary, setImportSummary] = useState<CandidateImportSummary | null>(null);
+  const [query, setQuery] = useState('');
+  const [adding, setAdding] = useState<string | null>(null); // position id to preselect, '' for none
+  const [importing, setImporting] = useState(false);
   const [editing, setEditing] = useState<Candidate | null>(null);
   const [deleting, setDeleting] = useState<Candidate | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
-  const selectedPositionId = positionId || getPositionId(positions[0] || {});
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return positions;
+    return positions
+      .map((p) => ({
+        ...p,
+        candidates: p.candidates.filter((c) =>
+          `${getCandidateName(c)} ${c.studentId || ''} ${c.party || ''}`.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((p) => p.candidates.length > 0);
+  }, [positions, query]);
 
-  const handleAddCandidate = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!selectedPositionId) {
-      toast.error('Add a position first');
-      return;
-    }
-    setIsAdding(true);
+  const total = positions.reduce((sum, p) => sum + p.candidates.length, 0);
+
+  const setStanding = async (candidate: Candidate, action: 'approve' | 'disqualify', silent = false) => {
+    if (!candidate._id) return;
+    setRowBusy(candidate._id);
     try {
-      await electionService.addCandidate(election._id, selectedPositionId, toFormData(form));
-      toast.success('Candidate added');
-      setForm(emptyCandidateForm);
-      if (imageInputRef.current) imageInputRef.current.value = '';
+      if (action === 'approve') await electionService.approveCandidate(candidate._id);
+      else await electionService.disqualifyCandidate(candidate._id);
       await onChanged();
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to add candidate'));
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setIsImporting(true);
-    setImportSummary(null);
-    try {
-      const result = await electionService.importCandidates(election._id, file);
-      setImportSummary(result.summary);
-      toast.success(`Imported ${result.summary.importedCandidates} candidate(s)`);
-      await onChanged();
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to import candidates'));
-    } finally {
-      setIsImporting(false);
-      if (importInputRef.current) importInputRef.current.value = '';
-    }
-  };
-
-  const handleCandidateAction = async (action: 'approve' | 'disqualify', candidateId: string) => {
-    try {
-      if (action === 'approve') {
-        await electionService.approveCandidate(candidateId);
-        toast.success('Candidate approved');
-      } else {
-        await electionService.disqualifyCandidate(candidateId);
-        toast.success('Candidate disqualified');
+      if (!silent) {
+        const name = getCandidateName(candidate);
+        if (action === 'disqualify') {
+          toast.success(`${name} disqualified`, {
+            description: 'Hidden from the ballot.',
+            action: { label: 'Undo', onClick: () => void setStanding(candidate, 'approve', true) },
+          });
+        } else {
+          toast.success(`${name} reinstated`, { description: 'Back on the ballot.' });
+        }
       }
-      await onChanged();
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Candidate action failed'));
+      toast.error(getApiErrorMessage(error, 'Could not update the candidate'));
+    } finally {
+      setRowBusy(null);
     }
   };
 
-  const handleDeleteCandidate = async () => {
+  const handleDelete = async () => {
     if (!deleting?._id) return;
-    setIsDeleting(true);
+    setDeleteBusy(true);
     try {
       await electionService.deleteCandidate(deleting._id);
-      toast.success('Candidate deleted');
+      toast.success(`${getCandidateName(deleting)} removed`);
       setDeleting(null);
       await onChanged();
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to delete candidate'));
+      toast.error(getApiErrorMessage(error, 'Could not remove the candidate'));
     } finally {
-      setIsDeleting(false);
+      setDeleteBusy(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {editable && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <form className="space-y-4 rounded-lg bg-white p-6 shadow" onSubmit={handleAddCandidate}>
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Add Candidate</h2>
-              <p className="text-sm text-gray-500">
-                The student ID must belong to an active student in the registry. Candidates are approved when added.
-              </p>
-            </div>
-            <select
-              value={selectedPositionId}
-              onChange={(event) => setPositionId(event.target.value)}
-              required
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-            >
-              {positions.length === 0 && <option value="">Add a position first</option>}
-              {positions.map((position) => (
-                <option key={position._id} value={position._id}>
-                  {getPositionTitle(position)}
-                </option>
-              ))}
-            </select>
-            <CandidateFields form={form} setForm={setForm} imageInputRef={imageInputRef} imageLabel="Upload candidate photo" />
-            <button
-              type="submit"
-              disabled={isAdding || positions.length === 0}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-button py-2 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isAdding && <Loader2 className="h-5 w-5 animate-spin" />}
-              {isAdding ? 'Adding candidate...' : 'Add Candidate'}
-            </button>
-          </form>
-
-          <div className="rounded-lg bg-white p-6 shadow">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">Bulk Import Candidates</h2>
-                <p className="mt-1 text-sm text-gray-500">
-                  CSV or Excel. Every candidate needs a Student ID that is active in the registry.
-                </p>
-              </div>
-              <label
-                className={`inline-flex items-center gap-2 rounded-md px-4 py-2 font-semibold text-white ${
-                  isImporting ? 'cursor-not-allowed bg-gray-400' : 'cursor-pointer bg-button hover:opacity-90'
-                }`}
-              >
-                {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                {isImporting ? 'Importing...' : 'Upload Spreadsheet'}
-                <input
-                  ref={importInputRef}
-                  type="file"
-                  accept=".csv,.xls,.xlsx"
-                  disabled={isImporting}
-                  onChange={handleImport}
-                  className="sr-only"
-                />
-              </label>
-            </div>
-            <div className="mt-4 grid gap-3 text-sm text-gray-600">
-              <div className="rounded-md bg-gray-50 p-3">
-                <p className="font-semibold text-gray-800">Long format</p>
-                <p>Columns like Position, Candidate, Student ID, Party, Manifesto.</p>
-              </div>
-              <div className="rounded-md bg-gray-50 p-3">
-                <p className="font-semibold text-gray-800">Position columns</p>
-                <p>Columns named after the election's positions, e.g. President, President Student ID.</p>
-              </div>
-            </div>
-            {importSummary && <ImportSummary summary={importSummary} />}
-          </div>
+    <div className="space-y-4">
+      <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative sm:w-72">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={`Search ${total} candidate${total === 1 ? '' : 's'}`}
+            aria-label="Search candidates"
+            className={cn(inputClass, 'py-2 pl-9')}
+          />
         </div>
+        {editable ? (
+          <div className="flex gap-2">
+            <Button variant="secondary" icon={FileSpreadsheet} onClick={() => setImporting(true)} disabled={!positions.length}>
+              Import
+            </Button>
+            <Button icon={UserPlus} onClick={() => setAdding('')} disabled={!positions.length}>
+              Add candidate
+            </Button>
+          </div>
+        ) : (
+          <Pill>
+            <Lock className="h-3 w-3" />
+            Locked while voting is underway
+          </Pill>
+        )}
+      </Card>
+
+      {positions.length === 0 ? (
+        <Card>
+          <EmptyState icon={UsersRound} title="Add positions first" description="Candidates stand for a position." />
+        </Card>
+      ) : filtered.length === 0 ? (
+        <Card>
+          <EmptyState icon={Search} title="No matches" description={`Nobody matches “${query}”.`} />
+        </Card>
+      ) : (
+        <>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {filtered.filter((p) => p.candidates.length > 0).map((position) => (
+            <Card key={position._id || position.title}>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+                <h3 className="truncate text-sm font-semibold text-primary-clr">{getPositionTitle(position)}</h3>
+                <span className="text-xs font-medium tabular-nums text-slate-400">{position.candidates.length}</span>
+              </div>
+              {(
+                <ul className="divide-y divide-slate-100">
+                  {position.candidates.map((candidate) => {
+                    const name = getCandidateName(candidate);
+                    const busy = rowBusy === candidate._id;
+                    return (
+                      <li
+                        key={candidate._id || name}
+                        className={cn('group flex items-center gap-3 px-5 py-3', candidate.disqualified && 'opacity-60')}
+                      >
+                        <Avatar name={name} imageUrl={candidate.imageUrl} />
+                        <div className="min-w-0 flex-1">
+                          <p className={cn('truncate text-sm font-medium text-primary-clr', candidate.disqualified && 'line-through')}>
+                            {name}
+                          </p>
+                          <p className="truncate text-xs text-slate-500">
+                            {candidate.studentId || 'No student ID'} · {candidate.party || 'Independent'}
+                          </p>
+                        </div>
+                        {candidate.disqualified ? (
+                          <Pill tone="red">Disqualified</Pill>
+                        ) : candidate.approved ? (
+                          <Pill tone="green">
+                            <CircleCheck className="h-3 w-3" />
+                            On ballot
+                          </Pill>
+                        ) : (
+                          <Pill tone="amber">Pending</Pill>
+                        )}
+                        {editable && (
+                          <div className="flex opacity-60 transition group-hover:opacity-100">
+                            <IconButton label={`Edit ${name}`} icon={Pencil} onClick={() => setEditing(candidate)} />
+                            {candidate.disqualified || !candidate.approved ? (
+                              <IconButton
+                                label={`Reinstate ${name}`}
+                                icon={RotateCcw}
+                                tone="success"
+                                loading={busy}
+                                onClick={() => void setStanding(candidate, 'approve')}
+                              />
+                            ) : (
+                              <IconButton
+                                label={`Disqualify ${name}`}
+                                icon={Ban}
+                                tone="danger"
+                                loading={busy}
+                                onClick={() => void setStanding(candidate, 'disqualify')}
+                              />
+                            )}
+                            <IconButton label={`Remove ${name}`} icon={Trash2} tone="danger" onClick={() => setDeleting(candidate)} />
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </Card>
+          ))}
+        </div>
+        {!query && filtered.some((p) => p.candidates.length === 0) && (
+          <Card className="p-5">
+            <p className="flex items-center gap-2 text-sm font-semibold text-amber-700">
+              <TriangleAlert className="h-4 w-4" />
+              No candidates yet — these positions won't be on the ballot
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {filtered
+                .filter((p) => p.candidates.length === 0)
+                .map((position) =>
+                  editable ? (
+                    <button
+                      key={position._id}
+                      type="button"
+                      onClick={() => setAdding(getPositionId(position))}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-primary-clr transition hover:border-active/50 hover:text-active"
+                    >
+                      <UserPlus className="h-3.5 w-3.5" />
+                      {getPositionTitle(position)}
+                    </button>
+                  ) : (
+                    <Pill key={position._id}>{getPositionTitle(position)}</Pill>
+                  ),
+                )}
+            </div>
+          </Card>
+        )}
+        </>
       )}
 
-      <div className="rounded-lg bg-white shadow">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Candidates by Position</h2>
-          <p className="text-sm text-gray-500">Students see every approved candidate. Disqualified candidates are hidden.</p>
-        </div>
-        {positions.length === 0 ? (
-          <p className="p-6 text-sm text-gray-500">No positions yet.</p>
-        ) : (
-          <div className="divide-y divide-gray-200">
-            {positions.map((position) => (
-              <div key={position._id || position.title} className="p-6">
-                <h3 className="font-semibold text-gray-900">{getPositionTitle(position)}</h3>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {position.candidates.length === 0 ? (
-                    <p className="text-sm text-gray-500">No candidates yet.</p>
-                  ) : (
-                    position.candidates.map((candidate) => {
-                      const badge = candidateBadge(candidate);
-                      return (
-                        <div key={candidate._id || candidate.fullName} className="rounded-lg border border-gray-200 p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-gray-900">{getCandidateName(candidate)}</p>
-                              <p className="text-sm text-gray-500">
-                                {candidate.studentId || 'No student ID'} · {candidate.party || 'Independent'}
-                              </p>
-                            </div>
-                            <span className={`rounded-full px-2 py-1 text-xs font-semibold ${badge.className}`}>
-                              {badge.label}
-                            </span>
-                          </div>
-                          {editable && candidate._id && (
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setEditing(candidate)}
-                                className="inline-flex items-center gap-1 rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                              >
-                                <Edit size={14} />
-                                Edit
-                              </button>
-                              {!candidate.approved && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCandidateAction('approve', candidate._id as string)}
-                                  className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                                >
-                                  Approve
-                                </button>
-                              )}
-                              {!candidate.disqualified && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCandidateAction('disqualify', candidate._id as string)}
-                                  className="rounded-md border px-3 py-1 text-sm text-red-600 hover:bg-red-50"
-                                >
-                                  Disqualify
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => setDeleting(candidate)}
-                                className="inline-flex items-center gap-1 rounded-md border px-3 py-1 text-sm text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 size={14} />
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      {adding !== null && (
+        <CandidateModal
+          mode="add"
+          positions={positions}
+          initialPositionId={adding || getPositionId(positions[0] || {})}
+          onClose={() => setAdding(null)}
+          onSave={async (positionId, form) => {
+            await electionService.addCandidate(election._id, positionId, toFormData(form));
+            const position = positions.find((p) => p._id === positionId);
+            toast.success(`${form.fullName} added`, {
+              description: position ? `Standing for ${getPositionTitle(position)}.` : undefined,
+            });
+            setAdding(null);
+            await onChanged();
+          }}
+        />
+      )}
 
       {editing && (
-        <EditCandidateModal
+        <CandidateModal
+          mode="edit"
           candidate={editing}
           onClose={() => setEditing(null)}
-          onSaved={async () => {
+          onSave={async (_positionId, form) => {
+            await electionService.updateCandidate(editing._id as string, toFormData(form));
+            toast.success(`${form.fullName} updated`);
             setEditing(null);
             await onChanged();
           }}
         />
       )}
 
-      {deleting && (
-        <ConfirmDialog
-          title="Delete candidate?"
-          confirmLabel="Delete candidate"
-          tone="danger"
-          busy={isDeleting}
-          onConfirm={handleDeleteCandidate}
-          onCancel={() => setDeleting(null)}
-        >
-          <p>
-            <strong>{getCandidateName(deleting)}</strong> will be removed from this election.
-          </p>
-        </ConfirmDialog>
-      )}
+      {importing && <ImportModal electionId={election._id} onClose={() => setImporting(false)} onImported={onChanged} />}
+
+      <ConfirmModal
+        open={Boolean(deleting)}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Remove this candidate?"
+        description={deleting ? `${getCandidateName(deleting)} will be removed from this election.` : undefined}
+        confirmLabel="Remove"
+        tone="danger"
+        busy={deleteBusy}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 };
 
-const CandidateFields = ({
-  form,
-  setForm,
-  imageInputRef,
-  imageLabel,
-}: {
-  form: CandidateForm;
-  setForm: React.Dispatch<React.SetStateAction<CandidateForm>>;
-  imageInputRef: React.RefObject<HTMLInputElement | null>;
-  imageLabel: string;
-}) => (
-  <>
-    <div className="grid gap-4 sm:grid-cols-2">
-      <input
-        value={form.fullName}
-        onChange={(event) => setForm((prev) => ({ ...prev, fullName: event.target.value }))}
-        placeholder="Full name"
-        required
-        className="w-full rounded-md border border-gray-300 px-3 py-2"
-      />
-      <input
-        value={form.studentId}
-        onChange={(event) => setForm((prev) => ({ ...prev, studentId: event.target.value }))}
-        placeholder="Student ID"
-        required
-        className="w-full rounded-md border border-gray-300 px-3 py-2"
-      />
-    </div>
-    <input
-      value={form.party}
-      onChange={(event) => setForm((prev) => ({ ...prev, party: event.target.value }))}
-      placeholder="Party"
-      className="w-full rounded-md border border-gray-300 px-3 py-2"
-    />
-    <textarea
-      value={form.manifesto}
-      onChange={(event) => setForm((prev) => ({ ...prev, manifesto: event.target.value }))}
-      placeholder="Manifesto"
-      className="min-h-20 w-full rounded-md border border-gray-300 px-3 py-2"
-    />
-    <label className="block rounded-lg border-2 border-dashed border-indigo-300 bg-indigo-50 px-4 py-4 text-center transition hover:border-indigo-500 hover:bg-indigo-100">
-      <input
-        ref={imageInputRef}
-        type="file"
-        accept="image/*"
-        onClick={(event) => {
-          event.currentTarget.value = '';
-        }}
-        onChange={(event) => setForm((prev) => ({ ...prev, image: event.target.files?.[0] || null }))}
-        className="sr-only"
-      />
-      <Upload className="mx-auto mb-2 h-6 w-6 text-indigo-600" />
-      <span className="block text-sm font-semibold text-gray-900">{imageLabel}</span>
-      {form.image && (
-        <span className="mt-2 inline-block rounded-full bg-white px-3 py-1 text-xs font-semibold text-indigo-700">
-          Selected: {form.image.name}
-        </span>
-      )}
-    </label>
-  </>
-);
-
-const EditCandidateModal = ({
+const CandidateModal = ({
+  mode,
+  positions = [],
+  initialPositionId = '',
   candidate,
   onClose,
-  onSaved,
+  onSave,
 }: {
-  candidate: Candidate;
+  mode: 'add' | 'edit';
+  positions?: PositionWithCandidates[];
+  initialPositionId?: string;
+  candidate?: Candidate;
   onClose: () => void;
-  onSaved: () => Promise<void>;
+  onSave: (positionId: string, form: CandidateForm) => Promise<void>;
 }) => {
-  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const [positionId, setPositionId] = useState(initialPositionId);
   const [form, setForm] = useState<CandidateForm>({
-    fullName: getCandidateName(candidate),
-    studentId: candidate.studentId || '',
-    party: candidate.party || '',
-    manifesto: candidate.manifesto || candidate.description || '',
+    fullName: candidate ? getCandidateName(candidate) : '',
+    studentId: candidate?.studentId || '',
+    party: candidate?.party || '',
+    manifesto: candidate?.manifesto || candidate?.description || '',
     image: null,
   });
-  const [isSaving, setIsSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const localPreview = useMemo(() => (form.image ? URL.createObjectURL(form.image) : null), [form.image]);
+  useEffect(() => () => {
+    if (localPreview) URL.revokeObjectURL(localPreview);
+  }, [localPreview]);
+  const preview = localPreview || candidate?.imageUrl;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!candidate._id) return;
-    setIsSaving(true);
+    setSaving(true);
+    setError('');
     try {
-      await electionService.updateCandidate(candidate._id, toFormData(form));
-      toast.success('Candidate updated');
-      await onSaved();
-    } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to update candidate'));
+      await onSave(positionId, form);
+    } catch (err: unknown) {
+      // Shown inline so SAAD can fix the field (e.g. an unknown student ID) without losing the form
+      setError(getApiErrorMessage(err, 'Could not save the candidate'));
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <form onSubmit={handleSubmit} className="max-h-[90vh] w-full max-w-2xl space-y-4 overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Edit Candidate</h2>
-          <p className="text-sm text-gray-500">Update the candidate details shown on the ballot.</p>
+    <Modal
+      open
+      onOpenChange={(open) => !open && !saving && onClose()}
+      title={mode === 'add' ? 'Add candidate' : 'Edit candidate'}
+    >
+      <form id="candidate-form" onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex items-center gap-4">
+          <label className="group relative cursor-pointer">
+            <Avatar name={form.fullName || '?'} imageUrl={preview} size="lg" />
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-primary-clr/50 text-white opacity-0 transition group-hover:opacity-100">
+              <ImagePlus className="h-5 w-5" />
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              aria-label="Candidate photo"
+              onChange={(e) => setForm((p) => ({ ...p, image: e.target.files?.[0] || null }))}
+            />
+          </label>
+          <div className="text-xs text-slate-500">
+            <p className="font-semibold text-primary-clr">Photo</p>
+            <p>{form.image ? form.image.name : 'Optional · shown on the ballot'}</p>
+          </div>
         </div>
-        <CandidateFields
-          form={form}
-          setForm={setForm}
-          imageInputRef={imageInputRef}
-          imageLabel="Upload replacement photo (leave empty to keep the current one)"
-        />
-        <div className="flex flex-wrap justify-end gap-3">
-          <button type="button" onClick={onClose} className="rounded-md border px-4 py-2 font-semibold hover:bg-gray-50">
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 rounded-md bg-button px-4 py-2 font-semibold text-white disabled:opacity-60"
-          >
-            {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isSaving ? 'Saving...' : 'Save candidate'}
-          </button>
+
+        {mode === 'add' && (
+          <Field label="Position">
+            <select value={positionId} onChange={(e) => setPositionId(e.target.value)} required className={inputClass}>
+              {positions.map((p) => (
+                <option key={p._id} value={p._id}>
+                  {getPositionTitle(p)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Full name">
+            <input
+              autoFocus
+              required
+              minLength={3}
+              value={form.fullName}
+              onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Student ID" hint="Must be active in the registry">
+            <input
+              required
+              value={form.studentId}
+              onChange={(e) => {
+                setError('');
+                setForm((p) => ({ ...p, studentId: e.target.value }));
+              }}
+              className={cn(inputClass, error && 'border-red-300 focus:border-red-400 focus:ring-red-100')}
+            />
+          </Field>
         </div>
+        <Field label="Party">
+          <input
+            value={form.party}
+            onChange={(e) => setForm((p) => ({ ...p, party: e.target.value }))}
+            placeholder="Independent"
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Manifesto">
+          <textarea
+            rows={3}
+            value={form.manifesto}
+            onChange={(e) => setForm((p) => ({ ...p, manifesto: e.target.value }))}
+            placeholder="Optional"
+            className={inputClass}
+          />
+        </Field>
+        {error && (
+          <p role="alert" className="flex items-start gap-2 rounded-2xl bg-red-50 p-3 text-sm text-red-700">
+            <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            {error}
+          </p>
+        )}
       </form>
-    </div>
+      <div className="mt-6 flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose} disabled={saving}>
+          Cancel
+        </Button>
+        <Button type="submit" form="candidate-form" loading={saving}>
+          {mode === 'add' ? 'Add candidate' : 'Save'}
+        </Button>
+      </div>
+    </Modal>
   );
 };
 
-const ImportSummary = ({ summary }: { summary: CandidateImportSummary }) => (
-  <div className="mt-5 rounded-md border border-gray-200 p-4">
-    <div className="grid gap-3 text-sm sm:grid-cols-4">
-      <SummaryStat label="Rows read" value={summary.rowsRead} />
-      <SummaryStat label="Parsed" value={summary.parsedCandidates} />
-      <SummaryStat label="Imported" value={summary.importedCandidates} className="text-green-700" />
-      <SummaryStat label="Skipped" value={summary.skippedCandidates} className="text-yellow-700" />
-    </div>
-    {summary.warnings.length > 0 && (
-      <div className="mt-4 rounded-md bg-yellow-50 p-3">
-        <p className="mb-2 text-sm font-semibold text-yellow-900">Import warnings</p>
-        <ul className="max-h-40 space-y-1 overflow-y-auto text-sm text-yellow-900">
-          {summary.warnings.map((warning, index) => (
-            <li key={`${warning.rowNumber || 'general'}-${index}`}>
-              {warning.rowNumber ? `Row ${warning.rowNumber}: ` : ''}
-              {warning.message}
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
-  </div>
-);
+const ImportModal = ({
+  electionId,
+  onClose,
+  onImported,
+}: {
+  electionId: string;
+  onClose: () => void;
+  onImported: () => Promise<void>;
+}) => {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [summary, setSummary] = useState<CandidateImportSummary | null>(null);
 
-const SummaryStat = ({ label, value, className = 'text-gray-900' }: { label: string; value: number; className?: string }) => (
-  <div>
-    <p className="text-gray-500">{label}</p>
-    <p className={`text-lg font-bold ${className}`}>{value}</p>
-  </div>
-);
+  const upload = async (file: File) => {
+    if (!/\.(csv|xlsx?|xls)$/i.test(file.name)) {
+      toast.error('Unsupported file', { description: 'Upload a CSV or Excel file.' });
+      return;
+    }
+    setFileName(file.name);
+    setUploading(true);
+    setSummary(null);
+    try {
+      const result = await electionService.importCandidates(electionId, file);
+      setSummary(result.summary);
+      const { importedCandidates, skippedCandidates } = result.summary;
+      if (importedCandidates > 0) {
+        toast.success(`${importedCandidates} candidate${importedCandidates === 1 ? '' : 's'} imported`, {
+          description: skippedCandidates ? `${skippedCandidates} skipped — see details.` : undefined,
+        });
+      } else {
+        toast.warning('Nothing imported', { description: 'Check the skipped rows.' });
+      }
+      await onImported();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Could not import the file'));
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onOpenChange={(open) => !open && !uploading && onClose()}
+      title="Import candidates"
+      description="Columns: Position, Candidate, Student ID — plus Party and Manifesto if you have them."
+      size="lg"
+      footer={
+        <Button variant={summary ? 'primary' : 'secondary'} onClick={onClose} disabled={uploading}>
+          {summary ? 'Done' : 'Cancel'}
+        </Button>
+      }
+    >
+      <label
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) void upload(file);
+        }}
+        className={cn(
+          'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-10 text-center transition',
+          dragging ? 'border-active bg-active/5' : 'border-slate-200 hover:border-active/50 hover:bg-slate-50',
+          uploading && 'pointer-events-none opacity-70',
+        )}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,.xls,.xlsx"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void upload(file);
+          }}
+        />
+        <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-active/10 text-active">
+          <UploadCloud className={cn('h-6 w-6', uploading && 'animate-bounce')} />
+        </span>
+        <p className="font-semibold text-primary-clr">{uploading ? `Importing ${fileName}…` : 'Drop a spreadsheet or click to browse'}</p>
+        <p className="mt-1 text-xs text-slate-500">CSV, XLS or XLSX · every candidate is checked against the registry</p>
+      </label>
+
+      {summary && (
+        <div className="mt-5 space-y-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            {[
+              { label: 'Rows', value: summary.rowsRead, tone: 'text-primary-clr' },
+              { label: 'Imported', value: summary.importedCandidates, tone: 'text-emerald-600' },
+              { label: 'Skipped', value: summary.skippedCandidates, tone: summary.skippedCandidates ? 'text-amber-600' : 'text-slate-400' },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-2xl bg-slate-50 p-3">
+                <p className={cn('text-2xl font-bold tabular-nums', stat.tone)}>{stat.value}</p>
+                <p className="text-xs font-medium text-slate-500">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+          {summary.warnings.length > 0 && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50">
+              <p className="flex items-center gap-2 border-b border-amber-200 px-4 py-2.5 text-sm font-semibold text-amber-900">
+                <TriangleAlert className="h-4 w-4" />
+                {summary.warnings.length} row{summary.warnings.length === 1 ? '' : 's'} need attention
+              </p>
+              <ul className="max-h-48 divide-y divide-amber-100 overflow-y-auto text-sm text-amber-900">
+                {summary.warnings.map((warning, index) => (
+                  <li key={`${warning.rowNumber || 'general'}-${index}`} className="flex gap-3 px-4 py-2">
+                    {warning.rowNumber && (
+                      <span className="shrink-0 font-mono text-xs leading-5 text-amber-700">Row {warning.rowNumber}</span>
+                    )}
+                    <span>{warning.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+};
 
 export default CandidatesTab;

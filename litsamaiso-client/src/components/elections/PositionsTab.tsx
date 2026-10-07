@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { ListChecks, Lock, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { electionService } from '../../services/electionService';
 import type { Election } from '../../types';
 import { getApiErrorMessage } from '../../utils/apiError';
-import ConfirmDialog from './ConfirmDialog';
-import { getPositionTitle, isEditable, type PositionWithCandidates } from './electionHelpers';
+import { getPositionTitle, isEditable, isVotable, type PositionWithCandidates } from './electionHelpers';
+import { Button, Card, CardHeader, ConfirmModal, EmptyState, IconButton, Pill, inputClass } from './ui';
 
 type PositionsTabProps = {
   election: Election;
@@ -15,142 +15,133 @@ type PositionsTabProps = {
 
 const PositionsTab: React.FC<PositionsTabProps> = ({ election, positions, onChanged }) => {
   const editable = isEditable(election);
-  const nextDisplayOrder = Math.max(0, ...positions.map((position) => position.displayOrder || 0)) + 1;
-  const [form, setForm] = useState({ title: '', description: '', displayOrder: '' });
-  const [isSaving, setIsSaving] = useState(false);
+  const nextOrder = Math.max(0, ...positions.map((p) => p.displayOrder || 0)) + 1;
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<PositionWithCandidates | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const handleCreatePosition = async (event: React.FormEvent) => {
+  const handleAdd = async (event: React.FormEvent) => {
     event.preventDefault();
-    setIsSaving(true);
+    setAdding(true);
     try {
-      await electionService.addPosition(election._id, {
-        title: form.title,
-        description: form.description,
-        displayOrder: Number(form.displayOrder) || nextDisplayOrder,
-      });
-      toast.success('Position created');
-      setForm({ title: '', description: '', displayOrder: '' });
+      await electionService.addPosition(election._id, { title, description, displayOrder: nextOrder });
+      toast.success(`“${title}” added`, { description: `Position ${nextOrder} on the ballot.` });
+      setTitle('');
+      setDescription('');
       await onChanged();
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to create position'));
+      toast.error(getApiErrorMessage(error, 'Could not add the position'));
     } finally {
-      setIsSaving(false);
+      setAdding(false);
     }
   };
 
-  const handleDeletePosition = async () => {
+  const handleDelete = async () => {
     if (!deleting?._id) return;
-    setIsDeleting(true);
+    setBusy(true);
     try {
       await electionService.deletePosition(deleting._id);
-      toast.success('Position deleted');
+      toast.success(`“${getPositionTitle(deleting)}” removed`);
       setDeleting(null);
       await onChanged();
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to delete position'));
+      toast.error(getApiErrorMessage(error, 'Could not remove the position'));
     } finally {
-      setIsDeleting(false);
+      setBusy(false);
     }
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="rounded-lg bg-white shadow lg:col-span-2">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">Positions ({positions.length})</h2>
-          <p className="text-sm text-gray-500">Shown on the ballot in this order. Each position is single-choice.</p>
-        </div>
-        {positions.length === 0 ? (
-          <p className="p-6 text-sm text-gray-500">No positions yet.</p>
-        ) : (
-          <ul className="divide-y divide-gray-200">
-            {positions.map((position) => (
-              <li key={position._id || position.title} className="flex items-start justify-between gap-4 px-6 py-4">
-                <div>
-                  <p className="font-semibold text-gray-900">
-                    <span className="mr-2 text-gray-400">{position.displayOrder}.</span>
-                    {getPositionTitle(position)}
-                  </p>
-                  {position.description && <p className="text-sm text-gray-500">{position.description}</p>}
-                  <p className="mt-1 text-xs text-gray-400">
-                    {position.candidates.length} candidate(s)
-                  </p>
-                </div>
-                {editable && (
-                  <button
-                    type="button"
-                    onClick={() => setDeleting(position)}
-                    className="inline-flex items-center gap-1 rounded-md border px-3 py-1 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 size={14} />
-                    Delete
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+    <Card>
+      <CardHeader
+        title="Ballot positions"
+        icon={ListChecks}
+        action={
+          !editable && (
+            <Pill>
+              <Lock className="h-3 w-3" />
+              Locked
+            </Pill>
+          )
+        }
+      />
 
       {editable && (
-        <form className="h-fit space-y-4 rounded-lg bg-white p-6 shadow" onSubmit={handleCreatePosition}>
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">Add Position</h2>
-            <p className="text-sm text-gray-500">Positions are the offices students vote for.</p>
-          </div>
+        <form onSubmit={handleAdd} className="flex flex-col gap-2 border-b border-slate-100 p-4 sm:flex-row">
           <input
-            value={form.title}
-            onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-            placeholder="Position title"
             required
-            className="w-full rounded-md border border-gray-300 px-3 py-2"
+            minLength={2}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Add a position, e.g. Class Representative"
+            aria-label="Position title"
+            className={inputClass}
           />
-          <textarea
-            value={form.description}
-            onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-            placeholder="Description"
-            className="min-h-20 w-full rounded-md border border-gray-300 px-3 py-2"
+          <input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Description (optional)"
+            aria-label="Position description"
+            className={inputClass}
           />
-          <label className="block space-y-2">
-            <span className="text-sm font-semibold text-gray-700">Display order</span>
-            <input
-              type="number"
-              min={1}
-              value={form.displayOrder}
-              placeholder={String(nextDisplayOrder)}
-              onChange={(event) => setForm((prev) => ({ ...prev, displayOrder: event.target.value }))}
-              className="w-full rounded-md border border-gray-300 px-3 py-2"
-            />
-            <span className="block text-xs text-gray-500">Where this position appears on the ballot.</span>
-          </label>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="w-full rounded-md bg-button py-2 font-semibold text-white disabled:opacity-60"
-          >
-            {isSaving ? 'Adding...' : 'Add Position'}
-          </button>
+          <Button type="submit" icon={Plus} loading={adding} className="shrink-0">
+            Add
+          </Button>
         </form>
       )}
 
-      {deleting && (
-        <ConfirmDialog
-          title="Delete position?"
-          confirmLabel="Delete position"
-          tone="danger"
-          busy={isDeleting}
-          onConfirm={handleDeletePosition}
-          onCancel={() => setDeleting(null)}
-        >
-          <p>
-            <strong>{getPositionTitle(deleting)}</strong> and its {deleting.candidates.length} candidate(s) will be removed
-            from this election.
-          </p>
-        </ConfirmDialog>
+      {positions.length === 0 ? (
+        <EmptyState icon={ListChecks} title="No positions yet" description="Add the offices students will vote for." />
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {positions.map((position) => {
+            const count = position.candidates.filter(isVotable).length;
+            return (
+              <li key={position._id || position.title} className="group flex items-center gap-4 px-5 py-3.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xs font-bold tabular-nums text-slate-500">
+                  {position.displayOrder}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-primary-clr">{getPositionTitle(position)}</p>
+                  {position.description && <p className="truncate text-xs text-slate-500">{position.description}</p>}
+                </div>
+                <Pill tone={count ? 'green' : 'amber'}>
+                  {count ? `${count} candidate${count === 1 ? '' : 's'}` : 'No candidates'}
+                </Pill>
+                {editable && (
+                  <IconButton
+                    label={`Remove ${getPositionTitle(position)}`}
+                    icon={Trash2}
+                    tone="danger"
+                    className="opacity-60 group-hover:opacity-100"
+                    onClick={() => setDeleting(position)}
+                  />
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </div>
+
+      <ConfirmModal
+        open={Boolean(deleting)}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Remove this position?"
+        description={
+          deleting
+            ? `“${getPositionTitle(deleting)}”${
+                deleting.candidates.length ? ` and its ${deleting.candidates.length} candidate(s)` : ''
+              } will be removed from this election.`
+            : undefined
+        }
+        confirmLabel="Remove"
+        tone="danger"
+        busy={busy}
+        onConfirm={handleDelete}
+      />
+    </Card>
   );
 };
 

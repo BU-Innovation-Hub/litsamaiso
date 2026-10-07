@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import ElectionDetail from '../components/elections/ElectionDetail';
 import ElectionList from '../components/elections/ElectionList';
+import { Skeleton } from '../components/elections/ui';
 import { electionService } from '../services/electionService';
 import type { Election } from '../types';
 import { getApiErrorMessage } from '../utils/apiError';
@@ -18,7 +19,7 @@ const ElectionsManagementPage: React.FC = () => {
     try {
       setElections(await electionService.getElections());
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to load elections'));
+      toast.error(getApiErrorMessage(error, 'Could not load elections'));
     } finally {
       setLoading(false);
     }
@@ -37,13 +38,8 @@ const ElectionsManagementPage: React.FC = () => {
   const selectedElection = elections.find((election) => election._id === selectedElectionId);
 
   return (
-    <div className="mt-5 min-h-screen bg-gray-50 pt-24">
-      <div className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Elections Management</h1>
-          <p className="text-gray-600">Create, schedule, and run institution elections.</p>
-        </div>
-
+    <div className="global-bg min-h-screen pt-36">
+      <div className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
         {selectedElection ? (
           <ElectionDetail
             key={selectedElection._id}
@@ -56,7 +52,11 @@ const ElectionsManagementPage: React.FC = () => {
             }}
           />
         ) : selectedElectionId && loading ? (
-          <p className="text-center text-gray-500">Loading...</p>
+          <div className="space-y-4">
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-32" />
+            <Skeleton className="h-64" />
+          </div>
         ) : (
           <ElectionList
             elections={elections}

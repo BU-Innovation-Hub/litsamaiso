@@ -1,38 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { CalendarDays, CheckCircle, Copy, Eye, Loader, Vote } from 'lucide-react';
+import { BarChart3, CalendarClock, Check, CircleCheck, Copy, Hourglass, Inbox, Vote } from 'lucide-react';
 import { toast } from 'sonner';
+import PositionStandings from '../components/elections/PositionStandings';
+import { formatDate, formatRelative, useNow } from '../components/elections/electionHelpers';
+import { Button, Card, EmptyState, Modal, Skeleton, StatusPill } from '../components/elections/ui';
 import { electionService } from '../services/electionService';
-import type { Election, ResultPositionDetail, VoteReceipt } from '../types';
+import type { Election, ResultPositionDetail } from '../types';
 import { getApiErrorMessage } from '../utils/apiError';
 
 type VoteStatus = { hasVoted: boolean; receiptId?: string; submittedAt?: string };
 
-// Longest wait before re-checking, and the setTimeout ceiling (~24.8 days)
+// Longest wait before re-checking, and a small grace after an open/close time
 const MAX_REFRESH_DELAY_MS = 60 * 60 * 1000;
 const REFRESH_GRACE_MS = 3000;
-
-// The server keeps each election's status current; the page only reflects it
-const getBallotState = (election: Election) => {
-  switch (election.status) {
-    case 'OPEN':
-      return { kind: 'open' as const, message: 'Ballot is open' };
-    case 'SCHEDULED':
-      return {
-        kind: 'upcoming' as const,
-        message: election.startTime
-          ? `Ballot opens ${new Date(election.startTime).toLocaleString()}`
-          : 'Ballot is not open yet',
-      };
-    case 'RESULTS_PUBLISHED':
-      return { kind: 'results' as const, message: 'Results published' };
-    case 'CLOSED':
-    case 'COUNTING':
-      return { kind: 'reviewing' as const, message: 'Results are being reviewed' };
-    default:
-      return { kind: 'upcoming' as const, message: 'Ballot is not open yet' };
-  }
-};
 
 // Next moment an election's status will change: a scheduled start or an open election's end
 const getNextBoundary = (elections: Election[]) => {
@@ -44,31 +25,38 @@ const getNextBoundary = (elections: Election[]) => {
   return times.length > 0 ? Math.min(...times) : null;
 };
 
-const copyToClipboard = async (value: string) => {
-  try {
-    await navigator.clipboard.writeText(value);
-    toast.success('Receipt copied');
-  } catch {
-    toast.error('Could not copy the receipt');
-  }
+const ReceiptChip = ({ receiptId, submittedAt }: { receiptId: string; submittedAt?: string }) => {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(receiptId);
+      setCopied(true);
+      toast.success('Receipt copied');
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Could not copy the receipt');
+    }
+  };
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-800">
+          <CircleCheck className="h-4 w-4" />
+          You voted{submittedAt ? ` · ${formatDate(submittedAt)}` : ''}
+        </p>
+        <p className="truncate font-mono text-xs text-emerald-700/80">Receipt {receiptId}</p>
+      </div>
+      <button
+        type="button"
+        onClick={() => void copy()}
+        aria-label="Copy receipt"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-emerald-700 transition hover:bg-emerald-100"
+      >
+        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      </button>
+    </div>
+  );
 };
-
-const ReceiptLine = ({ receiptId, submittedAt }: { receiptId: string; submittedAt?: string }) => (
-  <p className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-    {submittedAt && <span>Voted {new Date(submittedAt).toLocaleString()}</span>}
-    <span>· Receipt</span>
-    <code className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-700">{receiptId}</code>
-    <button
-      type="button"
-      onClick={() => void copyToClipboard(receiptId)}
-      className="inline-flex items-center gap-1 text-active hover:underline"
-      aria-label="Copy receipt"
-    >
-      <Copy size={12} />
-      Copy
-    </button>
-  </p>
-);
 
 const ElectionsPage: React.FC = () => {
   const location = useLocation();
@@ -79,9 +67,8 @@ const ElectionsPage: React.FC = () => {
   const [resultsElection, setResultsElection] = useState<Election | null>(null);
   const [resultPositions, setResultPositions] = useState<ResultPositionDetail[]>([]);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
-  const navigationState = location.state as { electionCompletedMessage?: string; receipt?: VoteReceipt } | null;
-  const completedMessage = navigationState?.electionCompletedMessage;
-  const justCastReceipt = navigationState?.receipt;
+  const now = useNow(30_000, clockOffsetMs);
+  const notice = (location.state as { electionCompletedMessage?: string } | null)?.electionCompletedMessage;
 
   const loadElections = useCallback(async () => {
     try {
@@ -100,7 +87,7 @@ const ElectionsPage: React.FC = () => {
       );
       setVoteStatuses(Object.fromEntries(entries));
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to load elections'));
+      toast.error(getApiErrorMessage(error, 'Could not load elections'));
     } finally {
       setIsLoading(false);
     }
@@ -114,7 +101,7 @@ const ElectionsPage: React.FC = () => {
     return () => window.clearTimeout(timeout);
   }, [loadElections]);
 
-  // Refetch just after the next open/close time so the ballot button changes without a manual refresh
+  // Refetch just after the next open/close time so cards change without a manual refresh
   useEffect(() => {
     const boundary = getNextBoundary(elections);
     if (boundary === null) return;
@@ -130,222 +117,169 @@ const ElectionsPage: React.FC = () => {
     setIsLoadingResults(true);
     try {
       const snapshot = await electionService.getResults(election._id);
-      const positions = await Promise.all(
-        snapshot.positions.map((position) =>
-          electionService.getResultsByPosition(election._id, String(position.positionId)),
+      setResultPositions(
+        await Promise.all(
+          snapshot.positions.map((p) => electionService.getResultsByPosition(election._id, String(p.positionId))),
         ),
       );
-      setResultPositions(positions);
     } catch (error: unknown) {
-      toast.error(getApiErrorMessage(error, 'Failed to load results'));
+      toast.error(getApiErrorMessage(error, 'Could not load results'));
       setResultsElection(null);
     } finally {
       setIsLoadingResults(false);
     }
   };
 
-  return (
-    <div className="global-bg min-h-screen pt-32">
-      <div className="mx-auto max-w-4xl space-y-6 px-4">
-        <h1 className="text-3xl font-bold text-primary-clr">Elections</h1>
+  const open = elections.filter((e) => e.status === 'OPEN');
+  const upcoming = elections.filter((e) => e.status === 'SCHEDULED');
+  const completed = elections.filter((e) => ['CLOSED', 'COUNTING', 'RESULTS_PUBLISHED'].includes(e.status || ''));
 
-        {completedMessage && (
-          <div>
-            <p className="font-serif text-3xl font-semibold leading-tight text-green-800 md:text-4xl">
-              {completedMessage}
+  const renderCard = (election: Election) => {
+    const voteStatus = voteStatuses[election._id];
+    const status = election.status || 'SCHEDULED';
+    return (
+      <Card key={election._id} className="animate-rise-in flex flex-col p-5">
+        <div className="flex items-start justify-between gap-3">
+          <StatusPill
+            status={status}
+            label={status === 'CLOSED' || status === 'COUNTING' ? 'Being reviewed' : status === 'SCHEDULED' ? 'Upcoming' : undefined}
+          />
+          {election.academicYear && <span className="text-xs font-medium text-slate-400">{election.academicYear}</span>}
+        </div>
+        <h3 className="mt-3 text-lg font-semibold text-primary-clr">{election.title}</h3>
+        {election.description && <p className="mt-1 line-clamp-2 text-sm text-slate-500">{election.description}</p>}
+
+        <p className="mt-4 flex items-center gap-1.5 text-sm text-slate-500">
+          {status === 'OPEN' ? (
+            <>
+              <Hourglass className="h-4 w-4 text-emerald-600" />
+              <span>
+                Closes <span className="font-semibold text-emerald-700">{formatRelative(election.endTime, now)}</span>
+              </span>
+            </>
+          ) : status === 'SCHEDULED' ? (
+            <>
+              <CalendarClock className="h-4 w-4 text-active" />
+              <span>
+                Opens <span className="font-semibold text-active">{formatRelative(election.startTime, now)}</span>
+                <span className="text-slate-400"> · {formatDate(election.startTime)}</span>
+              </span>
+            </>
+          ) : (
+            <>
+              <CalendarClock className="h-4 w-4" />
+              Ended {formatDate(election.endTime)}
+            </>
+          )}
+        </p>
+
+        <div className="mt-5 space-y-3 pt-1">
+          {voteStatus?.hasVoted && voteStatus.receiptId && (
+            <ReceiptChip receiptId={voteStatus.receiptId} submittedAt={voteStatus.submittedAt} />
+          )}
+          {status === 'OPEN' && !voteStatus?.hasVoted && (
+            <Link
+              to={`/elections/${election._id}/vote`}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-button font-semibold text-white shadow-sm shadow-slate-900/10 transition hover:bg-primary-clr active:scale-[0.99]"
+            >
+              <Vote className="h-4 w-4" />
+              Vote now
+            </Link>
+          )}
+          {status === 'RESULTS_PUBLISHED' && (
+            <Button variant="secondary" icon={BarChart3} className="w-full" onClick={() => void handleViewResults(election)}>
+              View results
+            </Button>
+          )}
+          {(status === 'CLOSED' || status === 'COUNTING') && (
+            <p className="rounded-2xl bg-slate-50 px-3 py-2.5 text-sm text-slate-500">Results will appear here once published.</p>
+          )}
+        </div>
+      </Card>
+    );
+  };
+
+  const section = (title: string, items: Election[]) =>
+    items.length > 0 && (
+      <section className="space-y-3">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {title}
+          <span className="rounded-full bg-white/80 px-2 text-xs tabular-nums">{items.length}</span>
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2">{items.map(renderCard)}</div>
+      </section>
+    );
+
+  return (
+    <div className="global-bg min-h-screen pt-36">
+      <div className="mx-auto max-w-4xl space-y-8 px-4 pb-16">
+        <header>
+          <h1 className="text-3xl font-bold text-primary-clr">Elections</h1>
+          {notice && (
+            <p className="animate-rise-in mt-3 flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
+              <CircleCheck className="h-4 w-4" />
+              {notice}
             </p>
-            {justCastReceipt && (
-              <ReceiptLine receiptId={justCastReceipt.receiptId} submittedAt={justCastReceipt.submittedAt} />
-            )}
-          </div>
-        )}
+          )}
+        </header>
 
         {isLoading ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader className="animate-spin" size={18} />
-            Loading elections...
+          <div className="grid gap-4 md:grid-cols-2">
+            <Skeleton className="h-56" />
+            <Skeleton className="h-56" />
           </div>
         ) : elections.length === 0 ? (
-          <div className="rounded-lg border border-border bg-white p-8 text-center">
-            <CalendarDays className="mx-auto mb-3 text-stroke-clr" size={36} />
-            <p className="text-muted-foreground">No elections available.</p>
-          </div>
+          <Card>
+            <EmptyState icon={Inbox} title="No elections right now" description="When an election is scheduled, it shows up here." />
+          </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {elections.map((election) => {
-              const ballot = getBallotState(election);
-              const voteStatus = voteStatuses[election._id];
-              const hasVoted = Boolean(voteStatus?.hasVoted);
-              const statusLabel =
-                ballot.kind === 'results'
-                  ? 'RESULTS PUBLISHED'
-                  : ballot.kind === 'reviewing'
-                    ? 'BEING REVIEWED'
-                    : hasVoted
-                      ? 'VOTED'
-                      : ballot.kind === 'open'
-                        ? 'OPEN'
-                        : 'UPCOMING';
-
-              return (
-                <article key={election._id} className="rounded-lg border border-border bg-white p-6 shadow-sm">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold text-primary-clr">{election.title}</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">{election.academicYear || 'Election'}</p>
-                    </div>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        ballot.kind === 'reviewing'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : ballot.kind === 'results' || hasVoted
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-active/10 text-active'
-                      }`}
-                    >
-                      {statusLabel}
-                    </span>
-                  </div>
-
-                  {election.description && <p className="mt-4 text-muted-foreground">{election.description}</p>}
-
-                  <div className="mt-5 flex flex-wrap gap-3 text-sm text-muted-foreground">
-                    {election.startTime && <span>Starts {new Date(election.startTime).toLocaleString()}</span>}
-                    {election.endTime && <span>Ends {new Date(election.endTime).toLocaleString()}</span>}
-                  </div>
-
-                  <div className="mt-5">
-                    {ballot.kind === 'results' ? (
-                      <button
-                        type="button"
-                        onClick={() => handleViewResults(election)}
-                        className="inline-flex items-center gap-2 rounded-md bg-active px-4 py-2 font-semibold text-white hover:bg-button"
-                      >
-                        <Eye size={18} />
-                        View results
-                      </button>
-                    ) : ballot.kind === 'reviewing' ? (
-                      <button
-                        type="button"
-                        disabled
-                        className="inline-flex cursor-not-allowed items-center gap-2 rounded-md bg-yellow-100 px-4 py-2 font-semibold text-yellow-800"
-                      >
-                        <Vote size={18} />
-                        Results are being reviewed
-                      </button>
-                    ) : hasVoted ? (
-                      <button
-                        type="button"
-                        disabled
-                        className="inline-flex cursor-not-allowed items-center gap-2 rounded-md bg-green-100 px-4 py-2 font-semibold text-green-800"
-                      >
-                        <CheckCircle size={18} />
-                        You have voted
-                      </button>
-                    ) : ballot.kind === 'open' ? (
-                      <Link
-                        to={`/elections/${election._id}/vote`}
-                        className="inline-flex items-center gap-2 rounded-md bg-active px-4 py-2 font-semibold text-white hover:bg-button"
-                      >
-                        <Vote size={18} />
-                        Open ballot
-                      </Link>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled
-                        className="inline-flex cursor-not-allowed items-center gap-2 rounded-md bg-gray-300 px-4 py-2 font-semibold text-gray-600"
-                      >
-                        <Vote size={18} />
-                        {ballot.message}
-                      </button>
-                    )}
-                    {hasVoted && voteStatus?.receiptId && (
-                      <ReceiptLine receiptId={voteStatus.receiptId} submittedAt={voteStatus.submittedAt} />
-                    )}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-
-        {resultsElection && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-              <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">Election Results</h2>
-                  <p className="text-sm text-gray-500">{resultsElection.title}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResultsElection(null);
-                    setResultPositions([]);
-                  }}
-                  className="rounded-md border px-4 py-2 font-semibold hover:bg-gray-50"
-                >
-                  Close
-                </button>
-              </div>
-
-              {isLoadingResults ? (
-                <div className="flex items-center justify-center gap-2 py-10 text-gray-500">
-                  <Loader className="h-5 w-5 animate-spin" />
-                  Loading results...
-                </div>
-              ) : resultPositions.length === 0 ? (
-                <p className="rounded-md bg-gray-50 p-4 text-sm text-gray-600">No results are available yet.</p>
-              ) : (
-                <div className="space-y-4">
-                  {resultPositions.map((position) => (
-                    <div key={position.positionId} className="rounded-lg border border-gray-200 p-4">
-                      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-semibold text-gray-900">{position.positionTitle || 'Position'}</h3>
-                        {position.outcome === 'TIE' && (
-                          <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-semibold text-yellow-800">Tie</span>
-                        )}
-                        {position.outcome === 'NO_VOTES' && (
-                          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">No votes</span>
-                        )}
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 text-sm">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Rank</th>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Candidate</th>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Votes</th>
-                              <th className="px-3 py-2 text-left font-semibold text-gray-600">Percentage</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100 bg-white">
-                            {position.rankings.map((ranking) => {
-                              const isWinner = Boolean(position.winnerId) && position.winnerId === ranking.candidateId;
-                              return (
-                                <tr key={ranking.candidateId} className={isWinner ? 'bg-green-50' : undefined}>
-                                  <td className="px-3 py-2 font-medium text-gray-700">{ranking.rank}</td>
-                                  <td className="px-3 py-2 text-gray-900">
-                                    {ranking.candidateName || 'Candidate'}
-                                    {isWinner && <span className="ml-2 text-xs font-semibold text-green-700">Winner</span>}
-                                  </td>
-                                  <td className="px-3 py-2 text-gray-700">{ranking.votes}</td>
-                                  <td className="px-3 py-2 text-gray-700">{ranking.percentage}%</td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          <>
+            {section('Open now', open)}
+            {section('Upcoming', upcoming)}
+            {section('Completed', completed)}
+          </>
         )}
       </div>
+
+      <Modal
+        open={Boolean(resultsElection)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setResultsElection(null);
+            setResultPositions([]);
+          }
+        }}
+        title="Results"
+        description={resultsElection?.title}
+        size="lg"
+      >
+        {isLoadingResults ? (
+          <div className="space-y-3">
+            <Skeleton className="h-40" />
+            <Skeleton className="h-40" />
+          </div>
+        ) : resultPositions.length === 0 ? (
+          <EmptyState icon={BarChart3} title="No results available" className="py-6" />
+        ) : (
+          <div className="space-y-4">
+            {resultPositions.filter((position) => position.rankings.length > 0).map((position) => (
+              <PositionStandings
+                key={position.positionId}
+                title={position.positionTitle || 'Position'}
+                outcome={position.outcome || (position.winnerId ? 'WINNER' : 'NO_VOTES')}
+                standings={position.rankings.map((r) => ({
+                  candidateId: r.candidateId,
+                  name: r.candidateName || 'Candidate',
+                  votes: r.votes,
+                  percentage: r.percentage,
+                  rank: r.rank,
+                  isWinner: Boolean(position.winnerId) && position.winnerId === r.candidateId,
+                }))}
+              />
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
