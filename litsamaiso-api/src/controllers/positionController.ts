@@ -7,6 +7,10 @@ import {
   getPositionById,
   listPositionsByElection,
 } from "../services/positionService.js";
+import {
+  importSrcPositionTemplates,
+  listPositionTemplates,
+} from "../services/positionTemplateService.js";
 
 const handleError = (res: Response, err: any): void => {
   if (err instanceof AppError) {
@@ -23,7 +27,6 @@ export const createPositionHandler = async (req: Request, res: Response) => {
       electionId: req.params.electionId as string,
       title: (req.body || {}).title,
       description: (req.body || {}).description,
-      maxVotesAllowed: (req.body || {}).maxVotesAllowed,
       displayOrder: (req.body || {}).displayOrder,
     });
 
@@ -81,6 +84,26 @@ export const listPositionsByElectionHandler = async (req: Request, res: Response
     });
 
     res.json({ positions });
+  } catch (err: any) {
+    handleError(res, err);
+  }
+};
+// Handler function to list the institution's standard positions
+export const listPositionTemplatesHandler = async (req: Request, res: Response) => {
+  try {
+    const templates = await listPositionTemplates({ user: (req as any).user });
+
+    res.json({ templates });
+  } catch (err: any) {
+    handleError(res, err);
+  }
+};
+// Handler function to import the fixed SRC positions into the institution's standard list
+export const importSrcPositionTemplatesHandler = async (req: Request, res: Response) => {
+  try {
+    const { created, templates } = await importSrcPositionTemplates({ user: (req as any).user });
+
+    res.status(201).json({ message: `${created} SRC position(s) imported`, created, templates });
   } catch (err: any) {
     handleError(res, err);
   }

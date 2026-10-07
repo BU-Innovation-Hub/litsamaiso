@@ -8,7 +8,8 @@ import { User } from "../models/User.js";
 import { AdministrativeEmailJob } from "../models/AdministrativeEmailJob.js";
 import type { AdministrativeEmailFailure } from "../models/AdministrativeEmailJob.js";
 import AdministrativeEmail from "../emailTemplates/AdministrativeEmail.js";
-import { getEmailBranding, sendEmail } from "../utils/email.js";
+import { getEmailBranding } from "../utils/email.js";
+import { emailLooksValid, sendBulk } from "../utils/bulkEmail.js";
 
 export type FinancialClearanceRecipientStatus = "pending" | "confirmed" | "paid";
 
@@ -27,25 +28,6 @@ type Recipient = {
   email: string;
 };
 
-const EMAIL_BATCH_SIZE = Math.max(
-  1,
-  Number.parseInt(process.env.ADMIN_EMAIL_BATCH_SIZE || "25", 10) || 25,
-);
-const EMAIL_CONCURRENCY = Math.max(
-  1,
-  Number.parseInt(process.env.ADMIN_EMAIL_CONCURRENCY || "3", 10) || 3,
-);
-const EMAIL_BATCH_DELAY_MS = Math.max(
-  0,
-  Number.parseInt(process.env.ADMIN_EMAIL_BATCH_DELAY_MS || "500", 10) || 500,
-);
-
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
-const emailLooksValid = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const normalizeRoleForLookup = (role: string): string => {
   const normalized = String(role || "").trim().toLowerCase();
@@ -193,34 +175,6 @@ const renderAdministrativeEmail = async (draft: AdministrativeEmailDraft) => {
   return { html, attachments };
 };
 
-const sendWithRetry = async (
-  recipient: Recipient,
-  draft: AdministrativeEmailDraft,
-  rendered: Awaited<ReturnType<typeof renderAdministrativeEmail>>,
-): Promise<AdministrativeEmailFailure | null> => {
-  let lastError = "";
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    try {
-      await sendEmail({
-        to: recipient.email,
-        subject: draft.subject,
-        text: draft.body,
-        html: rendered.html,
-        attachments: rendered.attachments,
-      });
-      return null;
-    } catch (error: any) {
-      lastError = error?.message || String(error);
-      if (attempt < 2) {
-        await sleep(500);
-      }
-    }
-  }
-
-  return { email: recipient.email, error: lastError || "Email send failed" };
-};
-
 export const processAdministrativeEmailJob = async (jobId: Types.ObjectId | string) => {
   const job = await AdministrativeEmailJob.findById(jobId);
   if (!job) return;
@@ -236,50 +190,30 @@ export const processAdministrativeEmailJob = async (jobId: Types.ObjectId | stri
       body: job.body,
     });
 
-    let successfulSends = 0;
-    const failures: AdministrativeEmailFailure[] = [];
-
-    for (let batchStart = 0; batchStart < recipients.length; batchStart += EMAIL_BATCH_SIZE) {
-      const batch = recipients.slice(batchStart, batchStart + EMAIL_BATCH_SIZE);
-
-      for (let start = 0; start < batch.length; start += EMAIL_CONCURRENCY) {
-        const group = batch.slice(start, start + EMAIL_CONCURRENCY);
-        const results = await Promise.all(
-          group.map((recipient) =>
-            sendWithRetry(
-              recipient,
-              { subject: job.subject, body: job.body },
-              rendered,
-            ),
-          ),
-        );
-
-        for (const failure of results) {
-          if (failure) {
-            failures.push(failure);
-          } else {
-            successfulSends += 1;
-          }
-        }
-      }
-
-      await AdministrativeEmailJob.findByIdAndUpdate(job._id, {
-        successfulSends,
-        failedSends: failures.length,
-        failures,
-      });
-
-      if (batchStart + EMAIL_BATCH_SIZE < recipients.length && EMAIL_BATCH_DELAY_MS > 0) {
-        await sleep(EMAIL_BATCH_DELAY_MS);
-      }
-    }
+    const progress = await sendBulk(
+      recipients,
+      (recipient) => ({
+        to: recipient.email,
+        subject: job.subject,
+        text: job.body,
+        html: rendered.html,
+        attachments: rendered.attachments,
+      }),
+      async ({ sent, failures }) => {
+        await AdministrativeEmailJob.findByIdAndUpdate(job._id, {
+          successfulSends: sent,
+          failedSends: failures.length,
+          failures: failures as AdministrativeEmailFailure[],
+        });
+      },
+    );
 
     await AdministrativeEmailJob.findByIdAndUpdate(job._id, {
       status: "completed",
       totalRecipients: recipients.length,
-      successfulSends,
-      failedSends: failures.length,
-      failures,
+      successfulSends: progress.sent,
+      failedSends: progress.failures.length,
+      failures: progress.failures as AdministrativeEmailFailure[],
       completedAt: new Date(),
     });
   } catch (error: any) {

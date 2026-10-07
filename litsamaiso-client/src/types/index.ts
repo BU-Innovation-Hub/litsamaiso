@@ -133,9 +133,23 @@ export interface Election {
   published?: boolean;
   archived?: boolean;
   resultsPublished?: boolean;
+  notifyStudents?: boolean;
   createdBy?: User;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ScheduleReadiness {
+  positionCount: number;
+  standardPositionCount: number;
+  approvedCandidateCount: number;
+  positionsWithoutCandidates: string[];
+  blockers: string[];
+}
+
+export interface VoteReceipt {
+  receiptId: string;
+  submittedAt: string;
 }
 
 export interface Vote {
@@ -154,9 +168,13 @@ export interface ResultRanking {
   rank: number;
 }
 
+// WINNER: one clear leader. TIE: shared top vote count. NO_VOTES: nobody received a vote.
+export type ResultOutcome = 'WINNER' | 'TIE' | 'NO_VOTES';
+
 export interface ResultPositionSnapshot {
   positionId: string;
   winnerId?: string | null;
+  outcome?: ResultOutcome;
   rankings: ResultRanking[];
 }
 
@@ -165,12 +183,16 @@ export interface ResultSnapshot {
   generatedAt: string;
   positions: ResultPositionSnapshot[];
   snapshotHash: string;
+  // Ballots counted; missing on snapshots made before students could skip positions
+  totalBallots?: number;
 }
 
 export interface ResultPositionDetail {
   generatedAt: string;
   positionId: string;
   positionTitle?: string;
+  outcome?: ResultOutcome;
+  winnerId?: string | null;
   rankings: Array<{
     candidateId: string;
     candidateName?: string;

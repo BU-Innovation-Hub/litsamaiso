@@ -1,5 +1,5 @@
 import apiClient from '../lib/api';
-import type { Election, Position, Candidate, CandidateImportResult, ResultPositionDetail, ResultSnapshot, Vote } from '../types';
+import type { Election, Position, Candidate, CandidateImportResult, ResultPositionDetail, ResultSnapshot, ScheduleReadiness, VoteReceipt } from '../types';
 
 const noCacheRequest = (params?: Record<string, unknown>) => ({
   params: { ...(params || {}), _: Date.now() },
@@ -12,8 +12,17 @@ const noCacheRequest = (params?: Record<string, unknown>) => ({
 export const electionService = {
   // Get all active elections for the current institution
   getElections: async (params?: { page?: number; limit?: number }) => {
-    const response = await apiClient.get<{ elections: Election[] }>('/elections', noCacheRequest(params));
-    return response.data.elections;
+    const { elections } = await electionService.getElectionsWithServerTime(params);
+    return elections;
+  },
+
+  // Same as getElections, plus the server's clock so the UI doesn't trust the device clock
+  getElectionsWithServerTime: async (params?: { page?: number; limit?: number }) => {
+    const response = await apiClient.get<{ elections: Election[]; serverTime: string }>(
+      '/elections',
+      noCacheRequest(params)
+    );
+    return response.data;
   },
 
   // Get a specific election by ID
@@ -53,13 +62,23 @@ export const electionService = {
     return response.data.election;
   },
 
-  publishElection: async (
-    electionId: string,
-    data: { startTime?: string; endTime?: string; timezone?: string }
-  ) => {
+  getScheduleReadiness: async (electionId: string) => {
+    const response = await apiClient.get<{ readiness: ScheduleReadiness }>(
+      `/elections/${electionId}/readiness`,
+      noCacheRequest()
+    );
+    return response.data.readiness;
+  },
+
+  closeElection: async (electionId: string) => {
+    const response = await apiClient.post<{ election: Election }>(`/elections/${electionId}/close`);
+    return response.data.election;
+  },
+
+  extendElection: async (electionId: string, endTime: string) => {
     const response = await apiClient.post<{ election: Election }>(
-      `/elections/${electionId}/publish`,
-      data
+      `/elections/${electionId}/extend`,
+      { endTime }
     );
     return response.data.election;
   },
@@ -85,6 +104,26 @@ export const electionService = {
       position
     );
     return response.data.position;
+  },
+
+  // Institution-level standard positions, copied onto each new election
+  getPositionTemplates: async () => {
+    const response = await apiClient.get<{ templates: Position[] }>(
+      '/elections/position-templates',
+      noCacheRequest()
+    );
+    return response.data.templates;
+  },
+
+  importSrcPositionTemplates: async () => {
+    const response = await apiClient.post<{ created: number; templates: Position[] }>(
+      '/elections/position-templates/import'
+    );
+    return response.data;
+  },
+
+  deletePosition: async (positionId: string) => {
+    await apiClient.delete(`/elections/positions/${positionId}`);
   },
 
   getPositions: async (electionId: string) => {
@@ -136,6 +175,10 @@ export const electionService = {
     return response.data.candidate;
   },
 
+  deleteCandidate: async (candidateId: string) => {
+    await apiClient.delete(`/elections/candidates/${candidateId}`);
+  },
+
   getCandidates: async (positionId: string) => {
     const response = await apiClient.get<{ candidates: Candidate[] }>(
       `/elections/positions/${positionId}/candidates`,
@@ -144,16 +187,9 @@ export const electionService = {
     return response.data.candidates;
   },
 
-  importCandidates: async (
-    electionId: string,
-    file: File,
-    options?: { approveImported?: boolean }
-  ) => {
+  importCandidates: async (electionId: string, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
-    if (options?.approveImported) {
-      formData.append('approveImported', 'true');
-    }
 
     const response = await apiClient.post<CandidateImportResult>(
       `/elections/${electionId}/candidates/import`,
@@ -164,9 +200,16 @@ export const electionService = {
   },
 
   // Cast a vote
-  castVote: async (electionId: string, vote: Vote | { selections: Array<{ positionId: string; candidateId: string }>; idempotencyKey: string }) => {
-    const response = await apiClient.post(`/elections/${electionId}/vote`, vote);
-    return response.data;
+  castVote: async (
+    electionId: string,
+    vote: { selections: Array<{ positionId: string; candidateId: string }>; idempotencyKey: string }
+  ) => {
+    const response = await apiClient.post<{ receipt: VoteReceipt }>(
+      `/elections/${electionId}/vote`,
+      { selections: vote.selections },
+      { headers: { 'Idempotency-Key': vote.idempotencyKey } }
+    );
+    return response.data.receipt;
   },
 
   // Get election results

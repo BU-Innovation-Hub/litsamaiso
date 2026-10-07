@@ -8,7 +8,6 @@ import reportRoutes from "./reportRoutes.js";
 import feedbackRoutes from "./feedbackRoutes.js";
 import electionRoutes from "./electionRoutes.js";
 import voteRoutes from "./voteRoutes.js";
-import resultRoutes from "./resultRoutes.js";
 import aiRoutes from "./aiRoutes.js";
 import ocrRoutes from "./ocrRoutes.js";
 import uploadRoutes from "./uploadRoutes.js";
@@ -48,7 +47,6 @@ export const apiV1Routes: ReadonlyArray<readonly [path: string, router: Router]>
   ["/feedback", feedbackRoutes],
   ["/elections", electionRoutes],
   ["/vote", voteRoutes],
-  ["/results", resultRoutes],
   ["/ai", aiRoutes],
   ["/ocr", ocrRoutes],
   ["/upload", uploadRoutes],

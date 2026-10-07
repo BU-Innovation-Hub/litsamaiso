@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test *)",
+      "Bash(npm i *)",
+      "Bash(node -e ' *)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5055 -State Listen -ErrorAction SilentlyContinue)",
+      "Bash(MONGO_URI=\"mongodb://127.0.0.1:27117/litsamaiso_e2e?replicaSet=testset\" CLIENT_BASE_URL=\"http://localhost:5174\" EMAIL_SMTP_HOST=\"127.0.0.1\" EMAIL_SMTP_PORT=\"2525\" EMAIL_SMTP_SECURE=\"false\" EMAIL_SMTP_USER=\"\" EMAIL_SMTP_PASS=\"\" EMAIL_FROM=\"Litsamaiso <elections@e2e.test>\" ADMIN_EMAIL_BATCH_DELAY_MS=\"0\" npx tsx \"C:/Users/JOELKA~1/AppData/Local/Temp/claude/c--Users-Joel-Kananelo-Documents-coding-litsamaiso/3cd7bf37-01aa-4bdb-9031-f3fce2cd4e4c/scratchpad/e2e/resume.mts\")",
+      "Bash(node shoot-mail.mjs)",
+      "Read(//c/Users/Joel Kananelo/Documents/coding/**)"
+    ]
+  }
+}

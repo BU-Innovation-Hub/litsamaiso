@@ -3,7 +3,10 @@ import {
   createElection,
   updateElection,
   scheduleElection,
-  publishElection,
+  getScheduleReadiness,
+  closeElectionNow,
+  extendElection,
+  syncDueElections,
   archiveElection,
   publishResults,
   softDeleteElection,
@@ -27,6 +30,7 @@ export const createElectionHandler = async (req: Request, res: Response) => {
       description: (req.body || {}).description,
       academicYear: (req.body || {}).academicYear,
       timezone: (req.body || {}).timezone,
+      notifyStudents: (req.body || {}).notifyStudents,
       votingRules: (req.body || {}).votingRules,
       securitySettings: (req.body || {}).securitySettings,
     });
@@ -50,7 +54,7 @@ export const updateElectionHandler = async (req: Request, res: Response) => {
     handleError(res, err);
   }
 };
-// Handler function to soft delete an election
+// Handler function to schedule an election's voting window and make it visible to students
 export const scheduleElectionHandler = async (req: Request, res: Response) => {
   try {
     const election = await scheduleElection({
@@ -66,18 +70,42 @@ export const scheduleElectionHandler = async (req: Request, res: Response) => {
     handleError(res, err);
   }
 };
-// Handler function to publish an election and make it available for voting
-export const publishElectionHandler = async (req: Request, res: Response) => {
+// Handler function to report what an election is missing before it can be scheduled
+export const getScheduleReadinessHandler = async (req: Request, res: Response) => {
   try {
-    const election = await publishElection({
+    const readiness = await getScheduleReadiness({
       user: (req as any).user,
       electionId: req.params.id as string,
-      startTime: (req.body || {}).startTime,
-      endTime: (req.body || {}).endTime,
-      timezone: (req.body || {}).timezone,
     });
 
-    res.json({ message: "Election published", election });
+    res.json({ readiness });
+  } catch (err: any) {
+    handleError(res, err);
+  }
+};
+// Handler function to end voting early on an open election
+export const closeElectionHandler = async (req: Request, res: Response) => {
+  try {
+    const election = await closeElectionNow({
+      user: (req as any).user,
+      electionId: req.params.id as string,
+    });
+
+    res.json({ message: "Election closed", election });
+  } catch (err: any) {
+    handleError(res, err);
+  }
+};
+// Handler function to push back the end time of an open election
+export const extendElectionHandler = async (req: Request, res: Response) => {
+  try {
+    const election = await extendElection({
+      user: (req as any).user,
+      electionId: req.params.id as string,
+      endTime: (req.body || {}).endTime,
+    });
+
+    res.json({ message: "Election extended", election });
   } catch (err: any) {
     handleError(res, err);
   }
@@ -145,7 +173,10 @@ export const listElectionsHandler = async (req: Request, res: Response) => {
     if (isStudent) {
       filter.published = true;
       filter.archived = false;
+      filter.status = { $ne: "DRAFT" };
     }
+
+    await syncDueElections({ institution: user.institution });
 
     const [elections, total] = await Promise.all([
       Election.find(filter).sort({ createdAt: -1 }).skip(skip).limit(lim).lean(),
@@ -158,7 +189,14 @@ export const listElectionsHandler = async (req: Request, res: Response) => {
       );
     }
 
-    res.json({ elections, total, page: pageNum, limit: lim, pages: Math.ceil(total / lim) });
+    res.json({
+      elections,
+      total,
+      page: pageNum,
+      limit: lim,
+      pages: Math.ceil(total / lim),
+      serverTime: new Date().toISOString(),
+    });
   } catch (err: any) {
     handleError(res, err);
   }
@@ -180,7 +218,10 @@ export const getElectionHandler = async (req: Request, res: Response) => {
     if (isStudent) {
       query.published = true;
       query.archived = false;
+      query.status = { $ne: "DRAFT" };
     }
+
+    await syncDueElections({ institution: user.institution, electionId: req.params.id as string });
 
     const election = await Election.findOne(query).lean();
 
@@ -189,7 +230,7 @@ export const getElectionHandler = async (req: Request, res: Response) => {
       return;
     }
 
-    res.json({ election });
+    res.json({ election, serverTime: new Date().toISOString() });
   } catch (err: any) {
     handleError(res, err);
   }

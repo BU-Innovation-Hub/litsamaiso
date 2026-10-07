@@ -1,6 +1,7 @@
 import { Types } from "mongoose";
 import { Election } from "../models/Election.js";
 import { Position, type PositionDocument } from "../models/Position.js";
+import { Candidate } from "../models/Candidate.js";
 import { SRC_POSITION_TEMPLATES, normalizePositionLabel } from "../constants/srcPositions.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
@@ -17,7 +18,6 @@ export const createPosition = async (params: {
   electionId: string;
   title: unknown;
   description?: unknown;
-  maxVotesAllowed?: unknown;
   displayOrder?: unknown;
 }): Promise<PositionDocument> => {
   const election = await Election.findOne({
@@ -31,10 +31,6 @@ export const createPosition = async (params: {
 
   const title = requireString(params.title, "title", { min: 2 });
   const description = optionalString(params.description);
-  const maxVotesAllowed =
-    params.maxVotesAllowed !== undefined
-      ? requireNumber(params.maxVotesAllowed, "maxVotesAllowed", { min: 1 })
-      : 1;
 
   let displayOrder: number;
   if (params.displayOrder !== undefined) {
@@ -53,7 +49,8 @@ export const createPosition = async (params: {
     electionId: election._id,
     title,
     ...(description !== undefined && { description }),
-    maxVotesAllowed,
+    // Every position is single-choice
+    maxVotesAllowed: 1,
     displayOrder,
     isActive: true,
   });
@@ -160,13 +157,6 @@ export const updatePosition = async (params: {
     const v = optionalString(params.updates.description);
     if (v !== undefined) position.description = v;
   }
-  if (params.updates.maxVotesAllowed !== undefined) {
-    position.maxVotesAllowed = requireNumber(
-      params.updates.maxVotesAllowed,
-      "maxVotesAllowed",
-      { min: 1 },
-    );
-  }
   if (params.updates.displayOrder !== undefined) {
     position.displayOrder = requireNumber(params.updates.displayOrder, "displayOrder", { min: 1 });
   }
@@ -212,6 +202,11 @@ export const softDeletePosition = async (params: {
   position.deletedAt = new Date();
   position.deletedBy = new Types.ObjectId(params.user._id);
   await position.save();
+
+  await Candidate.updateMany(
+    { positionId: position._id, deletedAt: null },
+    { $set: { deletedAt: new Date(), deletedBy: params.user._id } },
+  );
 
   await recordAudit({
     action: "position.delete",

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { model, Schema, type Types } from "mongoose";
 
 export interface BallotSelection {
@@ -5,18 +6,13 @@ export interface BallotSelection {
   candidateId: Types.ObjectId;
 }
 
+// An anonymous ballot: no student, receipt, IP or timestamp, and a random (not time-based)
+// id, so it can't be linked back to the VoterRecord written in the same transaction.
 export interface BallotDocument {
+  _id: string;
   electionId: Types.ObjectId;
-  studentId: string;
-  submittedAt: Date;
   selections: BallotSelection[];
-  ipAddress?: string;
-  userAgent?: string;
   ballotHash: string;
-  receiptId: string;
-  idempotencyKey?: string;
-  deletedAt?: Date | null;
-  deletedBy?: Types.ObjectId | null;
 }
 
 const ballotSelectionSchema = new Schema<BallotSelection>(
@@ -29,32 +25,20 @@ const ballotSelectionSchema = new Schema<BallotSelection>(
 
 const ballotSchema = new Schema<BallotDocument>(
   {
+    _id: { type: String, default: () => randomUUID() },
     electionId: { type: Schema.Types.ObjectId, ref: "Election", required: true },
-    studentId: { type: String, required: true, trim: true },
-    submittedAt: { type: Date, required: true },
     selections: { type: [ballotSelectionSchema], required: true },
-    ipAddress: { type: String, trim: true },
-    userAgent: { type: String, trim: true },
     ballotHash: { type: String, required: true, trim: true },
-    receiptId: { type: String, required: true, trim: true },
-    idempotencyKey: { type: String, trim: true },
-    deletedAt: { type: Date, default: null },
-    deletedBy: { type: Schema.Types.ObjectId, ref: "User", default: null },
   },
   {
-    timestamps: true,
+    timestamps: false,
+    versionKey: false,
   },
 );
 
-ballotSchema.index(
-  { electionId: 1, studentId: 1 },
-  { unique: true, partialFilterExpression: { deletedAt: null } },
-);
-ballotSchema.index({ electionId: 1, submittedAt: -1 });
-ballotSchema.index(
-  { electionId: 1, studentId: 1, idempotencyKey: 1 },
-  { unique: true, partialFilterExpression: { deletedAt: null, idempotencyKey: { $type: "string" } } },
-);
+ballotSchema.index({ electionId: 1 });
 
-export const Ballot = model<BallotDocument>("Ballot", ballotSchema);
+// Separate collection from the legacy "ballots", which stored studentId on each ballot.
+// Legacy ballots are moved here by `npm run migrate:ballot-secrecy`.
+export const Ballot = model<BallotDocument>("Ballot", ballotSchema, "secretballots");
 export default Ballot;

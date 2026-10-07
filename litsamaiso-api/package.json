@@ -10,6 +10,7 @@
         "backfill:user-borrowers": "tsx src/scripts/backfillUserBorrowerNumbers.ts",
         "import:borrowers": "tsx src/scripts/importBorrowerNumbers.ts",
         "migrate:national-id": "tsx src/scripts/migrateNationalId.ts",
+        "migrate:ballot-secrecy": "tsx src/scripts/migrateBallotSecrecy.ts",
         "build": "tsc",
         "start": "node ./dist/index.js",
         "test": "node --import tsx --test src/services/*.test.ts src/routes/*.test.ts"
