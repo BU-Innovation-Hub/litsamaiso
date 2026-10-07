@@ -98,9 +98,15 @@ export const isVotable = (candidate: { approved?: boolean; disqualified?: boolea
 export const ballotPositions = (positions: PositionWithCandidates[]) =>
   positions.filter((p) => p.candidates.some(isVotable));
 
-// Every ballot covers every ballot position, so the busiest position's total is the ballot count
-export const countBallots = (snapshot: { positions: Array<{ rankings: Array<{ votes: number }> }> } | null) =>
-  snapshot ? Math.max(0, ...snapshot.positions.map((p) => p.rankings.reduce((sum, r) => sum + r.votes, 0))) : 0;
+// Uses the stored ballot count. Older snapshots predate it; back then every ballot covered every
+// position, so the busiest position's total was the ballot count.
+export const countBallots = (
+  snapshot: { totalBallots?: number; positions: Array<{ rankings: Array<{ votes: number }> }> } | null,
+) => {
+  if (!snapshot) return 0;
+  if (typeof snapshot.totalBallots === 'number') return snapshot.totalBallots;
+  return Math.max(0, ...snapshot.positions.map((p) => p.rankings.reduce((sum, r) => sum + r.votes, 0)));
+};
 
 // Ticks every `intervalMs` so countdowns stay current
 export const useNow = (intervalMs = 30_000, offsetMs = 0) => {

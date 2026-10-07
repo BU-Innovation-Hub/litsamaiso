@@ -18,11 +18,14 @@ type PositionStandingsProps = {
   title: string;
   outcome?: ResultOutcome;
   standings: Standing[];
+  // Total ballots cast, to show how many students skipped this position
+  ballots?: number;
 };
 
 // One position's result: the leader highlighted on top, everyone ranked below with vote bars
-const PositionStandings: React.FC<PositionStandingsProps> = ({ title, outcome, standings }) => {
+const PositionStandings: React.FC<PositionStandingsProps> = ({ title, outcome, standings, ballots }) => {
   const totalVotes = standings.reduce((sum, s) => sum + s.votes, 0);
+  const skipped = ballots !== undefined ? Math.max(0, ballots - totalVotes) : 0;
   const winner = standings.find((s) => s.isWinner);
   const leaders = standings.filter((s) => s.rank === 1 && s.votes > 0);
 
@@ -32,6 +35,7 @@ const PositionStandings: React.FC<PositionStandingsProps> = ({ title, outcome, s
         <h3 className="font-semibold text-primary-clr">{title}</h3>
         <span className="text-xs font-medium text-slate-400">
           {totalVotes} vote{totalVotes === 1 ? '' : 's'}
+          {skipped > 0 && ` · ${skipped} skipped`}
         </span>
       </header>
 

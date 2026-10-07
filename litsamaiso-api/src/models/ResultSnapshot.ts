@@ -22,6 +22,8 @@ export interface ResultSnapshotDocument {
   generatedAt: Date;
   positions: ResultPositionSnapshot[];
   snapshotHash: string;
+  // Ballots counted; students may skip positions, so per-position totals can be lower
+  totalBallots?: number;
   generatedBy?: Types.ObjectId;
 }
 
@@ -51,6 +53,7 @@ const resultSnapshotSchema = new Schema<ResultSnapshotDocument>(
     generatedAt: { type: Date, required: true },
     positions: { type: [resultPositionSchema], default: [] },
     snapshotHash: { type: String, required: true, trim: true },
+    totalBallots: { type: Number },
     generatedBy: { type: Schema.Types.ObjectId, ref: "User" },
   },
   {

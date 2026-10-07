@@ -183,6 +183,8 @@ export interface ResultSnapshot {
   generatedAt: string;
   positions: ResultPositionSnapshot[];
   snapshotHash: string;
+  // Ballots counted; missing on snapshots made before students could skip positions
+  totalBallots?: number;
 }
 
 export interface ResultPositionDetail {

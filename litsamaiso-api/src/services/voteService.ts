@@ -82,7 +82,7 @@ export const castVote = async (params: {
   });
 
   if (!Array.isArray(params.selections) || params.selections.length === 0) {
-    throw new AppError("Selections are required", 400);
+    throw new AppError("Choose a candidate for at least one position", 400);
   }
 
   const [positions, candidates] = await Promise.all([
@@ -130,13 +130,7 @@ export const castVote = async (params: {
     selectedPositions.add(selection.positionId);
   }
 
-  const missing = ballotPositions.filter((p) => !selectedPositions.has(p._id.toString()));
-  if (missing.length > 0) {
-    throw new AppError(
-      `Select a candidate for every position. Missing: ${missing.map((p) => p.title).join(", ")}`,
-      400,
-    );
-  }
+  // Students may leave any position blank (abstain); a ballot only needs one choice overall
 
   let receipt: VoteReceipt | null = null;
 

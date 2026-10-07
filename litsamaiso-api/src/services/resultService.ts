@@ -130,9 +130,11 @@ export const computeElectionResults = async (
   });
 
   const generatedAt = new Date();
+  const totalBallots = await Ballot.countDocuments({ electionId: election._id });
   const payload = JSON.stringify({
     electionId: election._id.toString(),
     generatedAt: generatedAt.toISOString(),
+    totalBallots,
     positions: positionsSnapshot.map((p) => ({
       positionId: p.positionId.toString(),
       winnerId: p.winnerId ? p.winnerId.toString() : null,
@@ -151,6 +153,7 @@ export const computeElectionResults = async (
     generatedAt,
     positions: positionsSnapshot,
     snapshotHash: snapshotHash(payload),
+    totalBallots,
     generatedBy: options?.actor?._id,
   });
 

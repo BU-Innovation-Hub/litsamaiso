@@ -77,6 +77,7 @@ const ResultsTab: React.FC<ResultsTabProps> = ({ election, positions, snapshot, 
               key={String(result.positionId)}
               title={position ? getPositionTitle(position) : 'Position'}
               outcome={result.outcome || (winnerId ? 'WINNER' : 'NO_VOTES')}
+              ballots={snapshot.totalBallots}
               standings={result.rankings.map((ranking) => {
                 const candidate = position?.candidates.find((c) => getCandidateId(c) === String(ranking.candidateId));
                 return {

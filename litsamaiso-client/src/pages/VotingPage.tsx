@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, CircleCheck, Copy, Hourglass, Lock, ShieldCheck, Vote } from 'lucide-react';
 import { toast } from 'sonner';
@@ -42,8 +42,6 @@ const VotingPage: React.FC = () => {
   const [reviewing, setReviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<VoteReceipt | null>(null);
-  const [highlighted, setHighlighted] = useState<string | null>(null);
-  const positionRefs = useRef<Record<string, HTMLElement | null>>({});
   // One key per ballot visit, so a retried submit returns the same receipt instead of failing
   const [idempotencyKey] = useState(() => crypto.randomUUID());
 
@@ -81,14 +79,21 @@ const VotingPage: React.FC = () => {
 
   const chosen = positions.filter((p) => p._id && selected[p._id]).length;
   const complete = positions.length > 0 && chosen === positions.length;
+  const skipped = positions.length - chosen;
 
+  // Clicking the chosen candidate again clears the choice, so the position is skipped
+  const toggleChoice = (positionId: string, candidateId: string) =>
+    setSelected((prev) => {
+      const next = { ...prev };
+      if (next[positionId] === candidateId) delete next[positionId];
+      else next[positionId] = candidateId;
+      return next;
+    });
+
+  // Positions can be left blank, but a ballot needs at least one choice
   const handleReview = () => {
-    const missing = positions.find((p) => p._id && !selected[p._id]);
-    if (missing?._id) {
-      toast.warning(`Choose a candidate for ${getPositionTitle(missing)}`);
-      positionRefs.current[missing._id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setHighlighted(missing._id);
-      window.setTimeout(() => setHighlighted(null), 1600);
+    if (chosen === 0) {
+      toast.warning('Choose a candidate for at least one position');
       return;
     }
     setReviewing(true);
@@ -99,7 +104,9 @@ const VotingPage: React.FC = () => {
     setSubmitting(true);
     try {
       const result = await electionService.castVote(id, {
-        selections: positions.map((p) => ({ positionId: p._id as string, candidateId: selected[p._id as string] })),
+        selections: positions
+          .filter((p) => p._id && selected[p._id])
+          .map((p) => ({ positionId: p._id as string, candidateId: selected[p._id as string] })),
         idempotencyKey,
       });
       setReviewing(false);
@@ -242,13 +249,7 @@ const VotingPage: React.FC = () => {
               return (
                 <section
                   key={positionId}
-                  ref={(el) => {
-                    positionRefs.current[positionId] = el;
-                  }}
-                  className={cn(
-                    'rounded-3xl border bg-white/90 p-5 shadow-sm backdrop-blur transition sm:p-6',
-                    highlighted === positionId ? 'border-amber-400 ring-4 ring-amber-100' : 'border-white/70',
-                  )}
+                  className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-sm backdrop-blur transition sm:p-6"
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
@@ -257,10 +258,19 @@ const VotingPage: React.FC = () => {
                       </p>
                       <h2 className="text-xl font-bold text-primary-clr">{getPositionTitle(position)}</h2>
                       {position.description && <p className="text-sm text-slate-500">{position.description}</p>}
+                      <p className="mt-1 text-xs text-slate-400">Choose one candidate, or leave it blank to skip.</p>
                     </div>
-                    {choice && (
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                        <Check className="h-4 w-4" />
+                    {choice ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleChoice(positionId, choice)}
+                        className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-500 transition hover:bg-slate-100 hover:text-primary-clr"
+                      >
+                        Clear choice
+                      </button>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
+                        Skipped
                       </span>
                     )}
                   </div>
@@ -274,7 +284,7 @@ const VotingPage: React.FC = () => {
                           type="button"
                           role="radio"
                           aria-checked={isSelected}
-                          onClick={() => candidate._id && setSelected((prev) => ({ ...prev, [positionId]: candidate._id as string }))}
+                          onClick={() => candidate._id && toggleChoice(positionId, candidate._id)}
                           className={cn(
                             'relative flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition',
                             isSelected
@@ -313,6 +323,7 @@ const VotingPage: React.FC = () => {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-primary-clr">
                 {chosen} of {positions.length} chosen
+                {skipped > 0 && chosen > 0 && <span className="font-normal text-slate-500"> · {skipped} skipped</span>}
               </p>
               <div className="mt-1.5">
                 <ProgressBar value={(chosen / positions.length) * 100} tone={complete ? 'green' : 'indigo'} />
@@ -341,16 +352,26 @@ const VotingPage: React.FC = () => {
           </>
         }
       >
+        {skipped > 0 && (
+          <p className="mb-3 rounded-2xl bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
+            You're skipping {skipped} position{skipped === 1 ? '' : 's'}. You won't be able to vote for{' '}
+            {skipped === 1 ? 'it' : 'them'} later.
+          </p>
+        )}
         <ul className="divide-y divide-slate-100 rounded-2xl border border-slate-200">
           {positions.map((position) => {
             const candidate = position.candidates.find((c) => c._id === selected[position._id as string]);
             return (
               <li key={position._id} className="flex items-center gap-3 px-4 py-3">
-                {candidate && <Avatar name={getCandidateName(candidate)} imageUrl={candidate.imageUrl} size="sm" />}
+                {candidate ? (
+                  <Avatar name={getCandidateName(candidate)} imageUrl={candidate.imageUrl} size="sm" />
+                ) : (
+                  <span className="h-8 w-8 shrink-0 rounded-full border-2 border-dashed border-slate-200" />
+                )}
                 <div className="min-w-0">
                   <p className="text-xs text-slate-500">{getPositionTitle(position)}</p>
-                  <p className="truncate text-sm font-semibold text-primary-clr">
-                    {candidate ? getCandidateName(candidate) : '—'}
+                  <p className={cn('truncate text-sm font-semibold', candidate ? 'text-primary-clr' : 'italic text-slate-400')}>
+                    {candidate ? getCandidateName(candidate) : 'Skipped'}
                   </p>
                 </div>
               </li>
