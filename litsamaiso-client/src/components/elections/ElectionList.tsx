@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarClock, ChevronRight, Download, ListChecks, Plus, Search, Vote } from 'lucide-react';
+import { CalendarClock, ChevronRight, Download, ListChecks, Mail, Plus, Search, Vote } from 'lucide-react';
 import { toast } from 'sonner';
 import { electionService } from '../../services/electionService';
 import type { Election, Position } from '../../types';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { cn } from '../../lib/utils';
 import { formatDate, formatRelative, getStatus, useNow, type ElectionStatus } from './electionHelpers';
-import { Button, Card, EmptyState, Field, Modal, Pill, Skeleton, StatusPill, inputClass } from './ui';
+import { Button, Card, EmptyState, Field, Modal, Pill, Skeleton, StatusPill, ToggleRow, inputClass } from './ui';
 
 type ElectionListProps = {
   elections: Election[];
@@ -208,7 +208,7 @@ const ElectionList: React.FC<ElectionListProps> = ({ elections, loading, onCreat
   );
 };
 
-const emptyForm = { title: '', academicYear: '', description: '', timezone: 'Africa/Gaborone' };
+const emptyForm = { title: '', academicYear: '', description: '', timezone: 'Africa/Gaborone', notifyStudents: true };
 
 const CreateElectionModal = ({
   open,
@@ -283,6 +283,13 @@ const CreateElectionModal = ({
             className={inputClass}
           />
         </Field>
+        <ToggleRow
+          icon={Mail}
+          label="Email students"
+          description="When voting opens, before it closes, when it closes and when results are out."
+          checked={form.notifyStudents}
+          onChange={(notifyStudents) => setForm((p) => ({ ...p, notifyStudents }))}
+        />
         <div
           className={cn(
             'flex items-center justify-between gap-3 rounded-2xl p-3 text-sm',

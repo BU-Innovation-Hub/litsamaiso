@@ -12,8 +12,10 @@ import {
   rescheduleCloseJob,
   scheduleElectionJobs,
   scheduleCountJob,
+  scheduleReminderJob,
 } from "./electionScheduler.js";
 import { copyPositionTemplatesToElection } from "./positionTemplateService.js";
+import { queueElectionNotificationSafely } from "./electionNotificationService.js";
 
 const ensureEditable = (election: ElectionDocument): void => {
   if (["OPEN", "CLOSED", "COUNTING", "RESULTS_PUBLISHED", "ARCHIVED"].includes(election.status)) {
@@ -45,6 +47,7 @@ export const createElection = async (params: {
   description?: unknown;
   academicYear?: unknown;
   timezone?: unknown;
+  notifyStudents?: unknown;
   votingRules?: Record<string, unknown>;
   securitySettings?: Record<string, unknown>;
 }): Promise<ElectionDocument> => {
@@ -64,6 +67,7 @@ export const createElection = async (params: {
     published: false,
     archived: false,
     resultsPublished: false,
+    notifyStudents: params.notifyStudents === undefined ? true : Boolean(params.notifyStudents),
     votingRules: params.votingRules || {},
     securitySettings: params.securitySettings || {},
   };
@@ -110,6 +114,9 @@ export const updateElection = async (params: {
   if (params.updates.timezone !== undefined) {
     const v = optionalString(params.updates.timezone);
     if (v !== undefined) election.timezone = v;
+  }
+  if (params.updates.notifyStudents !== undefined) {
+    election.notifyStudents = Boolean(params.updates.notifyStudents);
   }
   if (params.updates.votingRules !== undefined) {
     election.votingRules = params.updates.votingRules as Record<string, unknown>;
@@ -253,6 +260,8 @@ export const openElectionByJob = async (electionId: string): Promise<void> => {
     targetId: electionId,
     details: { source: "job" },
   });
+
+  await queueElectionNotificationSafely(electionId, "OPENED");
 };
 
 // Closes an election once its end time has passed and queues counting; safe to call repeatedly or late
@@ -277,6 +286,7 @@ export const closeElectionByJob = async (electionId: string): Promise<void> => {
   });
 
   await scheduleCountJob(electionId);
+  await queueElectionNotificationSafely(electionId, "CLOSED");
 };
 
 // Brings elections whose start or end time has passed up to date, in case a scheduled job ran late or not at all
@@ -336,6 +346,8 @@ export const closeElectionNow = async (params: {
     details: { source: "manual", endTime: now.toISOString() },
   });
 
+  await queueElectionNotificationSafely(election._id, "CLOSED");
+
   return election;
 };
 
@@ -362,6 +374,9 @@ export const extendElection = async (params: {
   await election.save();
 
   await rescheduleCloseJob(election._id.toString(), endTime);
+  if (election.startTime) {
+    await scheduleReminderJob({ electionId: election._id.toString(), startTime: election.startTime, endTime });
+  }
 
   await recordAudit({
     action: "election.extend",
@@ -431,6 +446,8 @@ export const publishResults = async (params: {
     targetId: election._id?.toString(),
     details: { snapshotId: snapshot._id?.toString() },
   });
+
+  await queueElectionNotificationSafely(election._id, "RESULTS");
 
   return election;
 };

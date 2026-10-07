@@ -30,6 +30,7 @@ export const createElectionHandler = async (req: Request, res: Response) => {
       description: (req.body || {}).description,
       academicYear: (req.body || {}).academicYear,
       timezone: (req.body || {}).timezone,
+      notifyStudents: (req.body || {}).notifyStudents,
       votingRules: (req.body || {}).votingRules,
       securitySettings: (req.body || {}).securitySettings,
     });

@@ -133,6 +133,7 @@ export interface Election {
   published?: boolean;
   archived?: boolean;
   resultsPublished?: boolean;
+  notifyStudents?: boolean;
   createdBy?: User;
   createdAt?: string;
   updatedAt?: string;

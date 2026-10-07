@@ -7,6 +7,7 @@ import {
   Download,
   Loader2,
   Lock,
+  Mail,
   Pencil,
   Send,
   Trash2,
@@ -33,7 +34,7 @@ import {
   useNow,
   type PositionWithCandidates,
 } from './electionHelpers';
-import { Button, ConfirmModal, Field, IconButton, Modal, Skeleton, StatusPill, inputClass } from './ui';
+import { Button, ConfirmModal, Field, IconButton, Modal, Skeleton, StatusPill, ToggleRow, inputClass } from './ui';
 
 type Tab = 'overview' | 'positions' | 'candidates' | 'results';
 type Dialog = 'schedule' | 'extend' | 'close' | 'publish' | 'archive' | 'edit' | 'delete' | null;
@@ -393,7 +394,16 @@ const ElectionDetail: React.FC<ElectionDetailProps> = ({ election, onBack, onEle
         onOpenChange={(open) => setDialog(open ? 'edit' : null)}
         election={election}
         busy={busy}
-        onSubmit={(form) => run(() => electionService.updateElection(election._id, form), 'Details saved', 'Could not save details')}
+        onSubmit={(form) =>
+          run(
+            () => electionService.updateElection(election._id, form),
+            'Details saved',
+            'Could not save details',
+            form.notifyStudents !== (election.notifyStudents !== false)
+              ? `Student emails turned ${form.notifyStudents ? 'on' : 'off'}.`
+              : undefined,
+          )
+        }
       />}
     </div>
   );
@@ -593,13 +603,20 @@ const EditElectionModal = ({
   onOpenChange: (open: boolean) => void;
   election: Election;
   busy: boolean;
-  onSubmit: (form: { title: string; description: string; academicYear: string; timezone: string }) => Promise<boolean>;
+  onSubmit: (form: {
+    title: string;
+    description: string;
+    academicYear: string;
+    timezone: string;
+    notifyStudents: boolean;
+  }) => Promise<boolean>;
 }) => {
   const [form, setForm] = useState({
     title: election.title || '',
     description: election.description || '',
     academicYear: election.academicYear || '',
     timezone: election.timezone || 'Africa/Gaborone',
+    notifyStudents: election.notifyStudents !== false,
   });
 
   return (
@@ -641,6 +658,13 @@ const EditElectionModal = ({
             className={inputClass}
           />
         </Field>
+        <ToggleRow
+          icon={Mail}
+          label="Email students"
+          description="When voting opens, before it closes, when it closes and when results are out."
+          checked={form.notifyStudents}
+          onChange={(notifyStudents) => setForm((p) => ({ ...p, notifyStudents }))}
+        />
       </form>
       <div className="mt-6 flex justify-end gap-2">
         <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>

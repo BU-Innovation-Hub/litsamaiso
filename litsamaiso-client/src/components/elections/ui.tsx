@@ -246,6 +246,56 @@ export const Field = ({
   </label>
 );
 
+// A labelled on/off switch row, e.g. for "Email students"
+export const ToggleRow = ({
+  icon: Icon,
+  label,
+  description,
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  icon?: React.ElementType;
+  label: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  disabled?: boolean;
+}) => (
+  <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-3">
+    <div className="flex min-w-0 items-start gap-3">
+      {Icon && (
+        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-active/10 text-active">
+          <Icon className="h-4 w-4" />
+        </span>
+      )}
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-primary-clr">{label}</p>
+        {description && <p className="text-xs text-slate-500">{description}</p>}
+      </div>
+    </div>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        'relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-50',
+        checked ? 'bg-active' : 'bg-slate-200',
+      )}
+    >
+      <span
+        className={cn(
+          'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-[left]',
+          checked ? 'left-5.5' : 'left-0.5',
+        )}
+      />
+    </button>
+  </div>
+);
+
 export const Modal = ({
   open,
   onOpenChange,

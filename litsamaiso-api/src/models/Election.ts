@@ -22,6 +22,8 @@ export interface ElectionDocument {
   published: boolean;
   archived: boolean;
   resultsPublished: boolean;
+  // Email active registry students when voting opens, before it closes, when it closes and when results are published
+  notifyStudents: boolean;
   votingRules?: Record<string, unknown>;
   securitySettings?: Record<string, unknown>;
   deletedAt?: Date | null;
@@ -59,6 +61,7 @@ const electionSchema = new Schema<ElectionDocument>(
     published: { type: Boolean, default: false },
     archived: { type: Boolean, default: false },
     resultsPublished: { type: Boolean, default: false },
+    notifyStudents: { type: Boolean, default: true },
     votingRules: { type: Schema.Types.Mixed, default: {} },
     securitySettings: { type: Schema.Types.Mixed, default: {} },
     deletedAt: { type: Date, default: null },

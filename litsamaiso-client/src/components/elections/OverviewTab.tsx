@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Info,
   ListChecks,
+  Mail,
   TriangleAlert,
   UsersRound,
   Vote,
@@ -114,6 +115,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ election, positions, readines
             label="Students"
             value={election.published && status !== 'ARCHIVED' ? 'Can see it' : 'Hidden'}
           />
+          <InfoRow icon={Mail} label="Email students" value={election.notifyStudents === false ? 'Off' : 'On'} />
           <InfoRow icon={ListChecks} label="Positions" value={`${positions.length}`} />
           <InfoRow icon={UsersRound} label="Candidates" value={`${activeCandidates.length}`} />
           {election.description && (
