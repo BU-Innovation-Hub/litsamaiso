@@ -20,6 +20,8 @@ import auditLogRoutes from "./auditLogRoutes.js";
 import branchCodeRoutes from "./branchCodeRoutes.js";
 import administrativeEmailRoutes from "./administrativeEmailRoutes.js";
 import registryRoutes from "./registryRoutes.js";
+import onboardingRoutes from "./onboardingRoutes.js";
+import billingRoutes from "./billingRoutes.js";
 
 export const API_V1_PREFIX = "/api/v1";
 
@@ -59,6 +61,8 @@ export const apiV1Routes: ReadonlyArray<readonly [path: string, router: Router]>
   ["/institutions", institutionRoutes],
   ["/admin/email-composer", administrativeEmailRoutes],
   ["/registry", registryRoutes],
+  ["/onboarding", onboardingRoutes],
+  ["/billing", billingRoutes],
 ];
 
 const VERSION_PREFIX_ANY_CASE = /^\/api\/v\d+(?:\/|$)/i;

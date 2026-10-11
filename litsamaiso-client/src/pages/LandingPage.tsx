@@ -17,6 +17,7 @@ import {
 import { motion } from "motion/react";
 import { Link } from "react-router-dom";
 import { ExplainerVideo } from "@/components/ExplainerVideo";
+import { MarketingFooter, MarketingNav } from "@/components/marketing/MarketingChrome";
 import { DotPattern } from "@/components/ui/dot-pattern";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern";
@@ -179,21 +180,6 @@ const SectionHeading = ({
   </div>
 );
 
-const NavLink = ({
-  href,
-  children,
-}: {
-  href: string;
-  children: React.ReactNode;
-}) => (
-  <a
-    href={href}
-    className="rounded-full px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-primary-clr"
-  >
-    {children}
-  </a>
-);
-
 const LandingPage = () => {
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-gray-50">
@@ -220,31 +206,13 @@ const LandingPage = () => {
           squaresClassName="stroke-gray-400"
         />
 
-        <nav className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-5 py-6 md:px-8">
-          <Link to="/" className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-gray-100">
-              <img src="/logo-1.png" alt="" className="h-6 w-6" />
-            </span>
-            <span className="text-lg font-semibold text-primary-clr">Litsamaiso</span>
-          </Link>
-
-          <div className="hidden items-center rounded-full border border-gray-200 bg-white p-1 shadow-sm md:flex">
-            <NavLink href="#capabilities">Capabilities</NavLink>
-            <NavLink href="#workflow">Workflow</NavLink>
-            <NavLink href="#intelligence">Intelligence</NavLink>
-            <NavLink href="#team">Team</NavLink>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Link
-              to="/login"
-              className="inline-flex items-center gap-2 rounded-full bg-primary-clr px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90"
-            >
-              Sign in
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-        </nav>
+        <MarketingNav
+          anchors={[
+            { href: "#capabilities", label: "Capabilities" },
+            { href: "#workflow", label: "Workflow" },
+            { href: "#team", label: "Team" },
+          ]}
+        />
 
         <div className="relative z-10 flex justify-center items-center min-h-[calc(100vh-96px)] w-full px-4 pb-16 pt-10 md:px-8">
           <motion.div
@@ -267,19 +235,19 @@ const LandingPage = () => {
 
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
-                to="/register"
+                to="/pricing"
                 className="group inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary-clr px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90 sm:w-auto"
               >
                 Get started
                 <ChevronRight className="h-4 w-4 transition group-hover:translate-x-1" />
               </Link>
-              <a
-                href="#video"
+              <Link
+                to="/product"
                 className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-7 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50 sm:w-auto"
               >
                 Explore platform
                 <ArrowRight className="h-4 w-4" />
-              </a>
+              </Link>
             </div>
           </motion.div>
         </div>
@@ -566,46 +534,25 @@ const LandingPage = () => {
               </p>
               <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
                 <Link
-                  to="/login"
+                  to="/pricing"
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary-clr px-7 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-primary-clr/90"
                 >
-                  Launch platform
+                  See plans & pricing
                   <ArrowRight className="h-4 w-4" />
                 </Link>
-                <a
-                  href="#workflow"
+                <Link
+                  to="/login"
                   className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-7 py-3 text-sm font-semibold text-primary-clr shadow-sm transition hover:-translate-y-0.5 hover:bg-gray-50"
                 >
-                  View workflow
-                </a>
+                  Sign in
+                </Link>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-gray-200 bg-gray-100 py-10">
-        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-5 md:flex-row md:items-center md:justify-between md:px-8">
-          <div>
-            <Link to="/" className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-gray-200">
-                <img src="/logo-1.png" alt="" className="h-6 w-6" />
-              </span>
-              <span className="text-lg font-semibold text-primary-clr">Litsamaiso</span>
-            </Link>
-            <p className="mt-3 max-w-md text-sm leading-6 text-gray-500">
-              Academic support, confirmations, and student operations made
-              clearer for every team involved.
-            </p>
-            <a
-              href="mailto:support@litsamaiso.com"
-              className="mt-3 inline-flex text-sm font-medium text-primary-clr transition hover:text-active"
-            >
-              support@litsamaiso.com
-            </a>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   );
 };

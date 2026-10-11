@@ -1,13 +1,13 @@
 import { type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import type { Secret, SignOptions } from "jsonwebtoken";
 
 import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 import { Institution } from "../models/Institution.js";
 import { Student } from "../models/Student.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
+import { signToken } from "../utils/authToken.js";
+import { SESSION_INSTITUTION_FIELDS } from "../utils/sessionUser.js";
 import { createHash, randomBytes } from "crypto";
 import {
   getFriendlyRegistrationErrorMessage,
@@ -16,20 +16,6 @@ import {
   isPublicRegistrationAllowed,
   normalizeRoleName,
 } from "./registrationPolicy.js";
-
-const signToken = (userId: string, rememberMe: boolean): string => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    throw new Error("JWT_SECRET is not set");
-  }
-
-  const defaultExpiry = process.env.JWT_EXPIRES_IN;
-  const expiry = rememberMe ? "30d" : defaultExpiry;
-
-  return jwt.sign({ sub: userId }, secret as Secret, {
-    expiresIn: expiry as Exclude<SignOptions["expiresIn"], undefined>,
-  });
-};
 
 const hashResetToken = (token: string): string =>
   createHash("sha256").update(token).digest("hex");
@@ -283,7 +269,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   )
     .select("+password")
     .populate("role", "name")
-    .populate("institution", "name email locked lockedReason");
+    .populate("institution", SESSION_INSTITUTION_FIELDS);
   if (!user) {
     res.status(401).json({ message: "Invalid credentials" });
     return;
@@ -294,6 +280,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       message: "Your institution account has been locked",
       locked: true,
       lockedReason: (user.institution as any).lockedReason || undefined,
+      lockedBy: (user.institution as any).lockedBy || undefined,
     });
     return;
   }
@@ -311,6 +298,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     token,
     user: {
       id: user._id,
+      name: user.name,
       email: user.email,
       role: user.role,
       institution: user.institution,
@@ -320,6 +308,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,
       financialInfoConsentAt: user.financialInfoConsentAt,
+      tour: user.tour,
     },
   });
 };

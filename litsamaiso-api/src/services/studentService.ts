@@ -2,6 +2,7 @@ import XLSX from "xlsx";
 import { Buffer } from "buffer";
 import { Student } from "../models/Student.js";
 import type { Types } from "mongoose";
+import { createStudentCapacityGuard } from "./billingService.js";
 
 interface LoadResult {
   inserted: number;
@@ -62,6 +63,7 @@ export const loadStudentsFromExcel = async (
   const errors: string[] = [];
   const total = rows.length;
   const batchSize = 25;
+  const capacity = await createStudentCapacityGuard(institutionId);
 
   const emitProgress = (processed: number) => {
     onProgress?.({
@@ -136,7 +138,16 @@ export const loadStudentsFromExcel = async (
       if (borrowerNumber) {
         doc.borrowerNumber = borrowerNumber;
       }
-      await Student.create(doc);
+      if (!capacity.reserve()) {
+        skipped += 1;
+        continue;
+      }
+      try {
+        await Student.create(doc);
+      } catch (createError) {
+        capacity.release();
+        throw createError;
+      }
       inserted += 1;
     } catch (err: any) {
       errors.push(`Row ${idx + 2}: ${err.message || String(err)}`);
@@ -147,6 +158,9 @@ export const loadStudentsFromExcel = async (
       emitProgress(processed);
     }
   }
+
+  const capMessage = capacity.summary();
+  if (capMessage) errors.push(capMessage);
 
   return { inserted, skipped, errors, total };
 };

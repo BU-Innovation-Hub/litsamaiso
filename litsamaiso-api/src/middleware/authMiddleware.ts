@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
+import { Institution } from "../models/Institution.js";
 
 interface JwtPayload {
   sub: string;
@@ -35,6 +36,24 @@ export const requireAuth = async (
     if (!user) {
       res.status(401).json({ message: "User not found" });
       return;
+    }
+
+    // Locking is enforced per request, not only at login, so existing
+    // sessions are cut off as soon as an institution is locked.
+    const roleName = String((user.role as any)?.name || "").toLowerCase();
+    if (roleName !== "appadmin" && user.institution) {
+      const institution = await Institution.findById(user.institution)
+        .select("locked lockedReason lockedBy")
+        .lean();
+      if (institution?.locked) {
+        res.status(403).json({
+          message: "Your institution account has been locked",
+          locked: true,
+          lockedReason: institution.lockedReason || undefined,
+          lockedBy: institution.lockedBy || undefined,
+        });
+        return;
+      }
     }
 
     // attach user to request for downstream handlers

@@ -7,6 +7,12 @@ import ResetPasswordEmail from "../emailTemplates/ResetPasswordEmail.js";
 import PasswordChangedEmail from "../emailTemplates/PasswordChangedEmail.js";
 import IssueNotificationEmail from "../emailTemplates/IssueNotificationEmail.js";
 import IssueStatusEmail from "../emailTemplates/IssueStatusEmail.js";
+import {
+  InstitutionWelcomeEmail,
+  NewInstitutionAlertEmail,
+  OnboardingFailedAlertEmail,
+} from "../emailTemplates/OnboardingEmails.js";
+import { Role } from "../models/Role.js";
 import { User } from "../models/User.js";
 
 const LOGO_CID = "litsamaiso-logo";
@@ -172,6 +178,70 @@ export async function sendIssueStatusToStudent(issue: any, status: "approved" | 
   } catch (err) {
     console.error("[email] sendIssueStatusToStudent error", err);
   }
+}
+
+async function renderAndSend(to: string | string[], subject: string, element: React.ReactElement) {
+  const { attachments } = getEmailBranding();
+  const html = await Promise.resolve(render(element));
+  const transporter = buildTransporter();
+  await transporter.sendMail({ from: process.env.EMAIL_FROM, to, subject, html, attachments });
+}
+
+/** Every AppAdmin user, falling back to the seeded APP_ADMIN_EMAIL. */
+async function getAppAdminEmails(): Promise<string[]> {
+  const role = await Role.findOne({ name: /^AppAdmin$/i }).select("_id").lean();
+  const admins = role ? await User.find({ role: role._id }).select("email").lean() : [];
+  const emails = admins.map((admin) => admin.email).filter(Boolean);
+  if (!emails.length && process.env.APP_ADMIN_EMAIL) emails.push(process.env.APP_ADMIN_EMAIL);
+  return emails;
+}
+
+export async function sendInstitutionWelcomeEmail(opts: {
+  to: string;
+  adminName?: string | undefined;
+  institutionName: string;
+  planName: string;
+  dashboardUrl: string;
+}) {
+  const { appName, logoUrl, accentColor } = getEmailBranding();
+  await renderAndSend(
+    opts.to,
+    `${appName} — Welcome, ${opts.institutionName}`,
+    <InstitutionWelcomeEmail {...opts} appName={appName} logoUrl={logoUrl} accentColor={accentColor} />,
+  );
+}
+
+export async function sendNewInstitutionAlert(opts: {
+  institutionName: string;
+  institutionEmail: string;
+  adminName?: string | undefined;
+  adminEmail: string;
+  planName: string;
+}) {
+  const to = await getAppAdminEmails();
+  if (!to.length) return;
+  const { appName, logoUrl, accentColor } = getEmailBranding();
+  await renderAndSend(
+    to,
+    `${appName} — New institution: ${opts.institutionName}`,
+    <NewInstitutionAlertEmail {...opts} appName={appName} logoUrl={logoUrl} accentColor={accentColor} />,
+  );
+}
+
+export async function sendOnboardingFailedAlert(opts: {
+  institutionName: string;
+  adminEmail: string;
+  reason: string;
+  draftId: string;
+}) {
+  const to = await getAppAdminEmails();
+  if (!to.length) return;
+  const { appName, logoUrl, accentColor } = getEmailBranding();
+  await renderAndSend(
+    to,
+    `${appName} — Action needed: onboarding for ${opts.institutionName}`,
+    <OnboardingFailedAlertEmail {...opts} appName={appName} logoUrl={logoUrl} accentColor={accentColor} />,
+  );
 }
 
 export default { sendPasswordResetEmail, sendPasswordChangedEmail, sendEmail, sendIssueResolvedEmail };

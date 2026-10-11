@@ -73,3 +73,23 @@ test("the version root identifies the version", async () => {
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { version: "v1" });
 });
+
+test("billing and onboarding routes are mounted and guarded", async () => {
+  for (const path of ["/billing/status"]) {
+    assert.equal((await get(`${API_V1_PREFIX}${path}`)).status, 401, path);
+  }
+  const post = (path: string, body: unknown) =>
+    fetch(`${baseUrl}${API_V1_PREFIX}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  assert.equal((await post("/billing/portal", {})).status, 401);
+  // Input is validated before any database access.
+  assert.equal((await post("/billing/renew", {})).status, 400);
+  const draft = await post("/onboarding/drafts", { plan: "platinum" });
+  assert.equal(draft.status, 400);
+  assert.equal(((await draft.json()) as { field?: string }).field, "plan");
+  assert.equal((await post("/onboarding/complete", { sessionId: "nope" })).status, 400);
+});

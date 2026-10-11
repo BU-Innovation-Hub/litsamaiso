@@ -12,6 +12,10 @@ import { roleAccess } from './utils/roleAccess';
 import { getRoleName } from './utils/userDisplay';
 import { feedbackService } from './services/feedbackService';
 import { LogoutFeedbackModal } from './components/LogoutFeedbackModal';
+import { InstitutionThemeBridge } from './theme/InstitutionTheme';
+import { TooltipProvider } from './components/ui/tooltip';
+import { BillingBanner } from './components/BillingBanner';
+import { TourProvider } from './tour/TourProvider';
 
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
@@ -31,6 +35,13 @@ const AuditLogsPage = lazy(() => import('./pages/AuditLogsPage'));
 const BranchCodesPage = lazy(() => import('./pages/BranchCodesPage'));
 const AIEmailComposerPage = lazy(() => import('./pages/AIEmailComposerPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const InstitutionLockedPage = lazy(() => import('./pages/InstitutionLockedPage'));
+const ProductPage = lazy(() => import('./pages/marketing/ProductPage'));
+const PricingPage = lazy(() => import('./pages/marketing/PricingPage'));
+const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
+const OnboardingCompletePage = lazy(() => import('./pages/onboarding/OnboardingCompletePage'));
+const BillingSettingsPage = lazy(() => import('./pages/settings/BillingSettingsPage'));
+const BrandingSettingsPage = lazy(() => import('./pages/settings/BrandingSettingsPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const StudentRegistryPage = lazy(() => import('./pages/StudentRegistryPage'));
 
@@ -101,15 +112,21 @@ const ProtectedLayout = () => {
 
   if (isAdminDashboardRole(roleName)) {
     return (
-      <AdminDashboardShell>
-        <Outlet />
-      </AdminDashboardShell>
+      <TourProvider>
+        <AdminDashboardShell>
+          <InstitutionThemeBridge />
+          <BillingBanner />
+          <Outlet />
+        </AdminDashboardShell>
+      </TourProvider>
     );
   }
 
   return (
     <div className="min-h-screen">
+      <InstitutionThemeBridge />
       <Header />
+      <BillingBanner className="fixed inset-x-0 bottom-0 z-40 border-b-0 border-t shadow-lg" />
       <main>
         <Outlet />
       </main>
@@ -122,11 +139,17 @@ function App() {
     <PostHogErrorBoundary fallback={<div className="flex items-center justify-center min-h-screen text-destructive">Something went wrong. Please try again later.</div>}>
     <BrowserRouter>
       <AuthProvider>
+      <TooltipProvider>
         <GlobalFeedbackPromptHost />
         <Toaster richColors position="top-right" />
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          <Route path="/locked" element={<InstitutionLockedPage />} />
+          <Route path="/product" element={<ProductPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
+          <Route path="/onboarding/complete" element={<OnboardingCompletePage />} />
 
           {/* Public Routes */}
           <Route element={<PublicRoute />}>
@@ -174,12 +197,17 @@ function App() {
               <Route element={<RoleRoute allowedRoles={roleAccess.branchCodes} />}>
                 <Route path="/branch-codes" element={<BranchCodesPage />} />
               </Route>
+              <Route element={<RoleRoute allowedRoles={roleAccess.institutionSettings} />}>
+                <Route path="/settings/billing" element={<BillingSettingsPage />} />
+                <Route path="/settings/branding" element={<BrandingSettingsPage />} />
+              </Route>
             </Route>
           </Route>
           {/* Catch all - 404 */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
         </Suspense>
+      </TooltipProvider>
       </AuthProvider>
     </BrowserRouter>
     </PostHogErrorBoundary>

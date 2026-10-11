@@ -202,7 +202,7 @@ const UsersPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 pt-5 pb-10 mt-1">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
+        <div className="mb-8" data-tour="users-header">
           <h1 className="text-3xl font-bold text-gray-900">Users Management</h1>
           <p className="text-gray-600">
             {isAppAdmin ? 'Manage all users across institutions.' : 'Manage users in your institution scope.'}
@@ -260,6 +260,7 @@ const UsersPage: React.FC = () => {
               {(isAppAdmin || currentRole === 'InstitutionAdmin') && (
                 <button
                   type="button"
+                  data-tour="users-create"
                   onClick={openCreateModal}
                   className="ml-3 rounded-md bg-primary-clr px-3 py-2 font-semibold text-white hover:bg-active transition-colors"
                 >

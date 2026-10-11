@@ -5,14 +5,56 @@
 
 @theme {
   --font-ibm-plex-sans: "IBM Plex Sans", sans-serif;
-  --color-button: #0F172B;
-  --color-primary-clr: #020618;
-  --color-stroke-clr: #919DC2;
-  --color-active: #535BC0;
-  --color-active-clr: #020618;
+}
+
+/*
+ * Brand colours are CSS variables so an institution's theme (src/theme) can
+ * override them at runtime. Legacy token names are kept as aliases.
+ * 60-30-10: surface (60) / primary + sidebar (30) / accent + active (10).
+ */
+@theme inline {
+  --color-button: var(--brand-primary-strong);
+  --color-primary-clr: var(--brand-primary);
+  --color-stroke-clr: var(--brand-stroke);
+  --color-active: var(--brand-accent);
+  --color-active-clr: var(--brand-active);
+
+  --color-brand-primary: var(--brand-primary);
+  --color-brand-primary-strong: var(--brand-primary-strong);
+  --color-brand-primary-foreground: var(--brand-primary-foreground);
+  --color-brand-accent: var(--brand-accent);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --color-brand-active: var(--brand-active);
+  --color-brand-active-foreground: var(--brand-active-foreground);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-surface-raised: var(--brand-surface-raised);
+  --color-brand-sidebar: var(--brand-sidebar);
+  --color-brand-sidebar-foreground: var(--brand-sidebar-foreground);
+  --color-brand-sidebar-heading: var(--brand-sidebar-heading);
+  --color-brand-sidebar-muted: var(--brand-sidebar-muted);
+  --color-brand-sidebar-hover: var(--brand-sidebar-hover);
+  --color-brand-sidebar-border: var(--brand-sidebar-border);
 }
 
 :root {
+  /* Keep in sync with DEFAULT_THEME_VARIABLES in src/theme/palette.ts */
+  --brand-primary: #020618;
+  --brand-primary-strong: #0F172B;
+  --brand-primary-foreground: #ffffff;
+  --brand-accent: #535BC0;
+  --brand-accent-foreground: #ffffff;
+  --brand-active: #020618;
+  --brand-active-foreground: #ffffff;
+  --brand-stroke: #919DC2;
+  --brand-surface: #f8fafc;
+  --brand-surface-raised: #ffffff;
+  --brand-sidebar: #ffffff;
+  --brand-sidebar-foreground: #475569;
+  --brand-sidebar-heading: #020618;
+  --brand-sidebar-muted: #64748b;
+  --brand-sidebar-hover: #f1f5f9;
+  --brand-sidebar-border: #e2e8f0;
+
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(12.985% 0.04254 265.146);
@@ -294,4 +336,53 @@ button:disabled,
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+}
+
+/* Guided tour (driver.js) popovers, styled with the institution's brand tokens. */
+.driver-popover.litsamaiso-tour {
+  max-width: 340px;
+  border-radius: 16px;
+  padding: 20px;
+  font-family: "IBM Plex Sans", sans-serif;
+  color: #0f172a;
+  box-shadow: 0 20px 45px -12px rgb(2 6 24 / 0.35);
+}
+
+.driver-popover.litsamaiso-tour .driver-popover-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+.driver-popover.litsamaiso-tour .driver-popover-description {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #475569;
+}
+
+.driver-popover.litsamaiso-tour .driver-popover-progress-text {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.driver-popover.litsamaiso-tour .driver-popover-footer button {
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: none;
+  background: #fff;
+  color: #334155;
+}
+
+.driver-popover.litsamaiso-tour .driver-popover-footer .driver-popover-next-btn {
+  border-color: var(--brand-active);
+  background: var(--brand-active);
+  color: var(--brand-active-foreground);
+}
+
+.driver-popover.litsamaiso-tour .driver-popover-close-btn {
+  color: #94a3b8;
 }

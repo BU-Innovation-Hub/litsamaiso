@@ -6,6 +6,7 @@ import { User } from "../models/User.js";
 import { RegistryFinancialClearance } from "../models/RegistryFinancialClearance.js";
 import { recordAudit } from "../utils/auditLog.js";
 import { assignBorrowerNumber, BorrowerAssignmentError } from "./borrowerAssignmentService.js";
+import { assertStudentCapacity } from "./billingService.js";
 
 type RegistryRow = Record<string, any>;
 type Actor = { _id: unknown; email?: string; role?: any; institution: unknown };
@@ -250,6 +251,12 @@ const processRegistryRow = async (imported: any, row: RegistryRow, actor: Actor,
     if (ownerQuery && session) ownerQuery = ownerQuery.session(session);
     const owner: any = ownerQuery ? await ownerQuery : null;
     if (owner) { terminalOutcome(row, "error", borrowerConflictMessage(row.borrowerNumber, owner)); return "error"; }
+    try {
+      await assertStudentCapacity(actor.institution as any, 1);
+    } catch (capError: any) {
+      terminalOutcome(row, "skipped", capError?.message || "Plan student limit reached", capError);
+      return "skipped";
+    }
     let createdStudent: any;
     try {
       createdStudent = new Student({ institution: actor.institution as any, studentId: row.studentId, email: row.email, name: row.name, surname: row.surname, studentStatus: row.studentStatus, ...(row.nationalId ? { nationalId: row.nationalId } : {}) });
@@ -423,6 +430,7 @@ export const addRegistryStudent = async (actor: Actor, input: Record<string, any
   const student = { studentId: String(input.studentId || "").trim(), email: String(input.email || "").trim().toLowerCase(), name: String(input.name || "").trim(), surname: String(input.surname || "").trim(), studentStatus: Boolean(input.studentStatus), ...(input.nationalId ? { nationalId: normalizeNationalId(input.nationalId) } : {}), ...(borrowerNumber ? { borrowerNumber } : {}) };
   if (!student.studentId || !student.email || !student.name || !student.surname) throw new Error("studentId, email, name and surname are required");
   if (await duplicateStudent(actor.institution, student)) throw new Error("A student with the same student ID, email, National ID, or borrower number already exists");
+  await assertStudentCapacity(actor.institution as any, 1);
   const created: any = await (Student as any).create({ ...student, institution: actor.institution as any });
   if (borrowerNumber) {
     try {

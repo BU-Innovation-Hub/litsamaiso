@@ -51,6 +51,22 @@ const clearAuthSession = () => {
 };
 
 export const authService = {
+  /** Persists changes to the signed-in user (e.g. an updated institution theme). */
+  updateStoredUser: (user: User) => {
+    try {
+      localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(user)));
+    } catch {
+      // Non-fatal: the in-memory user is still updated by the caller.
+    }
+  },
+
+  /** Stores a session issued outside /auth/login (e.g. after onboarding payment). */
+  adoptSession: (data: AuthResponse): AuthResponse => {
+    const normalized = normalizeAuthResponse(data);
+    storeAuthSession(normalized);
+    return normalized;
+  },
+
   login: async (credentials: LoginRequest): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/login', credentials);
     const data = normalizeAuthResponse(response.data);

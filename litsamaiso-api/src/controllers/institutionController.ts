@@ -10,6 +10,10 @@ import { Position } from "../models/Position.js";
 import { Ballot } from "../models/Ballot.js";
 import { ResultSnapshot } from "../models/ResultSnapshot.js";
 import bcrypt from "bcryptjs";
+import AppError from "../utils/errors.js";
+import { provisionInstitution } from "../services/institutionProvisioningService.js";
+import { parseTheme, validateTheme } from "../utils/themePalette.js";
+import { SESSION_INSTITUTION_FIELDS } from "../utils/sessionUser.js";
 
 // List institutions (AppAdmin)
 export const listInstitutions = async (
@@ -47,59 +51,20 @@ export const createInstitution = async (req: Request, res: Response): Promise<vo
       return;
     }
 
-    // Ensure unique institution email
-    const exists = await Institution.findOne({ email: String(email).trim() });
-    if (exists) {
-      res.status(409).json({ message: 'Institution email already exists' });
-      return;
-    }
-
-    // Ensure admin email not in use
-    const existingUser = await User.findOne({ email: String(adminEmail).trim() });
-    if (existingUser) {
-      res.status(409).json({ message: 'Admin user email already exists' });
-      return;
-    }
-
-    // Find InstitutionAdmin role
-    const roleDoc = await Role.findOne({ name: new RegExp('^InstitutionAdmin$', 'i') });
-    if (!roleDoc) {
-      const available = await Role.find().select('name -_id').lean();
-      const names = available.map((r: any) => r.name).join(', ');
-      res.status(500).json({ message: `Missing required role. Available roles: ${names}` });
-      return;
-    }
-
-    // Create institution
-    const institution = new Institution({ name: String(name).trim(), email: String(email).trim() });
-    await institution.save();
-
-    // Create admin user
-    const hashed = await bcrypt.hash(String(adminPassword), 10);
-    const adminUser = new User();
-    (adminUser as any).email = String(adminEmail).trim();
-    (adminUser as any).password = hashed;
-    (adminUser as any).role = (roleDoc as any)._id;
-    (adminUser as any).institution = (institution as any)._id;
-    if (adminName) (adminUser as any).name = adminName;
-    await adminUser.save();
+    // AppAdmin-created institutions are billed outside Stripe ("manual").
+    const { institution, admin, role } = await provisionInstitution({
+      institution: { name: String(name), email: String(email) },
+      admin: { name: adminName ? String(adminName) : undefined, email: String(adminEmail), password: String(adminPassword) },
+      billing: { status: 'manual' },
+    });
 
     res.status(201).json({
       institution,
-      admin: { id: adminUser._id, email: adminUser.email, name: adminUser.name, role: (roleDoc as any).name, institution: institution._id },
+      admin: { id: admin._id, email: admin.email, name: admin.name, role: role.name, institution: institution._id },
     });
   } catch (err: any) {
-    // Attempt to cleanup institution if it was created
-    try {
-      const maybeEmail = (req.body as any)?.email;
-      if (maybeEmail) {
-        const inst = await Institution.findOne({ email: String(maybeEmail).trim() });
-        if (inst) await inst.deleteOne();
-      }
-    } catch (e) {
-      // ignore cleanup errors
-    }
-    res.status(500).json({ message: err.message || 'Failed to create institution' });
+    const status = err instanceof AppError ? err.statusCode : 500;
+    res.status(status).json({ message: err.message || 'Failed to create institution' });
   }
 };
 
@@ -310,6 +275,7 @@ export const lockInstitution = async (req: Request, res: Response): Promise<void
     institution.locked = true;
     institution.lockedReason = reason || undefined;
     institution.lockedAt = new Date();
+    institution.lockedBy = 'manual';
 
     await institution.save();
 
@@ -339,6 +305,7 @@ export const unlockInstitution = async (req: Request, res: Response): Promise<vo
     institution.locked = false;
     (institution as any).lockedReason = undefined;
     institution.lockedAt = undefined as any;
+    institution.lockedBy = undefined;
 
     await institution.save();
 
@@ -414,3 +381,30 @@ export const deleteInstitution = async (req: Request, res: Response): Promise<vo
 };
 
 export default { listInstitutions, createInstitution, updateInstitution, getInstitutionUsers, createInstitutionRoleUser, lockInstitution, unlockInstitution, deleteInstitution };
+
+// PUT /institutions/me/theme - InstitutionAdmin updates their workspace branding.
+export const updateMyTheme = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const currentUser = (req as any).user;
+    const theme = parseTheme(req.body?.theme ?? req.body);
+    const issues = validateTheme(theme);
+    if (issues.length) {
+      res.status(400).json({ message: issues[0], issues });
+      return;
+    }
+
+    const institution = await Institution.findByIdAndUpdate(
+      currentUser.institution,
+      { $set: { theme } },
+      { new: true, runValidators: true },
+    ).select(SESSION_INSTITUTION_FIELDS);
+    if (!institution) {
+      res.status(404).json({ message: 'Institution not found' });
+      return;
+    }
+
+    res.json({ institution });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || 'Failed to update theme' });
+  }
+};

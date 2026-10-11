@@ -7,12 +7,7 @@ export default {
   ],
   theme: {
     extend: {
-      colors: {
-        button: '#0F172B',
-        'primary-clr': '#020618',
-        'stroke-clr': '#919DC2',
-        'active-clr': '#535BC0',
-      },
+      // Brand colours live in src/index.css as themeable CSS variables.
       fontFamily: {
         'ibm-plex-sans': ['"IBM Plex Sans"', 'sans-serif'],
       },
