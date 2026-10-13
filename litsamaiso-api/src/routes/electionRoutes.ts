@@ -6,7 +6,9 @@ import {
   createElectionHandler,
   updateElectionHandler,
   scheduleElectionHandler,
-  publishElectionHandler,
+  getScheduleReadinessHandler,
+  closeElectionHandler,
+  extendElectionHandler,
   archiveElectionHandler,
   publishResultsHandler,
   deleteElectionHandler,
@@ -19,6 +21,8 @@ import {
   deletePositionHandler,
   getPositionHandler,
   listPositionsByElectionHandler,
+  listPositionTemplatesHandler,
+  importSrcPositionTemplatesHandler,
 } from "../controllers/positionController.js";
 import {
   createCandidateHandler,
@@ -103,12 +107,19 @@ const uploadCandidateSpreadsheet = (
 router.use(requireAuth);
 
 router.get("/", requireRole(["SAAD", "Student"]), listElectionsHandler);
+// Institution-level standard positions; registered before "/:id" so the path isn't read as an election id
+router.get("/position-templates", requireRole("SAAD"), listPositionTemplatesHandler);
+router.post("/position-templates/import", requireRole("SAAD"), importSrcPositionTemplatesHandler);
 router.get("/:id", requireRole(["SAAD", "Student"]), getElectionHandler);
 
 router.post("/", requireRole("SAAD"), createElectionHandler);
 router.patch("/:id", requireRole("SAAD"), updateElectionHandler);
 router.post("/:id/schedule", requireRole("SAAD"), scheduleElectionHandler);
-router.post("/:id/publish", requireRole("SAAD"), publishElectionHandler);
+// Kept as an alias of schedule: scheduling is the only way to make an election visible
+router.post("/:id/publish", requireRole("SAAD"), scheduleElectionHandler);
+router.get("/:id/readiness", requireRole("SAAD"), getScheduleReadinessHandler);
+router.post("/:id/close", requireRole("SAAD"), closeElectionHandler);
+router.post("/:id/extend", requireRole("SAAD"), extendElectionHandler);
 router.post("/:id/archive", requireRole("SAAD"), archiveElectionHandler);
 router.post("/:id/publish-results", requireRole("SAAD"), publishResultsHandler);
 router.delete("/:id", requireRole("SAAD"), deleteElectionHandler);

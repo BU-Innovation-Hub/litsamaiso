@@ -38,6 +38,17 @@ export const initAgenda = async (): Promise<Agenda> => {
     await service.computeElectionResults(electionId, { source: "job" });
   });
 
+  // Send an election email to students (opened, reminder, closed or results)
+  agenda.define("election.notify", async (job: Job) => {
+    const electionId = String(job.attrs.data?.electionId || "");
+    const kind = String(job.attrs.data?.kind || "");
+    if (!electionId || !["OPENED", "REMINDER", "CLOSED", "RESULTS"].includes(kind)) return;
+    const service = await import("../services/electionNotificationService.js");
+    await service.processElectionNotification(electionId, kind as "OPENED" | "REMINDER" | "CLOSED" | "RESULTS", {
+      keepAlive: () => job.touch(),
+    });
+  });
+
   await agenda.start();
 
   return agenda;

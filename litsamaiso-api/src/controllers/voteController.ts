@@ -44,36 +44,6 @@ export const castVoteHandler = async (req: Request, res: Response) => {
   }
 };
 // Handler function to get the voting status of the current user for a specific election
-export const submitVoteHandler = async (req: Request, res: Response) => {
-  try {
-    disableResponseCache(res);
-    const body = req.body || {};
-    const selections = Array.isArray(body.selections) ? body.selections : [];
-    const electionId = body.electionId ? String(body.electionId) : "";
-    if (!electionId) {
-      res.status(400).json({ message: "electionId is required" });
-      return;
-    }
-
-    const idempotencyKey = req.headers["idempotency-key"]
-      ? String(req.headers["idempotency-key"])
-      : undefined;
-
-    const receipt = await castVote({
-      user: (req as any).user,
-      electionId,
-      selections,
-      ...(req.ip !== undefined && { ipAddress: req.ip }),
-      ...(req.headers["user-agent"] !== undefined && { userAgent: req.headers["user-agent"] as string }),
-      ...(idempotencyKey !== undefined && { idempotencyKey }),
-    });
-
-    res.status(201).json({ message: "Vote cast", receipt });
-  } catch (err: any) {
-    handleError(res, err);
-  }
-};
-// Handler function to get the voting status of the current user for a specific election
 export const getVoteStatusHandler = async (req: Request, res: Response) => {
   try {
     disableResponseCache(res);

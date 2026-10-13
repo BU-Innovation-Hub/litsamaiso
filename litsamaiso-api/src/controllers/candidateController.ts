@@ -131,16 +131,11 @@ export const importCandidatesHandler = async (req: Request, res: Response) => {
       return;
     }
 
-    const approveImported = ["true", "1", "yes"].includes(
-      String((req.body || {}).approveImported || "").toLowerCase(),
-    );
-
     const result = await importCandidatesFromSpreadsheet({
       user: (req as any).user,
       electionId: req.params.electionId as string,
       fileBuffer: file.buffer,
       ...(file.originalname !== undefined && { fileName: file.originalname }),
-      approveImported,
     });
 
     res.status(201).json({

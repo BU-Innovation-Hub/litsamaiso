@@ -4,10 +4,15 @@ import { Election } from "../models/Election.js";
 import { Position } from "../models/Position.js";
 import { Candidate } from "../models/Candidate.js";
 import { Ballot } from "../models/Ballot.js";
+import { VoterRecord } from "../models/VoterRecord.js";
 import { Student } from "../models/Student.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 import { buildBallotHash, type BallotSelection } from "../utils/ballotHash.js";
+import { syncDueElections } from "./electionService.js";
+import { withOptionalTransaction } from "../utils/transaction.js";
+
+type VoteReceipt = { receiptId: string; submittedAt: Date };
 
 const resolveRoleName = (user: any): string => {
   const resolved =
@@ -40,6 +45,11 @@ const isDuplicateKeyError = (err: any): boolean => {
   return Boolean(err && typeof err === "object" && (err as any).code === 11000);
 };
 
+const toReceipt = (record: { receiptId: string; submittedAt: Date }): VoteReceipt => ({
+  receiptId: record.receiptId,
+  submittedAt: record.submittedAt,
+});
+
 export const castVote = async (params: {
   user: any;
   electionId: string;
@@ -47,7 +57,9 @@ export const castVote = async (params: {
   ipAddress?: string;
   userAgent?: string;
   idempotencyKey?: string;
-}): Promise<{ receiptId: string; ballotHash: string; submittedAt: Date }> => {
+}): Promise<VoteReceipt> => {
+  await syncDueElections({ institution: params.user.institution, electionId: params.electionId });
+
   const election = await Election.findOne({
     _id: params.electionId,
     deletedAt: null,
@@ -57,14 +69,6 @@ export const castVote = async (params: {
 
   if (election.status !== "OPEN") {
     throw new AppError("Election is not open", 400);
-  }
-
-  const now = new Date();
-  if (election.startTime && now < election.startTime) {
-    throw new AppError("Election has not started", 400);
-  }
-  if (election.endTime && now >= election.endTime) {
-    throw new AppError("Election has ended", 400);
   }
 
   const studentId = params.user.studentId;
@@ -78,181 +82,129 @@ export const castVote = async (params: {
   });
 
   if (!Array.isArray(params.selections) || params.selections.length === 0) {
-    throw new AppError("Selections are required", 400);
+    throw new AppError("Choose a candidate for at least one position", 400);
   }
 
-  const positions = await Position.find({
-    electionId: election._id,
-    deletedAt: null,
-    isActive: true,
-  })
-    .sort({ displayOrder: 1 })
-    .lean();
+  const [positions, candidates] = await Promise.all([
+    Position.find({ electionId: election._id, deletedAt: null, isActive: true })
+      .sort({ displayOrder: 1 })
+      .lean(),
+    Candidate.find({
+      electionId: election._id,
+      deletedAt: null,
+      approved: true,
+      disqualified: false,
+    })
+      .select("_id positionId")
+      .lean(),
+  ]);
 
-  if (!positions.length) {
-    throw new AppError("Election has no active positions", 400);
+  // Only positions with at least one approved candidate appear on the ballot
+  const candidatePositionMap = new Map(
+    candidates.map((candidate) => [candidate._id.toString(), candidate.positionId.toString()]),
+  );
+  const ballotPositions = positions.filter((position) =>
+    candidates.some((candidate) => candidate.positionId.toString() === position._id.toString()),
+  );
+  if (!ballotPositions.length) {
+    throw new AppError("Election has no positions with candidates", 400);
   }
 
   const normalizedSelections = normalizeSelections(params.selections);
-  const positionIds = new Set(positions.map((p) => p._id.toString()));
-  const selectionCounts = new Map<string, Set<string>>();
-  const candidateIds = new Set<string>();
+  const ballotPositionIds = new Set(ballotPositions.map((p) => p._id.toString()));
+  const selectedPositions = new Set<string>();
 
   for (const selection of normalizedSelections) {
     if (!selection.positionId || !selection.candidateId) {
       throw new AppError("Selections must include positionId and candidateId", 400);
     }
-
-    if (!positionIds.has(selection.positionId)) {
+    if (!ballotPositionIds.has(selection.positionId)) {
       throw new AppError("Invalid position in selections", 400);
     }
-    
-    if (!selectionCounts.has(selection.positionId)) {
-      selectionCounts.set(selection.positionId, new Set());
+    if (selectedPositions.has(selection.positionId)) {
+      throw new AppError("Only one candidate can be selected per position", 400);
     }
-    const candSet = selectionCounts.get(selection.positionId)!;
-    
-    if (candSet.has(selection.candidateId)) {
-      throw new AppError("Duplicate candidate selection for the same position", 400);
-    }
-    
-    candSet.add(selection.candidateId);
-    candidateIds.add(selection.candidateId);
-  }
-
-  for (const pos of positions) {
-    const posId = pos._id.toString();
-    const count = selectionCounts.get(posId)?.size || 0;
-    const allowAbstain = (election.votingRules as any)?.allowAbstain ?? false;
-    
-    if (count === 0 && !allowAbstain) {
-      throw new AppError(`You must select at least one candidate for position: ${pos.title || posId}`, 400);
-    }
-    
-    const maxAllowed = (pos as any).maxVotesAllowed || 1;
-    if (count > maxAllowed) {
-      throw new AppError(`You cannot select more than ${maxAllowed} candidates for position: ${pos.title || posId}`, 400);
-    }
-  }
-
-  const candidates = await Candidate.find({
-    _id: { $in: Array.from(candidateIds) },
-    electionId: election._id,
-    deletedAt: null,
-    approved: true,
-    disqualified: false,
-  })
-    .select("_id positionId")
-    .lean();
-
-  if (candidates.length !== normalizedSelections.length) {
-    throw new AppError("Invalid candidate selection", 400);
-  }
-
-  const candidatePositionMap = new Map(
-    candidates.map((candidate) => [
-      candidate._id.toString(),
-      candidate.positionId.toString(),
-    ]),
-  );
-
-  for (const selection of normalizedSelections) {
-    const mappedPositionId = candidatePositionMap.get(selection.candidateId);
-    if (!mappedPositionId || mappedPositionId !== selection.positionId) {
+    if (candidatePositionMap.get(selection.candidateId) !== selection.positionId) {
       throw new AppError("Invalid candidate selection", 400);
     }
+    selectedPositions.add(selection.positionId);
   }
 
-  const session = await mongoose.startSession();
-  let receipt: { receiptId: string; ballotHash: string; submittedAt: Date } | null = null;
+  // Students may leave any position blank (abstain); a ballot only needs one choice overall
+
+  let receipt: VoteReceipt | null = null;
 
   try {
-    await session.withTransaction(async () => {
-      if (params.idempotencyKey) {
-        const existingByKey = await Ballot.findOne({
-          electionId: election._id,
-          studentId,
-          idempotencyKey: params.idempotencyKey,
-          deletedAt: null,
-        })
-          .session(session)
-          .lean();
-
-        if (existingByKey) {
-          receipt = {
-            receiptId: existingByKey.receiptId,
-            ballotHash: existingByKey.ballotHash,
-            submittedAt: existingByKey.submittedAt,
-          };
-          return;
-        }
-      }
-
-      const existing = await Ballot.findOne({
-        electionId: election._id,
-        studentId,
-        deletedAt: null,
-      })
+    receipt = await withOptionalTransaction(async (session) => {
+      const existing = await VoterRecord.findOne({ electionId: election._id, studentId })
         .session(session)
         .lean();
       if (existing) {
+        if (params.idempotencyKey && existing.idempotencyKey === params.idempotencyKey) {
+          return toReceipt(existing);
+        }
         throw new AppError("You have already voted", 409);
       }
 
       const receiptId = randomUUID();
       const submittedAt = new Date();
+      const ballotId = randomUUID();
       const { hash } = buildBallotHash({
         electionId: election._id.toString(),
-        studentId,
-        receiptId,
-        submittedAt,
+        ballotId,
         selections: normalizedSelections,
       });
 
-      await Ballot.create(
+      // The voter record goes first: its unique (election, student) index is what stops a double vote
+      const [voterRecord] = await VoterRecord.create(
         [
           {
             electionId: election._id,
             studentId,
+            receiptId,
             submittedAt,
-            selections: normalizedSelections.map((s) => ({
-              positionId: new mongoose.Types.ObjectId(s.positionId),
-              candidateId: new mongoose.Types.ObjectId(s.candidateId),
-            })),
+            ...(params.idempotencyKey !== undefined && { idempotencyKey: params.idempotencyKey }),
             ...(params.ipAddress !== undefined && { ipAddress: params.ipAddress }),
             ...(params.userAgent !== undefined && { userAgent: params.userAgent }),
-            ballotHash: hash,
-            receiptId,
-            ...(params.idempotencyKey !== undefined && { idempotencyKey: params.idempotencyKey }),
           },
         ],
         { session },
       );
 
-      receipt = { receiptId, ballotHash: hash, submittedAt };
+      try {
+        await Ballot.create(
+          [
+            {
+              _id: ballotId,
+              electionId: election._id,
+              selections: normalizedSelections.map((s) => ({
+                positionId: new mongoose.Types.ObjectId(s.positionId),
+                candidateId: new mongoose.Types.ObjectId(s.candidateId),
+              })),
+              ballotHash: hash,
+            },
+          ],
+          { session },
+        );
+      } catch (err) {
+        // Without a transaction, undo the voter record so the student isn't marked as voted with no ballot
+        if (!session) await VoterRecord.deleteOne({ _id: voterRecord!._id });
+        throw err;
+      }
+
+      return { receiptId, submittedAt };
     });
   } catch (err) {
     if (isDuplicateKeyError(err)) {
-      const existing = await Ballot.findOne({
-        electionId: election._id,
-        studentId,
-        deletedAt: null,
-      }).lean();
-      if (existing) {
-        receipt = {
-          receiptId: existing.receiptId,
-          ballotHash: existing.ballotHash,
-          submittedAt: existing.submittedAt,
-        };
+      const existing = await VoterRecord.findOne({ electionId: election._id, studentId }).lean();
+      if (existing && params.idempotencyKey && existing.idempotencyKey === params.idempotencyKey) {
+        receipt = toReceipt(existing);
+      } else if (existing) {
+        throw new AppError("You have already voted", 409);
       }
     }
 
-    if (!receipt) {
-      if (err instanceof AppError) throw err;
-      throw err;
-    }
-  } finally {
-    session.endSession();
+    if (!receipt) throw err;
   }
 
   await recordAudit({
@@ -260,7 +212,7 @@ export const castVote = async (params: {
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
     actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
-    targetCollection: "Ballot",
+    targetCollection: "VoterRecord",
     details: {
       electionId: election._id?.toString(),
       studentId,
@@ -287,38 +239,26 @@ export const getVoteStatus = async (params: {
     throw new AppError("Student account is required", 400);
   }
 
-  const ballot = await Ballot.findOne({
-    electionId: election._id,
-    studentId,
-    deletedAt: null,
-  })
+  const record = await VoterRecord.findOne({ electionId: election._id, studentId })
     .select("receiptId submittedAt")
     .lean();
 
-  if (!ballot) {
+  if (!record) {
     return { hasVoted: false };
   }
 
-  return { hasVoted: true, receiptId: ballot.receiptId, submittedAt: ballot.submittedAt };
+  return { hasVoted: true, receiptId: record.receiptId, submittedAt: record.submittedAt };
 };
 
 export const getVoteReceipt = async (params: {
   user: any;
   receiptId: string;
-}): Promise<{
-  receiptId: string;
-  ballotHash: string;
-  submittedAt: Date;
-  electionId: string;
-}> => {
-  const ballot = await Ballot.findOne({
-    receiptId: params.receiptId,
-    deletedAt: null,
-  }).lean();
-  if (!ballot) throw new AppError("Receipt not found", 404);
+}): Promise<{ receiptId: string; submittedAt: Date; electionId: string }> => {
+  const record = await VoterRecord.findOne({ receiptId: params.receiptId }).lean();
+  if (!record) throw new AppError("Receipt not found", 404);
 
   const election = await Election.findOne({
-    _id: ballot.electionId,
+    _id: record.electionId,
     deletedAt: null,
     institution: params.user.institution,
   }).lean();
@@ -327,15 +267,14 @@ export const getVoteReceipt = async (params: {
   const roleName = resolveRoleName(params.user);
   if (roleName === "student") {
     const studentId = params.user.studentId;
-    if (!studentId || String(ballot.studentId) !== String(studentId)) {
+    if (!studentId || String(record.studentId) !== String(studentId)) {
       throw new AppError("Receipt not found", 404);
     }
   }
 
   return {
-    receiptId: ballot.receiptId,
-    ballotHash: ballot.ballotHash,
-    submittedAt: ballot.submittedAt,
-    electionId: String(ballot.electionId),
+    receiptId: record.receiptId,
+    submittedAt: record.submittedAt,
+    electionId: String(record.electionId),
   };
 };

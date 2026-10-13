@@ -8,6 +8,7 @@ import { Election } from "../models/Election.js";
 import { Candidate } from "../models/Candidate.js";
 import { Position } from "../models/Position.js";
 import { Ballot } from "../models/Ballot.js";
+import { VoterRecord } from "../models/VoterRecord.js";
 import { ResultSnapshot } from "../models/ResultSnapshot.js";
 import bcrypt from "bcryptjs";
 
@@ -387,6 +388,7 @@ export const deleteInstitution = async (req: Request, res: Response): Promise<vo
       positionsRes = await Position.deleteMany({ electionId: { $in: electionIds } });
       candidatesRes = await Candidate.deleteMany({ electionId: { $in: electionIds } });
       ballotsRes = await Ballot.deleteMany({ electionId: { $in: electionIds } });
+      await VoterRecord.deleteMany({ electionId: { $in: electionIds } });
       snapshotsRes = await ResultSnapshot.deleteMany({ electionId: { $in: electionIds } });
       electionsRes = await Election.deleteMany({ _id: { $in: electionIds } });
     }

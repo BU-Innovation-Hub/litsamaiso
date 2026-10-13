@@ -19,11 +19,10 @@ const canonicalizeSelections = (selections: BallotSelection[]): BallotSelection[
     );
 };
 
+// Tamper-evidence hash over the anonymous ballot only; it carries nothing that identifies the voter
 export const buildBallotHash = (params: {
   electionId: string;
-  studentId: string;
-  receiptId: string;
-  submittedAt: Date;
+  ballotId: string;
   selections: BallotSelection[];
 }): { payload: string; hash: string } => {
   const secret = process.env.ELECTION_HMAC_SECRET;
@@ -33,9 +32,7 @@ export const buildBallotHash = (params: {
 
   const canonical = {
     electionId: String(params.electionId),
-    studentId: String(params.studentId),
-    receiptId: String(params.receiptId),
-    submittedAt: params.submittedAt.toISOString(),
+    ballotId: String(params.ballotId),
     selections: canonicalizeSelections(params.selections),
   };
 

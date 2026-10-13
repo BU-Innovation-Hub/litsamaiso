@@ -253,16 +253,18 @@ curl -X GET "http://<HOST>/feedback" \
 
 - Purpose: Facilitate secure and scheduled student elections, including candidate management, voting, and automated result computation.
 - Core Entities:
-  - **Election**: Defines the election period and status (`DRAFT`, `PUBLISHED`, `CLOSED`, `COUNTING`, `RESULTS_PUBLISHED`).
-  - **Position**: Specific roles up for election (e.g., President, Secretary) with constraints like `maxVotesAllowed`.
-  - **Candidate**: Students registered to run for specific positions.
-  - **Vote**: Secure and validated records of student selections.
-  - **ResultSnapshot**: Computed aggregates of votes per candidate, generated when an election concludes.
+  - **Election**: Defines the voting window and status (`DRAFT`, `SCHEDULED`, `OPEN`, `CLOSED`, `COUNTING`, `RESULTS_PUBLISHED`, `ARCHIVED`).
+  - **PositionTemplate**: The institution's standard position list (imported from the fixed SRC list), copied onto each new election.
+  - **Position**: An office on one election's ballot. Every position is single-choice.
+  - **Candidate**: An active registry student standing for a position. Only approved, non-disqualified candidates appear on the ballot.
+  - **VoterRecord** / **Ballot**: Who voted and what was voted are stored separately with no link between them, so votes stay secret.
+  - **ResultSnapshot**: The signed tally per position, with an outcome of `WINNER`, `TIE` or `NO_VOTES`.
 - Key Workflows:
-  - **Setup**: Administrators create elections, define positions, and register candidates.
-  - **Scheduling**: The system utilizes `agenda` to automatically transition election states based on `startDate` and `endDate` (auto-open, auto-close, and auto-count).
-  - **Voting**: Students submit their ballots. The system validates selections to prevent duplicate votes for the same candidate and ensures constraints like `maxVotesAllowed` per position are respected.
-  - **Results**: Once an election is closed, background jobs safely compute the final tally and generate a `ResultSnapshot` for authorized publication.
+  - **Setup**: SAAD creates an election (it starts with the standard positions), adjusts positions, and adds candidates (manually or by spreadsheet import).
+  - **Scheduling**: Scheduling is the only way to make an election visible to students. It is refused if the election has no positions or no approved candidates; the UI warns about fewer positions than the standard list or positions without candidates. `agenda` jobs open and close the election on time, and any overdue open/close is caught up on startup and whenever elections are read or a vote is cast.
+  - **Voting**: Students must choose exactly one candidate in every position that has approved candidates. One ballot per student per election; students get a receipt ID.
+  - **Running**: SAAD can close voting early or extend the end time while an election is open.
+  - **Results**: Closing triggers counting. SAAD reviews the results, then publishes them. Published results are final and cannot be recounted. Draft and scheduled elections can be deleted; later ones can only be archived.
 
 ## Models
 
@@ -358,61 +360,83 @@ Fields:
 
 ### Election
 
-States: `DRAFT`, `PUBLISHED`, `CLOSED`, `COUNTING`, `RESULTS_PUBLISHED`
+States: `DRAFT`, `SCHEDULED`, `OPEN`, `CLOSED`, `COUNTING`, `RESULTS_PUBLISHED`, `ARCHIVED`
 
 Fields:
 
-- `title` — string
-- `description` — string
-- `startDate` — Date
-- `endDate` — Date
+- `title`, `description`, `academicYear`, `timezone` — string
+- `startTime`, `endTime` — Date
 - `status` — enum above
+- `published` — boolean, set when scheduled (visible to students)
+- `resultsPublished`, `archived` — boolean
 - `institution` — ObjectId, ref Institution
 
-### Candidate
+### PositionTemplate
+
+The institution's standard positions, copied onto every new election.
 
 Fields:
 
-- `name` — string
-- `surname` — string
-- `studentId` — string
-- `position` — ObjectId, ref Position
-- `election` — ObjectId, ref Election
-- `photo` — string (URL or base64)
-- `bio` — string
-- `isApproved` — boolean, default `false`
-- `isDisqualified` — boolean, default `false`
+- `institution` — ObjectId, ref Institution
+- `title`, `description` — string
+- `maxVotesAllowed` — number, always `1`
+- `displayOrder` — number
 
 ### Position
 
 Fields:
 
-- `title` — string
-- `description` — string
-- `election` — ObjectId, ref Election
-- `maxVotesAllowed` — number, default `1`
-- `candidateCount` — number
+- `electionId` — ObjectId, ref Election
+- `title`, `description` — string
+- `maxVotesAllowed` — number, always `1`
+- `displayOrder` — number
+- `isActive` — boolean
 
-### Ballot
+### Candidate
 
 Fields:
 
-- `election` — ObjectId, ref Election
-- `voter` — ObjectId, ref Student
-- `votes` — array of `{ position: ObjectId, candidate: ObjectId }`
-- `hash` — string (HMAC-SHA256)
-- `receiptCode` — string (last 8 chars of hash)
+- `electionId` — ObjectId, ref Election
+- `positionId` — ObjectId, ref Position
+- `studentId` — string, required; must be an active student in the institution's registry
+- `fullName`, `party`, `manifesto`, `imageUrl` — string
+- `approved`, `disqualified` — boolean
+
+### VoterRecord
+
+Records that a student voted. Holds no reference to the ballot.
+
+Fields:
+
+- `electionId` — ObjectId, ref Election
+- `studentId` — string
+- `receiptId` — string (UUID shown to the student)
 - `submittedAt` — Date
+- `idempotencyKey`, `ipAddress`, `userAgent` — string
+
+Indexes: `(electionId, studentId)` unique, `receiptId` unique
+
+### Ballot
+
+An anonymous ballot, stored in the `secretballots` collection. No student, receipt, IP or timestamp; the id is a random UUID.
+
+Fields:
+
+- `_id` — string (UUID)
+- `electionId` — ObjectId, ref Election
+- `selections` — array of `{ positionId, candidateId }`
+- `ballotHash` — string (HMAC-SHA256 over election, ballot id and selections)
+
+Legacy ballots (collection `ballots`, which stored `studentId`) are split into the two models above by `npm run migrate:ballot-secrecy -- --apply --confirm`.
 
 ### ResultSnapshot
 
 Fields:
 
-- `election` — ObjectId, ref Election
-- `results` — array of position results with candidate vote counts
-- `hash` — string
-- `publishedAt` — Date
-- `snapshotVersion` — number
+- `electionId` — ObjectId, ref Election
+- `generatedAt` — Date
+- `positions` — array of `{ positionId, rankings[{ candidateId, votes, percentage, rank }], winnerId, outcome }`; tied candidates share a rank, and `winnerId` is null unless `outcome` is `WINNER`
+- `snapshotHash` — string (HMAC-SHA256)
 
 ### AuditLog
 
@@ -829,13 +853,7 @@ Uploads an image file (multipart, field name `file`) to Cloudinary. Returns the 
 
 All routes require authentication.
 
-`POST /api/v1/vote/submit`
-
-Role: `Student`
-
-Rate limited: 5 req / 60s
-
-Submits a ballot. Also available at `POST /api/v1/elections/:electionId/vote`.
+Ballots are cast with `POST /api/v1/elections/:electionId/vote` (see the walkthrough).
 
 `GET /api/v1/vote/status`
 
@@ -851,7 +869,7 @@ Role: `Student` or `SAAD`
 
 Rate limited: 30 req / 60s
 
-Returns vote receipt details by receipt ID.
+Returns the receipt ID, submission time and election for a receipt. It never reveals the ballot's selections.
 
 ## Audit Logging
 
@@ -1031,6 +1049,12 @@ Repeat for each student (e.g. Khothatso, Thato, Mpho), saving each token for use
 
 Role: `SAAD`
 
+**2.0 Import the standard positions (once per institution)**
+
+`POST /api/v1/elections/position-templates/import`
+
+Saves the 12 SRC positions as the institution's standard list. Every election created afterwards starts with them. `GET /api/v1/elections/position-templates` lists them.
+
 **2.1 Create an Election**
 
 `POST /api/v1/elections`
@@ -1039,28 +1063,23 @@ Save the returned `election._id` as `<ELECTION_ID>`.
 
 ```json
 {
-  "title": "SRC Presidential Elections 2026",
-  "description": "General elections to elect the next SRC President.",
+  "title": "SRC Elections 2026",
+  "description": "General elections for the Student Representative Council.",
   "academicYear": "2026/2027",
-  "timezone": "Africa/Gaborone",
-  "votingRules": {
-    "allowAbstain": false
-  },
-  "securitySettings": {
-    "requireFaceAuth": false
-  }
+  "timezone": "Africa/Gaborone"
 }
 ```
 
-**2.2 Create a Position**
+**2.2 Add a Position (optional)**
 
 `POST /api/v1/elections/<ELECTION_ID>/positions`
+
+Only needed for positions beyond the standard list. Every position is single-choice.
 
 ```json
 {
   "title": "President",
   "description": "The President of the Student Representative Council",
-  "maxVotesAllowed": 1,
   "displayOrder": 1
 }
 ```
@@ -1074,26 +1093,36 @@ Save the returned `election._id` as `<ELECTION_ID>`.
 Form-data fields:
 
 - `fullName`: "John Doe"
+- `studentId`: "STU2026001" (required; must be an active student in the registry)
 - `party`: "Student Alliance"
 - `manifesto`: "I promise to bring better wifi."
-- `studentId`: "STU2026001"
 - `image`: Optional file upload
+
+Bulk import: `POST /api/v1/elections/<ELECTION_ID>/candidates/import` with a CSV/Excel `file`. Rows without a valid registry student ID are skipped with a warning.
 
 **2.4 Approve Candidate**
 
 `POST /api/v1/elections/candidates/<CANDIDATE_ID>/approve`
 
-Candidates must be approved before they are eligible for voting. No request body required.
+Candidates must be approved before they appear on the ballot. No request body required.
 
 #### 3. Scheduling Phase
 
 Role: `SAAD`
 
-**3.1 Schedule the Election**
+**3.1 Check readiness (optional)**
+
+`GET /api/v1/elections/<ELECTION_ID>/readiness`
+
+Returns `positionCount`, `standardPositionCount`, `positionsWithoutCandidates` and `blockers`. Scheduling is refused while `blockers` is non-empty.
+
+**3.2 Schedule the Election**
 
 `POST /api/v1/elections/<ELECTION_ID>/schedule`
 
-> **Tip:** Set `startTime` to the past or present to open voting immediately. The Agenda background worker will transition the election status within 5 seconds.
+Makes the election visible to students. `POST /api/v1/elections/<ELECTION_ID>/publish` is an alias.
+
+> **Tip:** Set `startTime` to the past or present to open voting immediately.
 
 ```json
 {
@@ -1111,13 +1140,15 @@ Role: `Student`
 
 `GET /api/v1/elections`
 
-Confirm the target election is visible and its status is `OPEN`. No request body required.
+Confirm the target election is visible and its status is `OPEN`. The response includes `serverTime`. No request body required.
 
 **4.2 Cast a Vote**
 
 `POST /api/v1/elections/<ELECTION_ID>/vote`
 
-Replace `<POSITION_ID>` and `<CANDIDATE_ID>` with the IDs created during the setup phase.
+Header (optional): `Idempotency-Key: <unique-key>`; resending the same key returns the original receipt.
+
+Include exactly one selection for every position that has approved candidates.
 
 ```json
 {
@@ -1126,38 +1157,49 @@ Replace `<POSITION_ID>` and `<CANDIDATE_ID>` with the IDs created during the set
       "positionId": "<POSITION_ID>",
       "candidateId": "<CANDIDATE_ID>"
     }
-  ],
-  "idempotencyKey": "vote-req-12345"
+  ]
 }
 ```
+
+Returns `{ "receipt": { "receiptId": "...", "submittedAt": "..." } }`.
+
+**4.3 Close early or extend (SAAD)**
+
+`POST /api/v1/elections/<ELECTION_ID>/close` ends voting now and starts counting.
+
+`POST /api/v1/elections/<ELECTION_ID>/extend` with `{ "endTime": "<later ISO time>" }` pushes back the end time.
 
 #### 5. Results Phase
 
 After voting ends (or `endTime` passes), the system automatically closes the election and computes results.
 
-**5.1 Publish Results**
+**5.1 Review Results**
+
+Role: `SAAD`
+
+`GET /api/v1/elections/<ELECTION_ID>/results`
+
+`POST /api/v1/elections/<ELECTION_ID>/results/recompute` recounts a closed election; it is refused once results are published.
+
+**5.2 Publish Results**
 
 Role: `SAAD`
 
 `POST /api/v1/elections/<ELECTION_ID>/publish-results`
 
-No request body required.
+Only allowed when the election is `CLOSED` and has a results snapshot. No request body required.
 
-**5.2 View Results**
+**5.3 View Results**
 
-Role: `SAAD`, `Student`
+Role: `SAAD`, `Student` (students only after publication)
 
 `GET /api/v1/elections/<ELECTION_ID>/results`
 
-No request body required.
-
-**5.3 View Winners**
-
-Role: `SAAD`, `Student`
-
 `GET /api/v1/elections/<ELECTION_ID>/results/winners`
 
-No request body required.
+`GET /api/v1/elections/<ELECTION_ID>/results/positions/<POSITION_ID>`
+
+Each position includes an `outcome` of `WINNER`, `TIE` or `NO_VOTES`.
 
 ## Important Notes
 

@@ -3,14 +3,13 @@ import { Types } from "mongoose";
 import { Election } from "../models/Election.js";
 import { Position, type PositionDocument } from "../models/Position.js";
 import { Candidate, type CandidateDocument } from "../models/Candidate.js";
+import { Student } from "../models/Student.js";
 import {
-  SRC_POSITION_TEMPLATES,
   getSrcPositionTemplateByLabel,
   normalizePositionLabel,
 } from "../constants/srcPositions.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
-import { ensureDefaultSrcPositions } from "./positionService.js";
 
 type SpreadsheetRow = Record<string, unknown>;
 
@@ -22,7 +21,6 @@ type CandidateImportRecord = {
   party?: string;
   manifesto?: string;
   imageUrl?: string;
-  approved?: boolean;
 };
 
 type ImportWarning = {
@@ -46,6 +44,8 @@ const FIELD_ALIASES: Record<PositionField, string[]> = {
   party: ["party", "organization", "organisation", "movement", "association"],
   manifesto: ["manifesto", "description", "bio", "profile", "statement"],
   imageUrl: ["image", "image url", "photo", "photo url", "candidate photo"],
+  // Recognised so an approval column isn't mistaken for candidate names; its value is ignored
+  // because every imported candidate is approved
   approved: ["approved", "approval", "status"],
 };
 
@@ -63,19 +63,6 @@ const optionalCellString = (value: unknown): string | undefined => {
   if (value === undefined || value === null) return undefined;
   const str = String(value).trim();
   return str ? str : undefined;
-};
-
-const parseBooleanCell = (value: unknown): boolean | undefined => {
-  const str = optionalCellString(value);
-  if (!str) return undefined;
-  const normalized = normalizeHeader(str);
-  if (["true", "yes", "y", "1", "approved", "approve"].includes(normalized)) {
-    return true;
-  }
-  if (["false", "no", "n", "0", "pending", "rejected", "not approved"].includes(normalized)) {
-    return false;
-  }
-  return undefined;
 };
 
 const splitCandidateNames = (value: unknown): string[] => {
@@ -170,7 +157,6 @@ const parseLongRows = (params: {
   const partyColumn = findColumn(headers, FIELD_ALIASES.party);
   const manifestoColumn = findColumn(headers, FIELD_ALIASES.manifesto);
   const imageUrlColumn = findColumn(headers, FIELD_ALIASES.imageUrl);
-  const approvedColumn = findColumn(headers, FIELD_ALIASES.approved);
 
   params.rows.forEach((row, index) => {
     const rowNumber = index + 2;
@@ -196,12 +182,10 @@ const parseLongRows = (params: {
       const party = partyColumn ? optionalCellString(row[partyColumn]) : undefined;
       const manifesto = manifestoColumn ? optionalCellString(row[manifestoColumn]) : undefined;
       const imageUrl = imageUrlColumn ? optionalCellString(row[imageUrlColumn]) : undefined;
-      const approved = approvedColumn ? parseBooleanCell(row[approvedColumn]) : undefined;
       if (studentId !== undefined) record.studentId = studentId;
       if (party !== undefined) record.party = party;
       if (manifesto !== undefined) record.manifesto = manifesto;
       if (imageUrl !== undefined) record.imageUrl = imageUrl;
-      if (approved !== undefined) record.approved = approved;
       records.push(record);
     });
   });
@@ -244,7 +228,7 @@ const parseWideRows = (params: {
   if (groups.length === 0) {
     warnings.push({
       message:
-        "No candidate columns matched seeded SRC positions. Use Position/Candidate columns or columns named after SRC positions.",
+        "No candidate columns matched this election's positions. Use Position/Candidate columns or columns named after the election's positions.",
     });
   }
 
@@ -267,12 +251,10 @@ const parseWideRows = (params: {
         const party = group.columns.party ? optionalCellString(row[group.columns.party]) : undefined;
         const manifesto = group.columns.manifesto ? optionalCellString(row[group.columns.manifesto]) : undefined;
         const imageUrl = group.columns.imageUrl ? optionalCellString(row[group.columns.imageUrl]) : undefined;
-        const approved = group.columns.approved ? parseBooleanCell(row[group.columns.approved]) : undefined;
         if (studentId !== undefined && candidateNames.length === 1) record.studentId = studentId;
         if (party !== undefined && candidateNames.length === 1) record.party = party;
         if (manifesto !== undefined && candidateNames.length === 1) record.manifesto = manifesto;
         if (imageUrl !== undefined && candidateNames.length === 1) record.imageUrl = imageUrl;
-        if (approved !== undefined) record.approved = approved;
         records.push(record);
       });
     });
@@ -346,7 +328,6 @@ export const importCandidatesFromSpreadsheet = async (params: {
   electionId: string;
   fileBuffer: Buffer;
   fileName?: string;
-  approveImported?: boolean;
 }): Promise<{
   summary: {
     rowsRead: number;
@@ -367,8 +348,6 @@ export const importCandidatesFromSpreadsheet = async (params: {
   if (!isEditableElection(election.status)) {
     throw new AppError("Election is frozen and candidates cannot be imported", 400);
   }
-
-  await ensureDefaultSrcPositions({ user: params.user, electionId: params.electionId });
 
   const positions = await Position.find({
     electionId: election._id,
@@ -402,12 +381,42 @@ export const importCandidatesFromSpreadsheet = async (params: {
 
   const payloads: Array<Record<string, unknown>> = [];
 
+  // Candidates must be active students in the institution's registry
+  const importedStudentIds = Array.from(
+    new Set(parsed.records.map((record) => record.studentId).filter(Boolean) as string[]),
+  );
+  const activeStudents = importedStudentIds.length
+    ? await Student.find({
+        institution: params.user.institution,
+        studentId: { $in: importedStudentIds },
+        studentStatus: true,
+      })
+        .select("studentId")
+        .lean()
+    : [];
+  const activeStudentIds = new Set(activeStudents.map((student) => student.studentId));
+
   parsed.records.forEach((record) => {
+    if (!record.studentId) {
+      warnings.push({
+        rowNumber: record.rowNumber,
+        message: `Skipped ${record.fullName}: student ID is required`,
+      });
+      return;
+    }
+    if (!activeStudentIds.has(record.studentId)) {
+      warnings.push({
+        rowNumber: record.rowNumber,
+        message: `Skipped ${record.fullName}: student ${record.studentId} is not an active student in the registry`,
+      });
+      return;
+    }
+
     const matchedTitle = matchPosition(record.positionLabel);
     if (!matchedTitle) {
       warnings.push({
         rowNumber: record.rowNumber,
-        message: `Skipped ${record.fullName}: position "${record.positionLabel}" did not match a seeded or existing position`,
+        message: `Skipped ${record.fullName}: position "${record.positionLabel}" did not match any position on this election`,
       });
       return;
     }
@@ -416,7 +425,7 @@ export const importCandidatesFromSpreadsheet = async (params: {
     if (!position) {
       warnings.push({
         rowNumber: record.rowNumber,
-        message: `Skipped ${record.fullName}: matched position "${matchedTitle}" is not available on this election`,
+        message: `Skipped ${record.fullName}: matched position "${matchedTitle}" is not on this election. Add it on the Positions tab first`,
       });
       return;
     }
@@ -430,9 +439,7 @@ export const importCandidatesFromSpreadsheet = async (params: {
     }
 
     const positionId = position._id.toString();
-    const uniqueKey = record.studentId
-      ? `${positionId}:student:${record.studentId.toLowerCase()}`
-      : `${positionId}:name:${candidateNameKey(record.fullName)}`;
+    const uniqueKey = `${positionId}:student:${record.studentId.toLowerCase()}`;
     const nameKey = `${positionId}:name:${candidateNameKey(record.fullName)}`;
 
     if (seenKeys.has(uniqueKey) || seenKeys.has(nameKey)) {
@@ -457,10 +464,10 @@ export const importCandidatesFromSpreadsheet = async (params: {
       electionId: election._id,
       positionId: position._id,
       fullName: record.fullName.trim(),
-      approved: Boolean(params.approveImported || record.approved),
+      approved: true,
       disqualified: false,
     };
-    if (record.studentId !== undefined) payload.studentId = record.studentId;
+    payload.studentId = record.studentId;
     if (record.party !== undefined) payload.party = record.party;
     if (record.manifesto !== undefined) payload.manifesto = record.manifesto;
     if (record.imageUrl !== undefined) payload.imageUrl = record.imageUrl;
