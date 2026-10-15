@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CheckCircle, Hash, Loader2, Mail, Save, Upload, User } from 'lucide-react';
+import { Camera, CheckCircle, Hash, Loader2, Mail, Save, User } from 'lucide-react';
 import { toast } from 'sonner';
+import FaceCapture from '../components/FaceCapture';
+import { Modal } from '../components/elections/ui';
 import Button from '../components/ui/button';
 import { useAuth } from '../hooks/useAuth';
 import { sanitizeUserForStorage } from '../utils/userDisplay';
@@ -10,8 +12,6 @@ import {
   type UserProfile,
 } from '../services/profileService';
 import { getApiErrorMessage } from '../utils/apiError';
-
-const fileSizeLimit = 10 * 1024 * 1024;
 
 const getInitials = (name: string) =>
   name
@@ -30,7 +30,8 @@ const ProfilePage: React.FC = () => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [savingPhoto, setSavingPhoto] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -71,39 +72,22 @@ const ProfilePage: React.FC = () => {
     [formData, profile],
   );
 
-  const validateImage = (file: File): boolean => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return false;
-    }
-
-    if (file.size > fileSizeLimit) {
-      toast.error('File size must be less than 10MB');
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleImageUpload = async (file: File) => {
-    if (!validateImage(file)) return;
-
-    setUploadingImage(true);
+  // The server saves the photo and the face in it, which voting is checked against
+  const handleFacePhoto = async (photo: Blob) => {
+    setSavingPhoto(true);
     try {
-      const { url } = await profileService.uploadProfileImage(file);
-      const nextFormData = { ...formData, studentCardUrl: url };
-      setFormData(nextFormData);
-
-      const updatedProfile = await profileService.updateProfile(nextFormData);
+      const updatedProfile = await profileService.uploadFacePhoto(photo);
       setProfile(updatedProfile);
+      setFormData((previous) => ({ ...previous, studentCardUrl: updatedProfile.studentCardUrl }));
       const updatedUser = mergeProfileIntoUser(user, updatedProfile);
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(updatedUser)));
-      toast.success('Image uploaded and saved successfully');
+      setCameraOpen(false);
+      toast.success('Profile photo saved');
     } catch (error) {
-      toast.error(getApiErrorMessage(error, 'Failed to upload image'));
+      toast.error(getApiErrorMessage(error, 'Your photo could not be saved'));
     } finally {
-      setUploadingImage(false);
+      setSavingPhoto(false);
     }
   };
 
@@ -338,44 +322,32 @@ const ProfilePage: React.FC = () => {
 
             <div className="space-y-2">
               <span className="text-sm font-medium text-gray-700">
-                Profile Image
+                Profile Photo
               </span>
               <div className="rounded-lg border-2 border-dashed border-gray-300 p-5 text-center transition hover:border-gray-400">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void handleImageUpload(file);
-                  }}
-                  className="hidden"
-                  id="image-upload"
-                  disabled={uploadingImage}
-                />
-                <label
-                  htmlFor="image-upload"
-                  className="flex cursor-pointer flex-col items-center"
+                <button
+                  type="button"
+                  onClick={() => setCameraOpen(true)}
+                  className="flex w-full cursor-pointer flex-col items-center"
                 >
                   <span className="mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-gray-100">
-                    {uploadingImage ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-                    ) : (
-                      <Upload className="h-5 w-5 text-gray-400" />
-                    )}
+                    <Camera className="h-5 w-5 text-gray-400" />
                   </span>
                   <span className="text-sm font-medium text-primary-clr">
-                    {uploadingImage ? 'Uploading...' : 'Upload image'}
+                    {profile.hasFaceProfile ? 'Retake photo' : 'Take photo'}
                   </span>
                   <span className="mt-1 text-xs text-gray-500">
-                    PNG or JPG, max. 10MB
+                    {profile.hasFaceProfile
+                      ? 'Your face is on file for voting'
+                      : 'Needed to vote: your face is checked against this photo'}
                   </span>
-                </label>
+                </button>
               </div>
             </div>
 
             <Button
               type="submit"
-              disabled={updating || uploadingImage}
+              disabled={updating || savingPhoto}
               className="h-11 w-full bg-gray-900 text-white hover:bg-gray-800"
             >
               {updating ? (
@@ -386,6 +358,19 @@ const ProfilePage: React.FC = () => {
               {updating ? 'Updating...' : 'Update Info'}
             </Button>
           </form>
+
+          <Modal
+            open={cameraOpen}
+            onOpenChange={(open) => !savingPhoto && setCameraOpen(open)}
+            title="Take your profile photo"
+            description="It's shown on your profile and used to confirm it's you when you vote."
+          >
+            <FaceCapture
+              onCapture={handleFacePhoto}
+              busy={savingPhoto}
+              busyLabel="Saving your photo..."
+            />
+          </Modal>
         </section>
       </div>
     </div>

@@ -53,8 +53,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionEmail,
     studentId,
     studentCardUrl,
-    faceImageBase64,
-    faceDescriptor,
     faceImageUrl,
     financialInfoConsent,
   } = req.body as {
@@ -66,8 +64,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     institutionEmail?: string;
     studentId?: string;
     studentCardUrl?: string;
-    faceImageBase64?: string;
-    faceDescriptor?: number[];
     faceImageUrl?: string;
     financialInfoConsent?: boolean;
   };
@@ -220,7 +216,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     studentId?: string;
     borrowerNumber?: string;
     studentCardUrl?: string;
-    faceDescriptor?: number[];
     faceImageUrl?: string;
     financialInfoConsentAt?: Date;
   } = {
@@ -241,10 +236,6 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   if (studentCardUrl) {
     userData.studentCardUrl = studentCardUrl;
-  }
-
-  if (Array.isArray(faceDescriptor)) {
-    userData.faceDescriptor = faceDescriptor;
   }
 
   if (faceImageUrl) {
@@ -317,7 +308,6 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       studentId: user.studentId,
       borrowerNumber: user.borrowerNumber,
       studentCardUrl: user.studentCardUrl,
-      faceDescriptor: user.faceDescriptor,
       faceImageUrl: user.faceImageUrl,
       financialInfoConsentAt: user.financialInfoConsentAt,
     },

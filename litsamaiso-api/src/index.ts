@@ -15,6 +15,7 @@ import auditMiddleware from "./middleware/auditMiddleware.js";
 import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
 import { syncDueElections } from "./services/electionService.js";
+import { warmUpFaceModels } from "./services/faceService.js";
 
 
 const app = express();
@@ -158,6 +159,11 @@ const startServer = async (): Promise<void> => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
+
+    // Not awaited: the API serves requests while the face models load, and a failure only affects face checks
+    warmUpFaceModels()
+      .then(() => console.log("Face recognition models loaded"))
+      .catch((error) => console.error("Failed to load face recognition models", error));
   } catch (error) {
     console.error("Failed to start server", error);
     process.exit(1);

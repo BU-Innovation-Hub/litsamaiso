@@ -33,7 +33,8 @@ import {
   disqualifyCandidateHandler,
   importCandidatesHandler,
 } from "../controllers/candidateController.js";
-import { castVoteHandler } from "../controllers/voteController.js";
+import { castVoteHandler, verifyFaceHandler } from "../controllers/voteController.js";
+import { readFacePhoto, requireFaceVerification } from "../middleware/faceVerification.js";
 import {
   getResultsHandler,
   recomputeResultsHandler,
@@ -177,10 +178,20 @@ router.delete(
   deleteCandidateHandler,
 );
 
+// The ballot opens only after the student's face matches their profile photo
+router.post(
+  "/:electionId/face-verify",
+  requireRole("Student"),
+  createRateLimit({ windowMs: 60 * 1000, max: 10, keyPrefix: "face-verify" }),
+  readFacePhoto,
+  verifyFaceHandler,
+);
+
 router.post(
   "/:electionId/vote",
   requireRole("Student"),
   createRateLimit({ windowMs: 60 * 1000, max: 5, keyPrefix: "vote" }),
+  requireFaceVerification,
   castVoteHandler,
 );
 

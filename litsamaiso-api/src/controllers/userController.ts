@@ -156,12 +156,11 @@ export const updateUser = async (
     return;
   }
 
-  const { email, role, studentId, faceDescriptor, faceImageUrl, password } =
+  const { email, role, studentId, faceImageUrl, password } =
     req.body as any;
 
   if (email) user.email = email;
   if (studentId) user.studentId = studentId;
-  if (faceDescriptor) user.faceDescriptor = faceDescriptor;
   if (faceImageUrl) user.faceImageUrl = faceImageUrl;
 
   // Password change: only allow when provided (admins perform resets)

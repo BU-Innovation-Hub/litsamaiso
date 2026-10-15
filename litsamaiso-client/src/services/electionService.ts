@@ -200,14 +200,30 @@ export const electionService = {
   },
 
   // Cast a vote
+  // Compares a camera photo with the student's profile photo; the token unlocks the ballot
+  verifyFace: async (electionId: string, photo: Blob) => {
+    const formData = new FormData();
+    formData.append('photo', photo, 'face.jpg');
+    const response = await apiClient.post<{ faceToken: string; expiresAt: string }>(
+      `/elections/${electionId}/face-verify`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  },
+
   castVote: async (
     electionId: string,
-    vote: { selections: Array<{ positionId: string; candidateId: string }>; idempotencyKey: string }
+    vote: {
+      selections: Array<{ positionId: string; candidateId: string }>;
+      idempotencyKey: string;
+      faceToken: string;
+    }
   ) => {
     const response = await apiClient.post<{ receipt: VoteReceipt }>(
       `/elections/${electionId}/vote`,
       { selections: vote.selections },
-      { headers: { 'Idempotency-Key': vote.idempotencyKey } }
+      { headers: { 'Idempotency-Key': vote.idempotencyKey, 'X-Face-Token': vote.faceToken } }
     );
     return response.data.receipt;
   },

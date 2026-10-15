@@ -105,6 +105,7 @@ Configure environment variables:
 | `SYSTEM_INSTITUTION_EMAIL` | No | — | Institution email for the AppAdmin seed |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | No | — | Google Gemini API key for AI account validation |
 | `ELECTION_HMAC_SECRET` | No | — | HMAC secret for ballot hashing and result snapshot integrity |
+| `FACE_MATCH_THRESHOLD` | No | `0.5` | Largest face-embedding distance accepted as the same person when a voter's face is checked. Lower is stricter |
 | `CLOUDINARY_CLOUD_NAME` | No | — | Cloudinary cloud name for image/file uploads |
 | `CLOUDINARY_API_KEY` | No | — | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | No | — | Cloudinary API secret |
@@ -263,6 +264,7 @@ curl -X GET "http://<HOST>/feedback" \
   - **Setup**: SAAD creates an election (it starts with the standard positions), adjusts positions, and adds candidates (manually or by spreadsheet import).
   - **Scheduling**: Scheduling is the only way to make an election visible to students. It is refused if the election has no positions or no approved candidates; the UI warns about fewer positions than the standard list or positions without candidates. `agenda` jobs open and close the election on time, and any overdue open/close is caught up on startup and whenever elections are read or a vote is cast.
   - **Voting**: Students must choose exactly one candidate in every position that has approved candidates. One ballot per student per election; students get a receipt ID.
+  - **Face check**: A student's profile photo is taken with the camera (`POST /profile/face`), and the server stores a face embedding from it. Before the ballot opens, the student takes a new camera photo (`POST /elections/:electionId/face-verify`); if it matches, the server returns a 15-minute token that `POST /elections/:electionId/vote` requires in the `X-Face-Token` header. The check photo isn't stored. Embeddings are computed on the server with TensorFlow.js on its WASM backend (`@vladmandic/face-api`), so no native binary is needed.
   - **Running**: SAAD can close voting early or extend the end time while an election is open.
   - **Results**: Closing triggers counting. SAAD reviews the results, then publishes them. Published results are final and cannot be recounted. Draft and scheduled elections can be deleted; later ones can only be archived.
 

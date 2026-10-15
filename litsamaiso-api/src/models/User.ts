@@ -30,7 +30,8 @@ const userSchema = new Schema<UserDocument>(
     studentId: { type: String, trim: true, unique: true, sparse: true },
     borrowerNumber: { type: String, trim: true },
     studentCardUrl: { type: String, trim: true },
-    faceDescriptor: { type: [Number], default: [] },
+    // Face embedding from the profile photo. Hidden by default so it's never sent to a client.
+    faceDescriptor: { type: [Number], default: [], select: false },
     faceImageUrl: { type: String, trim: true },
     financialInfoConsentAt: { type: Date },
     passwordResetTokenHash: { type: String, select: false },
