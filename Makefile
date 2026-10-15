@@ -3,7 +3,7 @@
 #
 # Run everything from this directory. No more cd-ing into each package.
 #   make install     install deps in api + client
-#   make dev         run api + client dev servers together
+#   make run         run api + client dev servers together
 #   make ship m="..."  stage, commit and push the current branch
 #
 # Portable between Windows cmd.exe and POSIX sh, so recipes avoid shell
@@ -62,17 +62,17 @@ reinstall: clean-deps install
 
 # --- dev -------------------------------------------------------------------
 
-## dev: run api and client dev servers side by side
-dev:
+## run: run api and client dev servers side by side
+run:
 	@echo starting api on :5000 and client on :5173 - Ctrl+C stops both
-	@$(MAKE) --no-print-directory -j 2 dev-api dev-client
+	@$(MAKE) --no-print-directory -j 2 run-backend run-frontend
 
-## dev-api: run the api dev server only
-dev-api:
+## run-backend: run the api dev server only
+run-backend:
 	-@cd $(API) && npm run dev
 
-## dev-client: run the client dev server only
-dev-client:
+## run-frontend: run the client dev server only
+run-frontend:
 	-@cd $(CLIENT) && npm run dev
 
 # --- build / checks --------------------------------------------------------
@@ -164,9 +164,9 @@ help:
 	@echo     make reinstall        wipe node_modules, then install
 	$(BLANK)
 	@echo   dev
-	@echo     make dev              api on :5000 and client on :5173 together
-	@echo     make dev-api          api dev server only
-	@echo     make dev-client       client dev server only
+	@echo     make run              api on :5000 and client on :5173 together
+	@echo     make run-backend      api dev server only
+	@echo     make run-frontend     client dev server only
 	$(BLANK)
 	@echo   build and checks
 	@echo     make build            build api and client
@@ -188,7 +188,7 @@ help:
 	@echo     make clean-deps       remove node_modules
 
 .PHONY: install install-api install-client reinstall \
-        dev dev-api dev-client \
+        run run-backend run-frontend \
         build build-api build-client lint check start preview \
         status ship save push sync pr \
         clean clean-deps help

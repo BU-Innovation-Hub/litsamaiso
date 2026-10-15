@@ -1,10 +1,11 @@
 import type { Request, Response } from "express";
 import AppError from "../utils/errors.js";
 import { castVote, getVoteReceipt, getVoteStatus } from "../services/voteService.js";
+import { verifyVoterFace } from "../services/faceVerificationService.js";
 
 const handleError = (res: Response, err: any): void => {
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({ message: err.message });
+    res.status(err.statusCode).json({ message: err.message, code: err.code });
     return;
   }
   res.status(500).json({ message: err.message || String(err) });
@@ -15,6 +16,20 @@ const disableResponseCache = (res: Response): void => {
   res.setHeader("Pragma", "no-cache");
   res.setHeader("Expires", "0");
   res.setHeader("Surrogate-Control", "no-store");
+};
+// Handler function to check the student's camera photo against their profile photo before the ballot opens
+export const verifyFaceHandler = async (req: Request, res: Response) => {
+  try {
+    disableResponseCache(res);
+    const verification = await verifyVoterFace({
+      userId: String((req as any).user._id),
+      electionId: req.params.electionId as string,
+      photo: req.file?.buffer as Buffer,
+    });
+    res.json(verification);
+  } catch (err: any) {
+    handleError(res, err);
+  }
 };
 // Handler function to cast a vote for an election, with support for idempotency and capturing client metadata
 export const castVoteHandler = async (req: Request, res: Response) => {

@@ -1,5 +1,8 @@
 import type { Request, Response } from "express";
 import { User } from "../models/User.js";
+import { getProfileFaceDescriptor } from "../services/faceService.js";
+import { uploadFileBuffer } from "../utils/cloudinary.js";
+import AppError from "../utils/errors.js";
 
 const getRoleName = (role: any): string =>
   String((role && role.name) || role || "Student");
@@ -13,6 +16,8 @@ const serializeProfile = (user: any) => ({
   borrowerNumber: user.borrowerNumber || "",
   studentCardUrl: user.studentCardUrl || "",
   faceImageUrl: user.faceImageUrl || "",
+  // Only whether a face is on file; the embedding itself never leaves the server
+  hasFaceProfile: (user.faceDescriptor?.length ?? 0) > 0,
   role: getRoleName(user.role),
   institution: user.institution,
   createdAt: user.createdAt,
@@ -29,7 +34,7 @@ export const getProfile = async (
   const user = await User.findById(currentUser._id)
     .populate("role", "name")
     .populate("institution", "name email")
-    .select("-password");
+    .select("+faceDescriptor");
 
   if (!user) {
     res.status(404).json({ message: "User not found" });
@@ -89,7 +94,7 @@ export const updateProfile = async (
   )
     .populate("role", "name")
     .populate("institution", "name email")
-    .select("-password");
+    .select("+faceDescriptor");
 
   if (!updatedUser) {
     res.status(404).json({ message: "User not found" });
@@ -100,4 +105,52 @@ export const updateProfile = async (
     message: "Profile updated successfully",
     data: serializeProfile(updatedUser),
   });
+};
+
+// Saves a camera photo as the profile photo, along with the face embedding used to verify voters
+export const saveFacePhoto = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  const currentUser = (req as any).user;
+  const photo = req.file?.buffer as Buffer;
+
+  try {
+    // Read the face first, so a photo the check can't use is never stored
+    const faceDescriptor = await getProfileFaceDescriptor(photo);
+    const { url } = await uploadFileBuffer({
+      buffer: photo,
+      fileName: "profile-photo.jpg",
+      folder: "profile-photos",
+      resourceType: "image",
+    });
+
+    // studentCardUrl is the photo the profile page shows, so it stays in step with the face on file
+    const updatedUser = await User.findByIdAndUpdate(
+      currentUser._id,
+      { studentCardUrl: url, faceImageUrl: url, faceDescriptor },
+      { new: true, runValidators: true },
+    )
+      .populate("role", "name")
+      .populate("institution", "name email")
+      .select("+faceDescriptor");
+
+    if (!updatedUser) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.json({
+      message: "Profile photo saved",
+      data: serializeProfile(updatedUser),
+    });
+  } catch (err: unknown) {
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ message: err.message, code: err.code });
+      return;
+    }
+    console.error("Failed to save profile photo", err);
+    res.status(500).json({ message: "Your photo could not be saved. Please try again." });
+  }
 };

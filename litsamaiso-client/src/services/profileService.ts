@@ -9,6 +9,8 @@ export interface UserProfile {
   studentId: string;
   studentCardUrl: string;
   faceImageUrl?: string;
+  // Whether a face is on file from the profile photo, needed before voting
+  hasFaceProfile?: boolean;
   role: string;
   institution?: Institution;
   createdAt?: string;
@@ -36,17 +38,18 @@ export const profileService = {
     return unwrapProfile(response.data);
   },
 
-  uploadProfileImage: async (file: File): Promise<{ url: string; publicId: string }> => {
+  // Saves a camera photo as the profile photo; the server keeps its face for voter checks
+  uploadFacePhoto: async (photo: Blob): Promise<UserProfile> => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('photo', photo, 'profile-photo.jpg');
 
-    const response = await apiClient.post<{ url: string; publicId: string }>(
-      '/upload',
+    const response = await apiClient.post<{ data: UserProfile }>(
+      '/profile/face',
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' } }
     );
 
-    return response.data;
+    return unwrapProfile(response.data);
   },
 };
 

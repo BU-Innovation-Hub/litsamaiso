@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, CircleCheck, Copy, Hourglass, Lock, ShieldCheck, Vote } from 'lucide-react';
+import { ArrowLeft, Check, CircleCheck, Copy, Hourglass, Lock, ScanFace, ShieldCheck, Vote } from 'lucide-react';
 import { toast } from 'sonner';
+import FaceCapture from '../components/FaceCapture';
 import { formatDate, formatRelative, useNow } from '../components/elections/electionHelpers';
 import { Avatar, Button, Card, EmptyState, Modal, ProgressBar, Skeleton } from '../components/elections/ui';
 import { cn } from '../lib/utils';
 import { electionService } from '../services/electionService';
+import { profileService } from '../services/profileService';
 import type { Candidate, Election, Position, VoteReceipt } from '../types';
-import { getApiErrorMessage } from '../utils/apiError';
+import { getApiErrorCode, getApiErrorMessage } from '../utils/apiError';
 
 type PositionWithCandidates = Position & { candidates: Candidate[] };
 
@@ -42,6 +44,10 @@ const VotingPage: React.FC = () => {
   const [reviewing, setReviewing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [receipt, setReceipt] = useState<VoteReceipt | null>(null);
+  // The ballot opens once the student's face matches their profile photo
+  const [faceToken, setFaceToken] = useState<string | null>(null);
+  const [hasFaceProfile, setHasFaceProfile] = useState(true);
+  const [verifyingFace, setVerifyingFace] = useState(false);
   // One key per ballot visit, so a retried submit returns the same receipt instead of failing
   const [idempotencyKey] = useState(() => crypto.randomUUID());
 
@@ -50,7 +56,11 @@ const VotingPage: React.FC = () => {
       if (!id) return;
       try {
         const electionData = await electionService.getElection(id);
-        const voteStatus = await electionService.getVoteStatus(id);
+        const [voteStatus, profile] = await Promise.all([
+          electionService.getVoteStatus(id),
+          profileService.getProfile(),
+        ]);
+        setHasFaceProfile(Boolean(profile.hasFaceProfile));
         if (voteStatus.hasVoted) {
           navigate('/elections', {
             replace: true,
@@ -99,8 +109,26 @@ const VotingPage: React.FC = () => {
     setReviewing(true);
   };
 
-  const handleSubmit = async () => {
+  const handleVerifyFace = async (photo: Blob) => {
     if (!id) return;
+    setVerifyingFace(true);
+    try {
+      const verification = await electionService.verifyFace(id, photo);
+      setFaceToken(verification.faceToken);
+      toast.success('Face confirmed. Your ballot is open.');
+    } catch (error: unknown) {
+      if (getApiErrorCode(error) === 'FACE_NOT_ENROLLED') {
+        setHasFaceProfile(false);
+        return;
+      }
+      toast.error(getApiErrorMessage(error, 'Your face could not be checked. Please try again.'));
+    } finally {
+      setVerifyingFace(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!id || !faceToken) return;
     setSubmitting(true);
     try {
       const result = await electionService.castVote(id, {
@@ -108,12 +136,20 @@ const VotingPage: React.FC = () => {
           .filter((p) => p._id && selected[p._id])
           .map((p) => ({ positionId: p._id as string, candidateId: selected[p._id as string] })),
         idempotencyKey,
+        faceToken,
       });
       setReviewing(false);
       setReceipt(result);
       toast.success('Your vote has been recorded');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error: unknown) {
+      // The face check expired while the ballot was open. Choices are kept for after the next check.
+      if (getApiErrorCode(error) === 'FACE_VERIFICATION_REQUIRED') {
+        setReviewing(false);
+        setFaceToken(null);
+        toast.warning('Your face check expired. Verify again to submit your ballot.');
+        return;
+      }
       if ((error as { response?: { status?: number } })?.response?.status === 409) {
         navigate('/elections', { replace: true, state: { electionCompletedMessage: 'You have already voted in this election.' } });
         return;
@@ -218,6 +254,53 @@ const VotingPage: React.FC = () => {
           }
         />
       </Card>,
+    );
+  }
+
+  if (positions.length > 0 && !faceToken) {
+    return shell(
+      <div className="space-y-5">
+        <Link to="/elections" className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-primary-clr">
+          <ArrowLeft className="h-4 w-4" />
+          Elections
+        </Link>
+
+        <Card className="p-5 sm:p-6">
+          {hasFaceProfile ? (
+            <>
+              <div className="mb-5 flex items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-active/10 text-active">
+                  <ScanFace className="h-6 w-6" />
+                </span>
+                <div>
+                  <h1 className="text-xl font-bold text-primary-clr">Confirm it's you</h1>
+                  <p className="text-sm text-slate-500">
+                    Your face is compared with your profile photo before the {election.title} ballot opens. This
+                    photo isn't stored.
+                  </p>
+                </div>
+              </div>
+              <FaceCapture
+                onCapture={handleVerifyFace}
+                busy={verifyingFace}
+                busyLabel="Checking your face..."
+                captureLabel="Verify my face"
+              />
+            </>
+          ) : (
+            <EmptyState
+              icon={ScanFace}
+              title="Take your profile photo first"
+              description="Voting checks your face against your profile photo, and you haven't taken one yet."
+              action={
+                <Link to="/profile" className="font-semibold text-active hover:underline">
+                  Go to your profile
+                </Link>
+              }
+            />
+          )}
+        </Card>
+      </div>,
     );
   }
 

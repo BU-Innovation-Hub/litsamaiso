@@ -33,3 +33,9 @@ export const getApiErrorMessage = (
 
   return fallback;
 };
+
+// The machine-readable reason some API errors include, e.g. FACE_MISMATCH
+export const getApiErrorCode = (error: unknown): string | undefined =>
+  axios.isAxiosError(error)
+    ? (error.response?.data as { code?: string } | undefined)?.code
+    : undefined;
