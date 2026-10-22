@@ -11,6 +11,7 @@ export type RegistrationErrorCode =
   | "studentMismatch"
   | "institutionUnavailable"
   | "consentRequired"
+  | "totpRequired"
   | "general";
 
 export const normalizeRoleName = (role: string): string => {
@@ -51,6 +52,8 @@ export const getFriendlyRegistrationErrorMessage = (
       return "We could not verify the selected institution. Please contact an administrator.";
     case "consentRequired":
       return "Please confirm that your financial information is true and accurate before creating your account.";
+    case "totpRequired":
+      return "Please set up an authenticator app and enter the 6-digit code it shows to create your account.";
     case "general":
     default:
       return "We could not complete your registration request. Please try again or contact support.";

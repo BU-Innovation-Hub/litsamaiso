@@ -1,6 +1,7 @@
 import type { User } from '../types';
 
-const normalizeRoleName = (roleName: string): string => {
+// Roles are stored with mixed casing (e.g. "student"); compare against the canonical names
+export const normalizeRoleName = (roleName: string): string => {
   const normalized = roleName.trim().toLowerCase();
   if (normalized === 'appadmin' || normalized === 'admin') return 'AppAdmin';
   if (normalized === 'institutionadmin') return 'InstitutionAdmin';

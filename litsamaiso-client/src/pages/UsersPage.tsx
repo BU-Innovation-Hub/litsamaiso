@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyRound, Search, Trash2, UserCog, Users } from 'lucide-react';
+import { KeyRound, Search, ShieldOff, Trash2, UserCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { userService } from '../services/userService';
 import { institutionService } from '../services/institutionService';
@@ -27,6 +27,9 @@ const UsersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  // AppAdmin only: for a student who lost the phone with their authenticator app
+  const [totpResetTarget, setTotpResetTarget] = useState<User | null>(null);
+  const [resettingTotp, setResettingTotp] = useState(false);
   const [passwordTarget, setPasswordTarget] = useState<User | null>(null);
   const [passwordForm, setPasswordForm] = useState({
     password: '',
@@ -171,6 +174,26 @@ const UsersPage: React.FC = () => {
       await loadUsers();
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Failed to delete user'));
+    }
+  };
+
+  const handleTotpReset = async () => {
+    if (!totpResetTarget) return;
+    const userId = getUserId(totpResetTarget);
+    if (!userId) return;
+
+    setResettingTotp(true);
+    try {
+      await userService.resetUserTotp(userId);
+      toast.success('Authenticator app reset');
+      setUsers((previous) =>
+        previous.map((item) => (getUserId(item) === userId ? { ...item, totpEnabledAt: undefined } : item)),
+      );
+      setTotpResetTarget(null);
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to reset the authenticator app'));
+    } finally {
+      setResettingTotp(false);
     }
   };
 
@@ -328,6 +351,17 @@ const UsersPage: React.FC = () => {
                                 <KeyRound className="h-4 w-4" />
                               </button>
                             )}
+                            {isAppAdmin && userRole === 'Student' && user.totpEnabledAt && (
+                              <button
+                                className="text-amber-600 hover:text-amber-800"
+                                title="Reset authenticator app"
+                                aria-label={`Reset authenticator app for ${user.email}`}
+                                type="button"
+                                onClick={() => setTotpResetTarget(user)}
+                              >
+                                <ShieldOff className="h-4 w-4" />
+                              </button>
+                            )}
                             <button
                               className="text-red-600 hover:text-red-900"
                               title="Delete user"
@@ -375,6 +409,37 @@ const UsersPage: React.FC = () => {
                 className="rounded-md bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700"
               >
                 Delete user
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {totpResetTarget && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Reset authenticator app</h2>
+            <p className="mt-2 text-sm text-gray-600">
+              <span className="font-semibold">{totpResetTarget.email}</span> will no longer be able to use
+              their current authenticator app. They'll set up a new one the next time they take their profile
+              photo. Only do this after confirming the student's identity. This action is recorded in the audit log.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setTotpResetTarget(null)}
+                disabled={resettingTotp}
+                className="rounded-md border px-4 py-2 font-semibold disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleTotpReset}
+                disabled={resettingTotp}
+                className="rounded-md bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+              >
+                {resettingTotp ? 'Resetting...' : 'Reset authenticator'}
               </button>
             </div>
           </div>

@@ -9,6 +9,12 @@ import { Institution } from "../models/Institution.js";
 import { Student } from "../models/Student.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
 import { createHash, randomBytes } from "crypto";
+import AppError from "../utils/errors.js";
+import {
+  confirmEnrollmentCode,
+  createEnrollment,
+  readEnrollmentToken,
+} from "../services/totpService.js";
 import {
   getFriendlyRegistrationErrorMessage,
   getPublicRegistrationError,
@@ -55,6 +61,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     studentCardUrl,
     faceImageUrl,
     financialInfoConsent,
+    totpEnrollmentToken,
+    totpCode,
   } = req.body as {
     email?: string;
     password?: string;
@@ -66,6 +74,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     studentCardUrl?: string;
     faceImageUrl?: string;
     financialInfoConsent?: boolean;
+    totpEnrollmentToken?: string;
+    totpCode?: string;
   };
 
   const normalizedEmail =
@@ -208,6 +218,28 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
   }
 
+  // Students set up an authenticator app as they register; it's needed to take their profile photo
+  let totpFields: ReturnType<typeof confirmEnrollmentCode> | undefined;
+  if (roleName === "student") {
+    if (!totpEnrollmentToken || !totpCode) {
+      res.status(400).json({
+        message: getFriendlyRegistrationErrorMessage("totpRequired"),
+        code: "TOTP_REQUIRED",
+      });
+      return;
+    }
+    try {
+      const { secret } = readEnrollmentToken(totpEnrollmentToken, normalizedEmail);
+      totpFields = confirmEnrollmentCode(secret, totpCode);
+    } catch (err: unknown) {
+      if (err instanceof AppError) {
+        res.status(err.statusCode).json({ message: err.message, code: err.code });
+        return;
+      }
+      throw err;
+    }
+  }
+
   const userData: {
     email: string;
     password: string;
@@ -242,11 +274,36 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     userData.faceImageUrl = faceImageUrl;
   }
 
-  const user = await User.create(userData);
+  await User.create({ ...userData, ...totpFields });
 
   res.status(201).json({
     message: "User registered",
   });
+};
+
+// The QR code a student scans while registering. It doesn't check whether the email belongs to a
+// student, so it can't be used to find out who has a record; register() does that check.
+export const startRegistrationTotpEnrollment = async (req: Request, res: Response): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  const { email } = req.body as { email?: string };
+  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    res.status(400).json({ message: "Enter a valid email address first." });
+    return;
+  }
+
+  try {
+    const enrollment = await createEnrollment({ subject: normalizedEmail, label: normalizedEmail });
+    res.json({ data: enrollment });
+  } catch (err: unknown) {
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ message: err.message, code: err.code });
+      return;
+    }
+    console.error("Failed to start registration TOTP enrollment", err);
+    res.status(500).json({ message: "Your authenticator setup could not be started. Please try again." });
+  }
 };
 
 export const login = async (req: Request, res: Response): Promise<void> => {

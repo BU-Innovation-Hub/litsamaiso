@@ -1,6 +1,14 @@
 import type { Request, Response } from "express";
 import { User } from "../models/User.js";
 import { getProfileFaceDescriptor } from "../services/faceService.js";
+import {
+  CLEAR_PHOTO_CAPTURE_GRANT,
+  createEnrollment,
+  enableTotp,
+  issuePhotoCaptureGrant,
+  photoCaptureGrantFilter,
+  verifyUserCode,
+} from "../services/totpService.js";
 import { uploadFileBuffer } from "../utils/cloudinary.js";
 import AppError from "../utils/errors.js";
 
@@ -18,11 +26,22 @@ const serializeProfile = (user: any) => ({
   faceImageUrl: user.faceImageUrl || "",
   // Only whether a face is on file; the embedding itself never leaves the server
   hasFaceProfile: (user.faceDescriptor?.length ?? 0) > 0,
+  // Students need an authenticator app before they can take or retake their photo
+  totpEnabled: Boolean(user.totpEnabledAt),
   role: getRoleName(user.role),
   institution: user.institution,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
 });
+
+const sendAppError = (res: Response, err: unknown, fallback: string, logLabel: string): void => {
+  if (err instanceof AppError) {
+    res.status(err.statusCode).json({ message: err.message, code: err.code });
+    return;
+  }
+  console.error(logLabel, err);
+  res.status(500).json({ message: fallback });
+};
 
 export const getProfile = async (
   req: Request,
@@ -115,6 +134,8 @@ export const saveFacePhoto = async (
   res.set("Cache-Control", "no-store");
   const currentUser = (req as any).user;
   const photo = req.file?.buffer as Buffer;
+  // Set by requirePhotoCaptureGrant for students; other roles have none
+  const captureGrant = res.locals.photoCaptureGrant as string | undefined;
 
   try {
     // Read the face first, so a photo the check can't use is never stored
@@ -126,10 +147,14 @@ export const saveFacePhoto = async (
       resourceType: "image",
     });
 
-    // studentCardUrl is the photo the profile page shows, so it stays in step with the face on file
-    const updatedUser = await User.findByIdAndUpdate(
-      currentUser._id,
-      { studentCardUrl: url, faceImageUrl: url, faceDescriptor },
+    // studentCardUrl is the photo the profile page shows, so it stays in step with the face on file.
+    // A student's grant is spent in the same write, so two uploads can't share one code.
+    const updatedUser = await User.findOneAndUpdate(
+      captureGrant ? photoCaptureGrantFilter(String(currentUser._id), captureGrant) : { _id: currentUser._id },
+      {
+        $set: { studentCardUrl: url, faceImageUrl: url, faceDescriptor },
+        ...(captureGrant ? { $unset: CLEAR_PHOTO_CAPTURE_GRANT } : {}),
+      },
       { new: true, runValidators: true },
     )
       .populate("role", "name")
@@ -137,6 +162,13 @@ export const saveFacePhoto = async (
       .select("+faceDescriptor");
 
     if (!updatedUser) {
+      if (captureGrant) {
+        res.status(403).json({
+          message: "Enter a code from your authenticator app before taking your photo",
+          code: "PHOTO_CAPTURE_GRANT_REQUIRED",
+        });
+        return;
+      }
       res.status(404).json({ message: "User not found" });
       return;
     }
@@ -146,11 +178,57 @@ export const saveFacePhoto = async (
       data: serializeProfile(updatedUser),
     });
   } catch (err: unknown) {
-    if (err instanceof AppError) {
-      res.status(err.statusCode).json({ message: err.message, code: err.code });
-      return;
-    }
-    console.error("Failed to save profile photo", err);
-    res.status(500).json({ message: "Your photo could not be saved. Please try again." });
+    sendAppError(res, err, "Your photo could not be saved. Please try again.", "Failed to save profile photo");
+  }
+};
+
+// Starts setting up an authenticator app. Moving to a new device first needs a code from the current one.
+export const startTotpEnrollment = async (req: Request, res: Response): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  const currentUser = (req as any).user;
+  const userId = String(currentUser._id);
+  const { currentCode } = req.body as { currentCode?: string };
+
+  try {
+    const replace = Boolean(currentUser.totpEnabledAt);
+    if (replace) await verifyUserCode(userId, currentCode);
+    const enrollment = await createEnrollment({
+      subject: userId,
+      label: currentUser.studentId || currentUser.email,
+      replace,
+    });
+    res.json({ data: enrollment });
+  } catch (err: unknown) {
+    sendAppError(res, err, "Your authenticator setup could not be started. Please try again.", "Failed to start TOTP enrollment");
+  }
+};
+
+// Confirms the first code from the new app. The code also unlocks the camera, so it isn't asked for twice.
+export const confirmTotpEnrollment = async (req: Request, res: Response): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  const userId = String((req as any).user._id);
+  const { enrollmentToken, code } = req.body as { enrollmentToken?: string; code?: string };
+
+  try {
+    await enableTotp({ userId, enrollmentToken, code });
+    const captureGrant = await issuePhotoCaptureGrant(userId);
+    res.json({ message: "Authenticator app set up", data: { captureGrant } });
+  } catch (err: unknown) {
+    sendAppError(res, err, "Your authenticator app could not be set up. Please try again.", "Failed to confirm TOTP enrollment");
+  }
+};
+
+// Exchanges a code for the grant that lets the student save one profile photo
+export const unlockFacePhoto = async (req: Request, res: Response): Promise<void> => {
+  res.set("Cache-Control", "no-store");
+  const userId = String((req as any).user._id);
+  const { code } = req.body as { code?: string };
+
+  try {
+    await verifyUserCode(userId, code);
+    const captureGrant = await issuePhotoCaptureGrant(userId);
+    res.json({ data: { captureGrant } });
+  } catch (err: unknown) {
+    sendAppError(res, err, "Your code could not be checked. Please try again.", "Failed to unlock face photo");
   }
 };

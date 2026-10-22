@@ -72,6 +72,8 @@ export const authService = {
     if (data.faceImageBase64) payload.faceImageBase64 = data.faceImageBase64;
     if (Array.isArray(data.faceDescriptor)) payload.faceDescriptor = data.faceDescriptor;
     if (data.financialInfoConsent) payload.financialInfoConsent = true;
+    if (data.totpEnrollmentToken) payload.totpEnrollmentToken = data.totpEnrollmentToken;
+    if (data.totpCode) payload.totpCode = data.totpCode;
 
     const response = await apiClient.post<{ message: string }>('/auth/register', payload);
     return {
