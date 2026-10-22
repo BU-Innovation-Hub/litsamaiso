@@ -10,6 +10,7 @@ import type { AdministrativeEmailFailure } from "../models/AdministrativeEmailJo
 import AdministrativeEmail from "../emailTemplates/AdministrativeEmail.js";
 import { getEmailBranding } from "../utils/email.js";
 import { emailLooksValid, sendBulk } from "../utils/bulkEmail.js";
+import { recordAudit } from "../utils/auditLog.js";
 
 export type FinancialClearanceRecipientStatus = "pending" | "confirmed" | "paid";
 
@@ -216,11 +217,35 @@ export const processAdministrativeEmailJob = async (jobId: Types.ObjectId | stri
       failures: progress.failures as AdministrativeEmailFailure[],
       completedAt: new Date(),
     });
+
+    // The send was accepted under the admin who asked for it; this records how it ended
+    await recordAudit({
+      action: "administrativeEmail.send.completed",
+      targetCollection: "AdministrativeEmailJob",
+      targetId: String(job._id),
+      details: {
+        source: "job",
+        requestedBy: String(job.requestedBy),
+        recipients: recipients.length,
+        sent: progress.sent,
+        failed: progress.failures.length,
+      },
+    });
   } catch (error: any) {
     await AdministrativeEmailJob.findByIdAndUpdate(job._id, {
       status: "failed",
       lastError: error?.message || String(error),
       completedAt: new Date(),
+    });
+    await recordAudit({
+      action: "administrativeEmail.send.failed",
+      targetCollection: "AdministrativeEmailJob",
+      targetId: String(job._id),
+      details: {
+        source: "job",
+        requestedBy: String(job.requestedBy),
+        error: error?.message || String(error),
+      },
     });
   }
 };

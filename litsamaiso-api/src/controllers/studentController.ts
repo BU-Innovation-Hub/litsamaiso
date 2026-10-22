@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import mongoose from "mongoose";
 import { loadStudentsFromExcel } from "../services/studentService.js";
 import { Institution } from "../models/Institution.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 
 export const uploadStudents = async (req: Request, res: Response) => {
   const wantsStream =
@@ -59,6 +60,21 @@ export const uploadStudents = async (req: Request, res: Response) => {
       return;
     }
 
+    // An import changes many records at once, so the audit keeps the file and the outcome
+    const auditImport = (result: Awaited<ReturnType<typeof loadStudentsFromExcel>>) =>
+      recordAudit({
+        ...auditActor(user),
+        action: "student.import",
+        targetCollection: "Student",
+        details: {
+          institutionId: String(inst._id),
+          fileName: file.originalname,
+          inserted: result.inserted,
+          skipped: result.skipped,
+          failed: result.errors.length,
+        },
+      });
+
     if (wantsStream) {
       res.status(200);
       res.setHeader("Content-Type", "application/x-ndjson");
@@ -84,6 +100,7 @@ export const uploadStudents = async (req: Request, res: Response) => {
           ...progress,
         });
       });
+      await auditImport(result);
 
       writeStreamEvent({
         type: "completed",
@@ -101,6 +118,7 @@ export const uploadStudents = async (req: Request, res: Response) => {
     }
 
     const result = await loadStudentsFromExcel(file.buffer, inst._id);
+    await auditImport(result);
     const totalRows = result.inserted + result.skipped + result.errors.length;
     res.json({
       message: "Import completed",
@@ -113,6 +131,13 @@ export const uploadStudents = async (req: Request, res: Response) => {
       errors: result.errors,
     });
   } catch (err: any) {
+    await recordAudit({
+      ...auditActor((req as any).user),
+      action: "student.import.failed",
+      targetCollection: "Student",
+      details: { fileName: (req as any).file?.originalname, error: err.message || String(err) },
+    });
+
     if (wantsStream && res.headersSent) {
       writeStreamEvent({
         type: "error",

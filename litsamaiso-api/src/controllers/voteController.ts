@@ -22,7 +22,7 @@ export const verifyFaceHandler = async (req: Request, res: Response) => {
   try {
     disableResponseCache(res);
     const verification = await verifyVoterFace({
-      userId: String((req as any).user._id),
+      user: (req as any).user,
       electionId: req.params.electionId as string,
       photo: req.file?.buffer as Buffer,
     });

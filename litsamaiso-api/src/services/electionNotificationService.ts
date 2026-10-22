@@ -315,6 +315,12 @@ export const processElectionNotification = async (
       { _id: record._id },
       { status: "failed", lastError: error?.message || String(error), completedAt: new Date() },
     );
+    await recordAudit({
+      action: "election.notify.failed",
+      targetCollection: "Election",
+      targetId: electionId,
+      details: { kind, error: error?.message || String(error) },
+    });
     console.error(`[election-email] ${kind} failed for election ${electionId}`, error);
   }
 };

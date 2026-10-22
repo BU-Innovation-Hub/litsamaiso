@@ -14,7 +14,7 @@ import { Institution } from "../models/Institution.js";
 import { Issue } from "../models/Issue.js";
 import { Student } from "../models/Student.js";
 import { User } from "../models/User.js";
-import { recordAudit } from "../utils/auditLog.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 import { FinancialClearance } from "../models/FinancialClearance.js";
 import { sendIssueResolvedEmail } from "../utils/email.js";
 
@@ -58,6 +58,21 @@ export const uploadAccounts = async (req: Request, res: Response) => {
       String(instId),
     );
 
+    // An import changes many records at once, so the audit keeps the file and the outcome
+    const auditImport = (result: Awaited<ReturnType<typeof loadAccountsFromExcel>>) =>
+      recordAudit({
+        ...auditActor(user),
+        action: "account.import",
+        targetCollection: "FinancialClearance",
+        details: {
+          institutionId: String(instId),
+          fileName: file.originalname,
+          inserted: result.inserted,
+          skipped: result.skipped,
+          failed: result.errors.length,
+        },
+      });
+
     if (wantsStream) {
       res.status(200);
       res.setHeader("Content-Type", "application/x-ndjson");
@@ -83,6 +98,7 @@ export const uploadAccounts = async (req: Request, res: Response) => {
           ...progress,
         });
       });
+      await auditImport(result);
 
       writeStreamEvent({
         type: "completed",
@@ -100,6 +116,7 @@ export const uploadAccounts = async (req: Request, res: Response) => {
     }
 
     const result = await loadAccountsFromExcel(file.buffer, instId);
+    await auditImport(result);
     console.log("[Accounts Controller] Import result:", result);
     res.json({ message: "Import completed", result });
   } catch (err: any) {
@@ -114,6 +131,12 @@ export const uploadAccounts = async (req: Request, res: Response) => {
     }
 
     console.error("[Accounts Controller] Error during upload:", err);
+    await recordAudit({
+      ...auditActor((req as any).user),
+      action: "account.import.failed",
+      targetCollection: "FinancialClearance",
+      details: { fileName: (req as any).file?.originalname, error: err.message || String(err) },
+    });
     res.status(500).json({ message: err.message || String(err) });
   }
 };
@@ -160,6 +183,14 @@ export const exportAccountRecords = async (req: Request, res: Response) => {
       user: (req as any).user,
       query: req.query,
       format,
+    });
+
+    // Exports take students' bank details out of the system
+    await recordAudit({
+      ...auditActor((req as any).user),
+      action: "account.export",
+      targetCollection: "FinancialClearance",
+      details: { format, rowCount: result.rowCount, filters: req.query },
     });
 
     res.setHeader("Content-Type", result.contentType);
@@ -226,6 +257,20 @@ export const loadPayedStudents = async (req: Request, res: Response) => {
       return;
     }
 
+    const auditImport = (result: Awaited<ReturnType<typeof loadPayedStudentsFromExcel>>) =>
+      recordAudit({
+        ...auditActor(user),
+        action: "account.importPaid",
+        targetCollection: "FinancialClearance",
+        details: {
+          institutionId: String(instId),
+          fileName: file.originalname,
+          updated: result.updated,
+          skipped: result.skipped,
+          failed: result.errors.length,
+        },
+      });
+
     if (wantsStream) {
       res.status(200);
       res.setHeader("Content-Type", "application/x-ndjson");
@@ -251,6 +296,7 @@ export const loadPayedStudents = async (req: Request, res: Response) => {
           ...progress,
         });
       });
+      await auditImport(result);
 
       writeStreamEvent({
         type: "completed",
@@ -268,6 +314,7 @@ export const loadPayedStudents = async (req: Request, res: Response) => {
     }
 
     const result = await loadPayedStudentsFromExcel(file.buffer, instId);
+    await auditImport(result);
     res.json({ message: "Paid accounts import completed", result });
   } catch (err: any) {
     if (wantsStream && res.headersSent) {
@@ -281,6 +328,12 @@ export const loadPayedStudents = async (req: Request, res: Response) => {
     }
 
     console.error("[Accounts Controller] Error during paid upload:", err);
+    await recordAudit({
+      ...auditActor((req as any).user),
+      action: "account.importPaid.failed",
+      targetCollection: "FinancialClearance",
+      details: { fileName: (req as any).file?.originalname, error: err.message || String(err) },
+    });
     res.status(500).json({ message: err.message || String(err) });
   }
 };

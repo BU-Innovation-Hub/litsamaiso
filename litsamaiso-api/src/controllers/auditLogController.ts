@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { AuditLog } from "../models/AuditLog.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 import mongoose from "mongoose";
 
 const toEJSON = (value: unknown): unknown => {
@@ -85,6 +86,13 @@ export const exportAuditLogs = async (
 ): Promise<void> => {
   try {
     const logs = await AuditLog.find().sort({ createdAt: -1 }).limit(50000).lean();
+    // Recorded after the read, so the export doesn't contain its own entry
+    await recordAudit({
+      ...auditActor((req as any).user),
+      action: "auditLog.export",
+      targetCollection: "AuditLog",
+      details: { count: logs.length },
+    });
     const ejson = logs.map((log) => toEJSON(log));
     const text = JSON.stringify(ejson, null, 2);
     res.setHeader("Content-Type", "text/plain");

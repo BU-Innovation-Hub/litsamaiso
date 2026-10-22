@@ -8,6 +8,7 @@ import { User } from "../models/User.js";
 import { Institution } from "../models/Institution.js";
 import { Student } from "../models/Student.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 import { createHash, randomBytes } from "crypto";
 import {
   getFriendlyRegistrationErrorMessage,
@@ -244,6 +245,20 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   const user = await User.create(userData);
 
+  await recordAudit({
+    ...auditActor({ _id: user._id, email: user.email, role: roleDoc.name }),
+    action: "auth.register",
+    targetCollection: "User",
+    targetId: String(user._id),
+    details: {
+      role: roleDoc.name,
+      institutionId: String(institution._id),
+      ...(studentId ? { studentId } : {}),
+      // An InstitutionAdmin registering creates their institution at the same time
+      ...(roleName === "institutionadmin" ? { createdInstitution: true } : {}),
+    },
+  });
+
   res.status(201).json({
     message: "User registered",
   });
@@ -275,12 +290,25 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     .select("+password")
     .populate("role", "name")
     .populate("institution", "name email locked lockedReason");
+
+  // The identifier is recorded even when no account matches, to show guessing
+  const recordLoginFailure = (reason: string) =>
+    recordAudit({
+      ...auditActor(user),
+      action: "auth.login.failed",
+      targetCollection: "User",
+      ...(user ? { targetId: String(user._id) } : {}),
+      details: { identifier, reason },
+    });
+
   if (!user) {
+    await recordLoginFailure("unknown_account");
     res.status(401).json({ message: "Invalid credentials" });
     return;
   }
 
   if ((user.institution as any)?.locked) {
+    await recordLoginFailure("institution_locked");
     res.status(403).json({
       message: "Your institution account has been locked",
       locked: true,
@@ -291,11 +319,20 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
   const passwordMatches = await bcrypt.compare(password, user.password);
   if (!passwordMatches) {
+    await recordLoginFailure("wrong_password");
     res.status(401).json({ message: "Invalid credentials" });
     return;
   }
 
   const token = signToken(user._id.toString(), Boolean(rememberMe));
+
+  await recordAudit({
+    ...auditActor(user),
+    action: "auth.login",
+    targetCollection: "User",
+    targetId: String(user._id),
+    details: { rememberMe: Boolean(rememberMe) },
+  });
 
   res.json({
     message: "Login successful",
@@ -350,6 +387,15 @@ export const requestPasswordReset = async (
     });
   }
 
+  // The response is the same either way, so only the log shows whether an account matched
+  await recordAudit({
+    ...auditActor(user),
+    action: "auth.passwordReset.request",
+    targetCollection: "User",
+    ...(user ? { targetId: String(user._id) } : {}),
+    details: { email: normalizedEmail, accountFound: Boolean(user) },
+  });
+
   res.json({
     message:
       "If an account exists for that email, a password reset link has been sent",
@@ -383,6 +429,11 @@ export const resetPassword = async (
   }).select("+passwordResetTokenHash +passwordResetTokenExpiresAt");
 
   if (!user) {
+    await recordAudit({
+      action: "auth.passwordReset.failed",
+      targetCollection: "User",
+      details: { email: normalizedEmail, reason: "invalid_or_expired_token" },
+    });
     res.status(400).json({ message: "Invalid or expired reset token" });
     return;
   }
@@ -391,6 +442,13 @@ export const resetPassword = async (
   user.passwordResetTokenHash = undefined as any;
   user.passwordResetTokenExpiresAt = undefined as any;
   await user.save();
+
+  await recordAudit({
+    ...auditActor(user),
+    action: "auth.passwordReset",
+    targetCollection: "User",
+    targetId: String(user._id),
+  });
 
   res.json({ message: "Password reset successful" });
 };

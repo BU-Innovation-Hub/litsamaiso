@@ -1,5 +1,19 @@
 import { AuditLog } from "../models/AuditLog.js";
 
+type AuditActor = { actorId?: string; actorEmail?: string; actorRole?: string };
+
+// Who did it, from a user document such as req.user. The role is recorded only when it's
+// populated (or already a name); an unpopulated role id says nothing to someone reading the log.
+export const auditActor = (user: any): AuditActor => {
+  const actor: AuditActor = {};
+  if (!user) return actor;
+  if (user._id) actor.actorId = String(user._id);
+  if (user.email) actor.actorEmail = String(user.email);
+  const role = typeof user.role === "string" ? user.role : user.role?.name;
+  if (role) actor.actorRole = String(role);
+  return actor;
+};
+
 export const recordAudit = async (options: {
   action: string;
   actorId?: string;

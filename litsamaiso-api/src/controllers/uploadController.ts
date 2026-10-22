@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { uploadFileBuffer } from "../utils/cloudinary.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 
 export const uploadFile = async (req: Request, res: Response) => {
   try {
@@ -14,6 +15,17 @@ export const uploadFile = async (req: Request, res: Response) => {
       fileName: file.originalname,
       folder: "uploads",
       resourceType: "auto",
+    });
+    await recordAudit({
+      ...auditActor((req as any).user),
+      action: "file.upload",
+      details: {
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        url: result.url,
+        publicId: result.publicId,
+      },
     });
     res.json({ url: result.url, publicId: result.publicId });
   } catch (err: any) {
