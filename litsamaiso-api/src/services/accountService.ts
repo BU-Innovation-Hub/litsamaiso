@@ -83,6 +83,7 @@ interface AccountExportResult {
   buffer: Buffer;
   contentType: string;
   filename: string;
+  rowCount: number;
 }
 
 const safeString = (value: unknown): string => String(value ?? "").trim();
@@ -302,6 +303,7 @@ export const exportAccounts = async (params: {
       buffer: Buffer.from(XLSX.utils.sheet_to_csv(worksheet), "utf8"),
       contentType: "text/csv; charset=utf-8",
       filename: `accounts-export-${stamp}.csv`,
+      rowCount: rows.length,
     };
   }
 
@@ -312,6 +314,7 @@ export const exportAccounts = async (params: {
     buffer: XLSX.write(workbook, { bookType: "xlsx", type: "buffer" }),
     contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     filename: `accounts-export-${stamp}.xlsx`,
+    rowCount: rows.length,
   };
 };
 

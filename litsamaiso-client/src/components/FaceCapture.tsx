@@ -149,7 +149,7 @@ const FaceCapture: React.FC<FaceCaptureProps> = ({
       </div>
 
       <p className="text-center text-xs text-slate-500">
-        Face the camera in good light, with only you in the frame.
+        Face the camera in good light, close enough to fill the oval, with only you in the frame.
       </p>
 
       <Button
