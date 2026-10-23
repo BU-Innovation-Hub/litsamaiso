@@ -54,6 +54,12 @@ export const userService = {
     return response.data;
   },
 
+  // Clears a student's authenticator app (AppAdmin); they set up a new one before their next photo
+  resetUserTotp: async (userId: string) => {
+    const response = await apiClient.delete<{ message: string }>(`/users/${userId}/totp`);
+    return response.data;
+  },
+
   // Change password
   changePassword: async (oldPassword: string, newPassword: string) => {
     const response = await apiClient.post('/users/change-password', {

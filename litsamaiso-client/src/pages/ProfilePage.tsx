@@ -1,17 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Camera, CheckCircle, Hash, Loader2, Mail, Save, User } from 'lucide-react';
+import { Camera, CheckCircle, Hash, Loader2, Mail, Save, Smartphone, User } from 'lucide-react';
 import { toast } from 'sonner';
 import FaceCapture from '../components/FaceCapture';
+import AuthenticatorFlow from '../components/totp/AuthenticatorFlow';
 import { Modal } from '../components/elections/ui';
 import Button from '../components/ui/button';
 import { useAuth } from '../hooks/useAuth';
-import { sanitizeUserForStorage } from '../utils/userDisplay';
+import { normalizeRoleName, sanitizeUserForStorage } from '../utils/userDisplay';
 import {
   mergeProfileIntoUser,
   profileService,
   type UserProfile,
 } from '../services/profileService';
-import { getApiErrorMessage } from '../utils/apiError';
+import { getApiErrorCode, getApiErrorMessage } from '../utils/apiError';
 
 const getInitials = (name: string) =>
   name
@@ -32,6 +33,11 @@ const ProfilePage: React.FC = () => {
   const [updating, setUpdating] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [savingPhoto, setSavingPhoto] = useState(false);
+  // A student's camera opens only after a code from their authenticator app unlocks one photo save
+  const [captureGrant, setCaptureGrant] = useState<string | null>(null);
+  // Set when the server asks for a code, so the dialog follows the server even if the role check here disagrees
+  const [codeRequired, setCodeRequired] = useState(false);
+  const [moveAuthenticatorOpen, setMoveAuthenticatorOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -72,19 +78,37 @@ const ProfilePage: React.FC = () => {
     [formData, profile],
   );
 
+  const setTotpEnabled = (totpEnabled: boolean) =>
+    setProfile((previous) => (previous ? { ...previous, totpEnabled } : previous));
+
+  // Closing the camera also drops the grant, so reopening it asks for a new code
+  const setPhotoModalOpen = (open: boolean) => {
+    if (savingPhoto) return;
+    setCameraOpen(open);
+    if (!open) setCaptureGrant(null);
+  };
+
   // The server saves the photo and the face in it, which voting is checked against
   const handleFacePhoto = async (photo: Blob) => {
     setSavingPhoto(true);
     try {
-      const updatedProfile = await profileService.uploadFacePhoto(photo);
+      const updatedProfile = await profileService.uploadFacePhoto(photo, captureGrant ?? undefined);
       setProfile(updatedProfile);
       setFormData((previous) => ({ ...previous, studentCardUrl: updatedProfile.studentCardUrl }));
       const updatedUser = mergeProfileIntoUser(user, updatedProfile);
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(updatedUser)));
       setCameraOpen(false);
+      setCaptureGrant(null);
       toast.success('Profile photo saved');
     } catch (error) {
+      // The grant was already used or has expired: back to the code step
+      if (getApiErrorCode(error) === 'PHOTO_CAPTURE_GRANT_REQUIRED') {
+        setCaptureGrant(null);
+        setCodeRequired(true);
+        toast.warning('Enter a new code from your authenticator app to take your photo.');
+        return;
+      }
       toast.error(getApiErrorMessage(error, 'Your photo could not be saved'));
     } finally {
       setSavingPhoto(false);
@@ -132,6 +156,8 @@ const ProfilePage: React.FC = () => {
     );
   }
 
+  const isStudent = normalizeRoleName(profile.role || '') === 'Student';
+  const showCamera = Boolean(captureGrant) || !(isStudent || codeRequired);
   const displayName = getDisplayName(previewProfile);
   const institutionName = previewProfile.institution?.name || 'Botho University';
   const initials = getInitials(displayName);
@@ -345,6 +371,33 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
+            {isStudent && (
+              <div className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 p-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100">
+                    <Smartphone className="h-5 w-5 text-gray-500" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-primary-clr">Authenticator app</p>
+                    <p className="text-xs text-gray-500">
+                      {profile.totpEnabled
+                        ? 'Set up. You enter a code from it to change your photo. Lost your phone? Ask an administrator to reset it.'
+                        : "Not set up yet. You'll set it up when you take your photo."}
+                    </p>
+                  </div>
+                </div>
+                {profile.totpEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setMoveAuthenticatorOpen(true)}
+                    className="shrink-0 text-sm font-semibold text-active hover:underline"
+                  >
+                    New device
+                  </button>
+                )}
+              </div>
+            )}
+
             <Button
               type="submit"
               disabled={updating || savingPhoto}
@@ -361,14 +414,50 @@ const ProfilePage: React.FC = () => {
 
           <Modal
             open={cameraOpen}
-            onOpenChange={(open) => !savingPhoto && setCameraOpen(open)}
-            title="Take your profile photo"
-            description="It's shown on your profile and used to confirm it's you when you vote."
+            onOpenChange={setPhotoModalOpen}
+            title={
+              showCamera
+                ? 'Take your profile photo'
+                : profile.totpEnabled
+                  ? "Confirm it's you"
+                  : 'Set up your authenticator app'
+            }
+            description={
+              showCamera
+                ? "It's shown on your profile and used to confirm it's you when you vote."
+                : profile.totpEnabled
+                  ? 'Enter a code from your authenticator app to open the camera.'
+                  : 'Changing your photo needs a code from an authenticator app. You only set it up once.'
+            }
           >
-            <FaceCapture
-              onCapture={handleFacePhoto}
-              busy={savingPhoto}
-              busyLabel="Saving your photo..."
+            {/* The camera isn't started until a student's code has unlocked it */}
+            {showCamera ? (
+              <FaceCapture
+                onCapture={handleFacePhoto}
+                busy={savingPhoto}
+                busyLabel="Saving your photo..."
+              />
+            ) : (
+              <AuthenticatorFlow
+                mode="unlock"
+                totpEnabled={Boolean(profile.totpEnabled)}
+                onStatusChange={setTotpEnabled}
+                onUnlocked={setCaptureGrant}
+              />
+            )}
+          </Modal>
+
+          <Modal
+            open={moveAuthenticatorOpen}
+            onOpenChange={setMoveAuthenticatorOpen}
+            title="Move to a new device"
+            description="Enter a code from your current app, then scan the new QR code with your new device. You can then remove the old Litsamaiso entry."
+          >
+            <AuthenticatorFlow
+              mode="move"
+              totpEnabled={Boolean(profile.totpEnabled)}
+              onStatusChange={setTotpEnabled}
+              onMoved={() => setMoveAuthenticatorOpen(false)}
             />
           </Modal>
         </section>

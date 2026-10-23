@@ -3,6 +3,9 @@ import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
 import { auditActor, recordAudit } from "../utils/auditLog.js";
 import bcrypt from "bcryptjs";
+import { isValidObjectId } from "mongoose";
+import { resetTotp } from "../services/totpService.js";
+import AppError from "../utils/errors.js";
 
 // Helper: get id string from ObjectId, populated doc, or string
 const idOf = (v: any): string | null => {
@@ -81,7 +84,7 @@ export const listUsers = async (req: Request, res: Response): Promise<void> => {
 
   const [users, total, roleCountsAggregate] = await Promise.all([
     User.find(query)
-      .select("email role institution studentId faceImageUrl name")
+      .select("email role institution studentId faceImageUrl name totpEnabledAt")
       .populate("role", "name")
       .populate("institution", "name email")
       .skip(skip)
@@ -114,7 +117,7 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
   const currentUser = (req as any).user;
 
   const user = await User.findById(id)
-    .select("email role institution studentId faceImageUrl name")
+    .select("email role institution studentId faceImageUrl name totpEnabledAt")
     .populate("role", "name")
     .populate("institution", "name email");
   if (!user) {
@@ -275,4 +278,28 @@ export const deleteUser = async (
   });
 
   res.json({ message: "User deleted" });
+};
+
+// For a student who lost the phone with their authenticator app; audit-logged
+export const resetUserTotp = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const id = String(req.params.id ?? "");
+  if (!isValidObjectId(id)) {
+    res.status(404).json({ message: "User not found" });
+    return;
+  }
+
+  try {
+    await resetTotp({ targetUserId: id, actor: (req as any).user });
+    res.json({ message: "Authenticator app reset. The student will set up a new one before their next photo." });
+  } catch (err: unknown) {
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ message: err.message, code: err.code });
+      return;
+    }
+    console.error("Failed to reset TOTP", err);
+    res.status(500).json({ message: "The authenticator app could not be reset. Please try again." });
+  }
 };

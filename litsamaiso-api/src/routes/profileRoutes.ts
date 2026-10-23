@@ -1,8 +1,16 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/authMiddleware.js";
+import { requireAuth, requireRole } from "../middleware/authMiddleware.js";
 import { readFacePhoto } from "../middleware/faceVerification.js";
+import { requirePhotoCaptureGrant } from "../middleware/totpVerification.js";
 import { createRateLimit } from "../middleware/rateLimit.js";
-import { getProfile, saveFacePhoto, updateProfile } from "../controllers/profileController.js";
+import {
+  confirmTotpEnrollment,
+  getProfile,
+  saveFacePhoto,
+  startTotpEnrollment,
+  unlockFacePhoto,
+  updateProfile,
+} from "../controllers/profileController.js";
 
 const router = Router();
 
@@ -10,9 +18,31 @@ router.use(requireAuth);
 
 router.get("/", getProfile);
 router.put("/", updateProfile);
+
+// Authenticator app (TOTP) for students: set up, move to a new device, and unlock the camera
+router.post(
+  "/totp/enrollment",
+  requireRole("Student"),
+  createRateLimit({ windowMs: 60 * 1000, max: 10, keyPrefix: "profile-totp-enroll" }),
+  startTotpEnrollment,
+);
+router.post(
+  "/totp/enable",
+  requireRole("Student"),
+  createRateLimit({ windowMs: 60 * 1000, max: 10, keyPrefix: "profile-totp-enable" }),
+  confirmTotpEnrollment,
+);
+router.post(
+  "/face/unlock",
+  requireRole("Student"),
+  createRateLimit({ windowMs: 60 * 1000, max: 10, keyPrefix: "profile-face-unlock" }),
+  unlockFacePhoto,
+);
+
 router.post(
   "/face",
   createRateLimit({ windowMs: 60 * 1000, max: 10, keyPrefix: "profile-face" }),
+  requirePhotoCaptureGrant,
   readFacePhoto,
   saveFacePhoto,
 );

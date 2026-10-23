@@ -2,8 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
-import { getApiErrorMessage } from '../utils/apiError';
+import { ArrowLeft } from 'lucide-react';
+import { getApiErrorCode, getApiErrorMessage } from '../utils/apiError';
 import PasswordInput from '../components/ui/PasswordInput';
+import TotpEnrollment from '../components/totp/TotpEnrollment';
+import { totpService, type TotpEnrollment as Enrollment } from '../services/totpService';
+
+// A setup this close to expiring is replaced rather than reused, so the student has time to type a code
+const ENROLLMENT_REUSE_MARGIN_MS = 60 * 1000;
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,6 +23,10 @@ const RegisterPage: React.FC = () => {
   });
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
+  // Students set up an authenticator app after the details step; it's needed to take their profile photo
+  const [step, setStep] = useState<'details' | 'authenticator'>('details');
+  const [enrollment, setEnrollment] = useState<(Enrollment & { email: string }) | null>(null);
+  const [preparingAuthenticator, setPreparingAuthenticator] = useState(false);
   const consentModalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,6 +74,28 @@ const RegisterPage: React.FC = () => {
     setShowConsentModal(true);
   };
 
+  // The setup is tied to the email, so it's kept while the student only fixes other details
+  const prepareAuthenticator = async (forceNew = false): Promise<boolean> => {
+    const email = formData.email.trim().toLowerCase();
+    const reusable =
+      !forceNew &&
+      enrollment?.email === email &&
+      Date.parse(enrollment.expiresAt) - Date.now() > ENROLLMENT_REUSE_MARGIN_MS;
+    if (reusable) return true;
+
+    setPreparingAuthenticator(true);
+    try {
+      const next = await totpService.startRegistrationEnrollment(email);
+      setEnrollment({ ...next, email });
+      return true;
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Your authenticator setup could not be started'));
+      return false;
+    } finally {
+      setPreparingAuthenticator(false);
+    }
+  };
+
   const handleConsentSubmit = async () => {
     if (!consentChecked) {
       toast.error('Please confirm you have read the financial information consent.');
@@ -71,7 +103,12 @@ const RegisterPage: React.FC = () => {
     }
 
     setShowConsentModal(false);
+    if (await prepareAuthenticator()) setStep('authenticator');
+  };
 
+  // The code is sent with the registration, so it's checked while it's still current
+  const handleRegister = async (totpCode: string) => {
+    if (!enrollment) return;
     try {
       await register({
         email: formData.email,
@@ -79,11 +116,18 @@ const RegisterPage: React.FC = () => {
         role,
         studentId: formData.studentId || undefined,
         financialInfoConsent: true,
+        totpEnrollmentToken: enrollment.enrollmentToken,
+        totpCode,
       });
 
       toast.success('Account created successfully! Please sign in.');
       navigate('/login');
     } catch (error: unknown) {
+      if (getApiErrorCode(error) === 'TOTP_ENROLLMENT_EXPIRED') {
+        toast.warning('That setup expired. Remove the old entry from your app and scan the new QR code.');
+        await prepareAuthenticator(true);
+        return;
+      }
       toast.error(getApiErrorMessage(error, 'Registration failed'));
     }
   };
@@ -119,75 +163,110 @@ const RegisterPage: React.FC = () => {
             </h3>
           </div>
 
-          <div className="auth-header">
-            <h1 className="text-2xl font-semibold text-primary-clr">
-              Create an Account
-            </h1>
-            <p className="mb-6 text-sm text-gray-500">
-              Please complete all fields to gain access to the system.
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email Address</label>
-              <input
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="Your email address"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Student ID Number</label>
-              <input
-                name="studentId"
-                value={formData.studentId}
-                onChange={handleChange}
-                placeholder="e.g. 2230694"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <PasswordInput
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Confirm Password</label>
-              <PasswordInput
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="Confirm your password"
-                required
-              />
-            </div>
-
-            {isLoading ? (
-              <div className="flex w-full items-center justify-center rounded-md bg-button py-3">
-                <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
+          {step === 'authenticator' ? (
+            <>
+              <div className="auth-header">
+                <h1 className="text-2xl font-semibold text-primary-clr">
+                  Set Up Your Authenticator
+                </h1>
+                <p className="mb-6 text-sm text-gray-500">
+                  You'll enter a code from this app whenever you take or change your profile
+                  photo. That photo is what your face is checked against when you vote.
+                </p>
               </div>
-            ) : (
+
+              <TotpEnrollment
+                enrollment={enrollment}
+                loading={preparingAuthenticator}
+                busy={isLoading}
+                submitLabel="Create Account"
+                onConfirm={handleRegister}
+                onRegenerate={() => void prepareAuthenticator(true)}
+              />
+
               <button
-                type="submit"
-                className="w-full rounded-lg bg-button py-3 font-semibold text-white"
+                type="button"
+                onClick={() => setStep('details')}
+                disabled={isLoading}
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-primary-clr disabled:opacity-50"
               >
-                Create Account
+                <ArrowLeft className="h-4 w-4" />
+                Back to your details
               </button>
-            )}
-          </form>
+            </>
+          ) : (
+            <>
+              <div className="auth-header">
+                <h1 className="text-2xl font-semibold text-primary-clr">
+                  Create an Account
+                </h1>
+                <p className="mb-6 text-sm text-gray-500">
+                  Please complete all fields to gain access to the system.
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5">
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email Address</label>
+                  <input
+                    name="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Your email address"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Student ID Number</label>
+                  <input
+                    name="studentId"
+                    value={formData.studentId}
+                    onChange={handleChange}
+                    placeholder="e.g. 2230694"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Password</label>
+                  <PasswordInput
+                    name="password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    placeholder="Enter your password"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Confirm Password</label>
+                  <PasswordInput
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    placeholder="Confirm your password"
+                    required
+                  />
+                </div>
+
+                {preparingAuthenticator ? (
+                  <div className="flex w-full items-center justify-center rounded-md bg-button py-3">
+                    <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    className="w-full rounded-lg bg-button py-3 font-semibold text-white"
+                  >
+                    Continue
+                  </button>
+                )}
+              </form>
+            </>
+          )}
 
           {showConsentModal && (
             <div
@@ -255,10 +334,10 @@ const RegisterPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleConsentSubmit}
-                    disabled={isLoading}
+                    disabled={preparingAuthenticator}
                     className="rounded-md bg-button px-4 py-2 font-semibold text-white transition-colors hover:bg-active disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isLoading ? 'Creating Account...' : 'I Agree & Continue'}
+                    {preparingAuthenticator ? 'Preparing...' : 'I Agree & Continue'}
                   </button>
                 </div>
               </div>

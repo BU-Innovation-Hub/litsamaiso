@@ -14,6 +14,13 @@ export interface UserDocument {
   financialInfoConsentAt?: Date;
   passwordResetTokenHash?: string;
   passwordResetTokenExpiresAt?: Date;
+  totpSecretEncrypted?: string;
+  totpEnabledAt?: Date;
+  totpLastUsedStep?: number;
+  totpFailedAttempts?: number;
+  totpLockedUntil?: Date;
+  photoCaptureGrantHash?: string;
+  photoCaptureGrantExpiresAt?: Date;
 }
 
 const userSchema = new Schema<UserDocument>(
@@ -36,6 +43,16 @@ const userSchema = new Schema<UserDocument>(
     financialInfoConsentAt: { type: Date },
     passwordResetTokenHash: { type: String, select: false },
     passwordResetTokenExpiresAt: { type: Date, select: false },
+    // Authenticator app (TOTP) key, encrypted with TOTP_ENCRYPTION_KEY. Only students have one.
+    totpSecretEncrypted: { type: String, select: false },
+    totpEnabledAt: { type: Date },
+    // Time step of the last accepted code, so a code can't be used twice
+    totpLastUsedStep: { type: Number, select: false },
+    totpFailedAttempts: { type: Number, default: 0, select: false },
+    totpLockedUntil: { type: Date, select: false },
+    // Hash of the single-use grant a code unlocks for one profile photo save
+    photoCaptureGrantHash: { type: String, select: false },
+    photoCaptureGrantExpiresAt: { type: Date, select: false },
   },
   {
     timestamps: true,

@@ -12,6 +12,8 @@ export interface User {
   faceDescriptor?: number[];
   faceImageUrl?: string;
   financialInfoConsentAt?: string;
+  // Set when a student has an authenticator app; returned by the users admin list
+  totpEnabledAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -69,6 +71,9 @@ export interface RegisterRequest {
   faceDescriptor?: number[];
   faceImageUrl?: string;
   financialInfoConsent?: boolean;
+  // Students confirm their authenticator app as they register
+  totpEnrollmentToken?: string;
+  totpCode?: string;
 }
 
 // Election Types
