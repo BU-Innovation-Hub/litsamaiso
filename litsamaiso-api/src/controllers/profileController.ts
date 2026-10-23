@@ -10,6 +10,7 @@ import {
   verifyUserCode,
 } from "../services/totpService.js";
 import { uploadFileBuffer } from "../utils/cloudinary.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 
 const getRoleName = (role: any): string =>
@@ -120,6 +121,20 @@ export const updateProfile = async (
     return;
   }
 
+  // req.user was loaded before the update, so it still holds the old values
+  const changes: Record<string, { from: string | null; to: string }> = {};
+  for (const [field, value] of Object.entries(updateData)) {
+    const previous = currentUser[field] ?? null;
+    if (previous !== value) changes[field] = { from: previous, to: value };
+  }
+  await recordAudit({
+    ...auditActor(currentUser),
+    action: "profile.update",
+    targetCollection: "User",
+    targetId: String(currentUser._id),
+    details: { changes },
+  });
+
   res.json({
     message: "Profile updated successfully",
     data: serializeProfile(updatedUser),
@@ -140,6 +155,9 @@ export const saveFacePhoto = async (
   try {
     // Read the face first, so a photo the check can't use is never stored
     const faceDescriptor = await getProfileFaceDescriptor(photo);
+    const replacedFace = Boolean(
+      await User.exists({ _id: currentUser._id, "faceDescriptor.0": { $exists: true } }),
+    );
     const { url } = await uploadFileBuffer({
       buffer: photo,
       fileName: "profile-photo.jpg",
@@ -173,11 +191,29 @@ export const saveFacePhoto = async (
       return;
     }
 
+    // Voting compares faces with this photo, so replacing it is worth a close look
+    await recordAudit({
+      ...auditActor(currentUser),
+      action: "profile.face.enroll",
+      targetCollection: "User",
+      targetId: String(currentUser._id),
+      details: { photoUrl: url, replacedFace },
+    });
+
     res.json({
       message: "Profile photo saved",
       data: serializeProfile(updatedUser),
     });
   } catch (err: unknown) {
+    if (err instanceof AppError) {
+      await recordAudit({
+        ...auditActor(currentUser),
+        action: "profile.face.enroll.failed",
+        targetCollection: "User",
+        targetId: String(currentUser._id),
+        details: { reason: err.code ?? err.message },
+      });
+    }
     sendAppError(res, err, "Your photo could not be saved. Please try again.", "Failed to save profile photo");
   }
 };

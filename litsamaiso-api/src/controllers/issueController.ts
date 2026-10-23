@@ -3,6 +3,7 @@ import Issue from "../models/Issue.js";
 import { FinancialClearance } from "../models/FinancialClearance.js";
 import { extractAccountCandidates } from "../services/geminiService.js";
 import { notifyFinanceUsersAboutIssue } from "../services/accountService.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 
 export const listIssuesForStudent = async (req: Request, res: Response) => {
   try {
@@ -74,6 +75,14 @@ export const createIssue = async (req: Request, res: Response) => {
 
     const issue = await Issue.findOneAndUpdate({ borrowerNumber, studentId: user.studentId }, updatePayload, { upsert: true, new: true, setDefaultsOnInsert: true });
 
+    await recordAudit({
+      ...auditActor(user),
+      action: "issue.create",
+      targetCollection: "Issue",
+      targetId: String(issue._id),
+      details: { studentId: user.studentId, borrowerNumber, bankName: smartBankName, accountNumber },
+    });
+
     // Notify finance (best-effort)
     try {
       await notifyFinanceUsersAboutIssue({
@@ -105,6 +114,12 @@ export const deleteIssuesForStudent = async (req: Request, res: Response) => {
       return;
     }
     const result = await Issue.deleteMany({ studentId: user.studentId });
+    await recordAudit({
+      ...auditActor(user),
+      action: "issue.delete",
+      targetCollection: "Issue",
+      details: { studentId: user.studentId, deletedCount: result.deletedCount },
+    });
     res.json({ message: "Issues deleted successfully.", deletedCount: result.deletedCount });
   } catch (err: any) {
     console.error("Error deleting issues:", err);
@@ -192,6 +207,14 @@ export const updateIssueById = async (req: Request, res: Response) => {
       res.status(404).json({ error: "Issue not found" });
       return;
     }
+
+    await recordAudit({
+      ...auditActor(user),
+      action: "issue.update",
+      targetCollection: "Issue",
+      targetId: id,
+      details: { studentId: updated.studentId, updates },
+    });
 
     // Notify finance (best-effort)
     try {

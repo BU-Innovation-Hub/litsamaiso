@@ -10,6 +10,7 @@ import { Position } from "../models/Position.js";
 import { Ballot } from "../models/Ballot.js";
 import { VoterRecord } from "../models/VoterRecord.js";
 import { ResultSnapshot } from "../models/ResultSnapshot.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 import bcrypt from "bcryptjs";
 
 // List institutions (AppAdmin)
@@ -85,6 +86,19 @@ export const createInstitution = async (req: Request, res: Response): Promise<vo
     if (adminName) (adminUser as any).name = adminName;
     await adminUser.save();
 
+    await recordAudit({
+      ...auditActor((req as any).user),
+      action: "institution.create",
+      targetCollection: "Institution",
+      targetId: String(institution._id),
+      details: {
+        name: institution.name,
+        email: institution.email,
+        adminUserId: String(adminUser._id),
+        adminEmail: adminUser.email,
+      },
+    });
+
     res.status(201).json({
       institution,
       admin: { id: adminUser._id, email: adminUser.email, name: adminUser.name, role: (roleDoc as any).name, institution: institution._id },
@@ -121,6 +135,8 @@ export const updateInstitution = async (req: Request, res: Response): Promise<vo
       return;
     }
 
+    const before = { name: institution.name, email: institution.email };
+
     if (email && email !== institution.email) {
       const exists = await Institution.findOne({ email: String(email).trim() });
       if (exists && String(exists._id) !== String(id)) {
@@ -133,6 +149,17 @@ export const updateInstitution = async (req: Request, res: Response): Promise<vo
     if (name) institution.name = name;
 
     await institution.save();
+
+    const changes: Record<string, { from: string; to: string }> = {};
+    if (institution.name !== before.name) changes.name = { from: before.name, to: institution.name };
+    if (institution.email !== before.email) changes.email = { from: before.email, to: institution.email };
+    await recordAudit({
+      ...auditActor(currentUser),
+      action: "institution.update",
+      targetCollection: "Institution",
+      targetId: String(institution._id),
+      details: { changes },
+    });
 
     res.json({ institution });
   } catch (err: any) {
@@ -283,6 +310,19 @@ export const createInstitutionRoleUser = async (req: Request, res: Response): Pr
     if (studentId) (newUser as any).studentId = String(studentId).trim();
     await newUser.save();
 
+    await recordAudit({
+      ...auditActor(currentUser),
+      action: "user.create",
+      targetCollection: "User",
+      targetId: String(newUser._id),
+      details: {
+        email: newUser.email,
+        role: roleDoc.name,
+        institutionId: String(instId),
+        ...(newUser.studentId ? { studentId: newUser.studentId } : {}),
+      },
+    });
+
     res.status(201).json({ message: "Role user created", user: { id: newUser._id, email: newUser.email, role: roleDoc.name } });
   } catch (err: any) {
     res.status(500).json({ message: err.message || "Failed to create role user" });
@@ -314,6 +354,14 @@ export const lockInstitution = async (req: Request, res: Response): Promise<void
 
     await institution.save();
 
+    await recordAudit({
+      ...auditActor(currentUser),
+      action: "institution.lock",
+      targetCollection: "Institution",
+      targetId: String(institution._id),
+      details: { name: institution.name, ...(reason ? { reason } : {}) },
+    });
+
     res.json({ institution });
   } catch (err: any) {
     res.status(500).json({ message: err.message || 'Failed to lock institution' });
@@ -342,6 +390,14 @@ export const unlockInstitution = async (req: Request, res: Response): Promise<vo
     institution.lockedAt = undefined as any;
 
     await institution.save();
+
+    await recordAudit({
+      ...auditActor(currentUser),
+      action: "institution.unlock",
+      targetCollection: "Institution",
+      targetId: String(institution._id),
+      details: { name: institution.name },
+    });
 
     res.json({ institution });
   } catch (err: any) {
@@ -396,20 +452,27 @@ export const deleteInstitution = async (req: Request, res: Response): Promise<vo
     // Finally delete the institution
     await institution.deleteOne();
 
-    res.json({
-      message: 'Institution deleted',
-      deleted: {
-        institutions: 1,
-        users: usersRes.deletedCount || 0,
-        students: studentsRes.deletedCount || 0,
-        accounts: accountsRes.deletedCount || 0,
-        elections: electionsRes.deletedCount || 0,
-        positions: positionsRes.deletedCount || 0,
-        candidates: candidatesRes.deletedCount || 0,
-        ballots: ballotsRes.deletedCount || 0,
-        resultSnapshots: snapshotsRes.deletedCount || 0,
-      },
+    const deleted = {
+      institutions: 1,
+      users: usersRes.deletedCount || 0,
+      students: studentsRes.deletedCount || 0,
+      accounts: accountsRes.deletedCount || 0,
+      elections: electionsRes.deletedCount || 0,
+      positions: positionsRes.deletedCount || 0,
+      candidates: candidatesRes.deletedCount || 0,
+      ballots: ballotsRes.deletedCount || 0,
+      resultSnapshots: snapshotsRes.deletedCount || 0,
+    };
+
+    await recordAudit({
+      ...auditActor(currentUser),
+      action: "institution.delete",
+      targetCollection: "Institution",
+      targetId: String(instId),
+      details: { name: institution.name, email: institution.email, deleted },
     });
+
+    res.json({ message: 'Institution deleted', deleted });
   } catch (err: any) {
     res.status(500).json({ message: err.message || 'Failed to delete institution' });
   }

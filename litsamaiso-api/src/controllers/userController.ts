@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
+import { auditActor, recordAudit } from "../utils/auditLog.js";
 import bcrypt from "bcryptjs";
 import { isValidObjectId } from "mongoose";
 import { resetTotp } from "../services/totpService.js";
@@ -162,6 +163,9 @@ export const updateUser = async (
   const { email, role, studentId, faceImageUrl, password } =
     req.body as any;
 
+  const auditedFields = ["email", "studentId", "faceImageUrl", "role", "institution"] as const;
+  const before = Object.fromEntries(auditedFields.map((field) => [field, idOf((user as any)[field])]));
+
   if (email) user.email = email;
   if (studentId) user.studentId = studentId;
   if (faceImageUrl) user.faceImageUrl = faceImageUrl;
@@ -217,6 +221,20 @@ export const updateUser = async (
 
   await user.save();
 
+  const changes: Record<string, { from: string | null; to: string | null }> = {};
+  for (const field of auditedFields) {
+    const after = idOf((user as any)[field]);
+    if (after !== before[field]) changes[field] = { from: before[field] ?? null, to: after };
+  }
+  await recordAudit({
+    ...auditActor(currentUser),
+    action: "user.update",
+    targetCollection: "User",
+    targetId: String(user._id),
+    // The new password itself is never logged, only that an admin set one
+    details: { changes, ...(password ? { passwordChanged: true } : {}) },
+  });
+
   const updatedUser = await User.findById(user._id)
     .select("email role institution studentId faceImageUrl name borrowerNumber studentCardUrl")
     .populate("role", "name")
@@ -245,6 +263,20 @@ export const deleteUser = async (
   }
 
   await User.findByIdAndDelete(id);
+
+  await recordAudit({
+    ...auditActor(currentUser),
+    action: "user.delete",
+    targetCollection: "User",
+    targetId: String(user._id),
+    details: {
+      email: user.email,
+      role: idOf(user.role),
+      institution: idOf(user.institution),
+      ...(user.studentId ? { studentId: user.studentId } : {}),
+    },
+  });
+
   res.json({ message: "User deleted" });
 };
 

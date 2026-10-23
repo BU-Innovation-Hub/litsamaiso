@@ -2,6 +2,7 @@ import "dotenv/config";
 import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 import { connectDatabase } from "../config/database.js";
+import { AuditLog } from "../models/AuditLog.js";
 import { Ballot } from "../models/Ballot.js";
 import { VoterRecord } from "../models/VoterRecord.js";
 import { buildBallotHash } from "../utils/ballotHash.js";
@@ -106,6 +107,11 @@ const migrateBallotSecrecy = async (): Promise<void> => {
 
   if (shouldApply) {
     const remaining = await legacy.countDocuments({});
+    await AuditLog.create({
+      action: "vote.ballot_secrecy_migration",
+      targetCollection: "Ballot",
+      details: { elections: electionIds.length, migrated: totalMigrated, remainingLegacy: remaining },
+    });
     console.log(`Done. Migrated ${totalMigrated} ballot(s). ${remaining} document(s) left in legacy "ballots".`);
   } else {
     console.log("No changes written. Re-run with --apply --confirm to migrate.");

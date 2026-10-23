@@ -11,9 +11,22 @@ const require = createRequire(import.meta.url);
 
 // The client sends 640px camera frames. Bigger images would permanently grow the WASM heap.
 const MAX_PHOTO_SIDE = 1280;
-// Face embeddings closer than this (Euclidean distance) are treated as the same person
-const DEFAULT_MATCH_THRESHOLD = 0.5;
+// Face embeddings closer than this (Euclidean distance) are treated as the same person.
+// Two different people in face-api's sample photos came out 0.49 apart, so 0.5 was too loose.
+const DEFAULT_MATCH_THRESHOLD = 0.4;
+// face-api's own cut-off for "same person". Different people are usually 0.6 to 0.9 apart, so a
+// FACE_MATCH_THRESHOLD above this is a mistake (say "4" for "0.4") that would let almost anyone through.
+const MAX_MATCH_THRESHOLD = 0.6;
+// The detector's confidence that it found a face. Dim, blurred or turned-away faces score lower,
+// and their embeddings drift too far to compare: clear camera frames score 0.75 and up.
+const MIN_FACE_SCORE = 0.6;
+// The face's height or width, whichever is smaller, as a share of the photo's shorter side.
+// Smaller faces are too far from the camera to compare reliably.
+const MIN_FACE_SHARE = 0.25;
 const NO_FACE_MESSAGE = "No face was found. Face the camera in good light and try again.";
+const MULTIPLE_FACES_MESSAGE = "More than one face is in the photo. Make sure only you are in the frame.";
+
+export type DetectedFace = { descriptor: number[]; score: number; share: number };
 
 let faceApiReady: Promise<FaceApi> | null = null;
 
@@ -47,6 +60,8 @@ const loadFaceApi = (): Promise<FaceApi> => {
 
 // Loading takes a moment, so do it at startup instead of during a student's first check
 export const warmUpFaceModels = async (): Promise<void> => {
+  // Also warns now, rather than at the first vote, if FACE_MATCH_THRESHOLD is set wrong
+  getFaceMatchThreshold();
   await loadFaceApi();
 };
 
@@ -70,40 +85,75 @@ const decodePhoto = (faceapi: FaceApi, photo: Buffer) => {
   return faceapi.tf.tensor3d(image.data, [image.height, image.width, 3], "int32");
 };
 
-// Embeddings of every face in the photo, largest (closest to the camera) first
-const detectFaces = async (photo: Buffer): Promise<number[][]> => {
+// Every face in the photo, largest (closest to the camera) first. The detector's own threshold
+// stays low so faint faces are still found: they count as extra people, and a faint main face
+// is reported as unclear rather than missing.
+const detectFaces = async (photo: Buffer): Promise<DetectedFace[]> => {
   const faceapi = await loadFaceApi();
   const tensor = decodePhoto(faceapi, photo);
   try {
+    const [height, width] = tensor.shape;
+    const shortSide = Math.min(height, width);
     const faces = await faceapi
       .detectAllFaces(tensor, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 }))
       .withFaceLandmarks()
       .withFaceDescriptors();
     return faces
       .sort((a, b) => b.detection.box.area - a.detection.box.area)
-      .map((face) => Array.from(face.descriptor));
+      .map((face) => ({
+        descriptor: Array.from(face.descriptor),
+        score: face.detection.score,
+        share: Math.min(face.detection.box.width, face.detection.box.height) / shortSide,
+      }));
   } finally {
     tensor.dispose();
   }
 };
 
-// The profile photo is the reference, so it must show only the student
-export const getProfileFaceDescriptor = async (photo: Buffer): Promise<number[]> => {
-  const faces = await detectFaces(photo);
-  const [face] = faces;
-  if (!face) throw new AppError(NO_FACE_MESSAGE, 422, "FACE_NOT_FOUND");
-  if (faces.length > 1) {
-    throw new AppError("More than one face is in the photo. Make sure only you are in the frame.", 422, "MULTIPLE_FACES");
+// Only a close, clear face gives an embedding that can be trusted either way
+const assertComparable = (face: DetectedFace): void => {
+  if (face.share < MIN_FACE_SHARE) {
+    throw new AppError(
+      "Your face is too far from the camera. Move closer so it fills the oval, then try again.",
+      422,
+      "FACE_TOO_SMALL",
+    );
   }
-  return face;
+  if (face.score < MIN_FACE_SCORE) {
+    throw new AppError(
+      "Your face isn't clear enough. Look straight at the camera in good light, then try again.",
+      422,
+      "FACE_UNCLEAR",
+    );
+  }
 };
 
-// At the ballot the largest face is the person at the camera; others may be passing behind them
-export const getVoterFaceDescriptor = async (photo: Buffer): Promise<number[]> => {
-  const [closest] = await detectFaces(photo);
-  if (!closest) throw new AppError(NO_FACE_MESSAGE, 422, "FACE_NOT_FOUND");
-  return closest;
+// The profile photo is the reference, so it must show only the student
+export const pickProfileFace = (faces: readonly DetectedFace[]): number[] => {
+  const [face] = faces;
+  if (!face) throw new AppError(NO_FACE_MESSAGE, 422, "FACE_NOT_FOUND");
+  if (faces.length > 1) throw new AppError(MULTIPLE_FACES_MESSAGE, 422, "MULTIPLE_FACES");
+  assertComparable(face);
+  return face.descriptor;
 };
+
+// At the ballot the largest face is the person at the camera. Small faces behind them are
+// ignored, but a second face just as close means it isn't clear who is being checked.
+export const pickVoterFace = (faces: readonly DetectedFace[]): number[] => {
+  const [closest, ...others] = faces;
+  if (!closest) throw new AppError(NO_FACE_MESSAGE, 422, "FACE_NOT_FOUND");
+  if (others.some((face) => face.share >= MIN_FACE_SHARE)) {
+    throw new AppError(MULTIPLE_FACES_MESSAGE, 422, "MULTIPLE_FACES");
+  }
+  assertComparable(closest);
+  return closest.descriptor;
+};
+
+export const getProfileFaceDescriptor = async (photo: Buffer): Promise<number[]> =>
+  pickProfileFace(await detectFaces(photo));
+
+export const getVoterFaceDescriptor = async (photo: Buffer): Promise<number[]> =>
+  pickVoterFace(await detectFaces(photo));
 
 export const faceDistance = (a: readonly number[], b: readonly number[]): number => {
   if (a.length === 0 || a.length !== b.length) {
@@ -117,7 +167,22 @@ export const faceDistance = (a: readonly number[], b: readonly number[]): number
   return Math.sqrt(sum);
 };
 
+let ignoredThresholdSetting: string | undefined;
+
 export const getFaceMatchThreshold = (): number => {
-  const configured = Number(process.env.FACE_MATCH_THRESHOLD);
-  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_MATCH_THRESHOLD;
+  const setting = process.env.FACE_MATCH_THRESHOLD?.trim();
+  if (!setting) return DEFAULT_MATCH_THRESHOLD;
+
+  const configured = Number(setting);
+  if (Number.isFinite(configured) && configured > 0 && configured <= MAX_MATCH_THRESHOLD) return configured;
+
+  // This runs on every face check, so each bad setting is reported once
+  if (ignoredThresholdSetting !== setting) {
+    ignoredThresholdSetting = setting;
+    console.warn(
+      `FACE_MATCH_THRESHOLD=${setting} is ignored: it must be a number above 0 and at most ${MAX_MATCH_THRESHOLD}. ` +
+        `Using ${DEFAULT_MATCH_THRESHOLD}.`,
+    );
+  }
+  return DEFAULT_MATCH_THRESHOLD;
 };
