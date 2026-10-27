@@ -6,6 +6,7 @@ import {
 	register,
 	requestPasswordReset,
 	resetPassword,
+	startRegistrationTotpEnrollment,
 } from "../controllers/authController.js";
 import createRateLimit from "../middleware/rateLimit.js";
 
@@ -27,6 +28,11 @@ const loginRateLimit = createRateLimit({
 	max: getRateLimitMax("AUTH_LOGIN_RATE_LIMIT_MAX", 5000),
 	keyPrefix: "auth-login",
 });
+const totpEnrollmentRateLimit = createRateLimit({
+	windowMs: 15 * 60 * 1000,
+	max: getRateLimitMax("AUTH_TOTP_ENROLLMENT_RATE_LIMIT_MAX", 30),
+	keyPrefix: "auth-totp-enrollment",
+});
 const resetRateLimit = createRateLimit({
 	windowMs: 60 * 60 * 1000,
 	max: getRateLimitMax("AUTH_RESET_RATE_LIMIT_MAX", 20),
@@ -35,6 +41,8 @@ const resetRateLimit = createRateLimit({
 
 // Use multipart/form-data for registration (field name: `faceImage`)
 router.post("/register", registerRateLimit, upload.single("faceImage"), register);
+// Students scan this QR code with their authenticator app before submitting /register
+router.post("/totp/enrollment", totpEnrollmentRateLimit, startRegistrationTotpEnrollment);
 router.post("/login", loginRateLimit, login);
 router.post("/forgot-password", resetRateLimit, requestPasswordReset);
 router.post("/reset-password", resetRateLimit, resetPassword);

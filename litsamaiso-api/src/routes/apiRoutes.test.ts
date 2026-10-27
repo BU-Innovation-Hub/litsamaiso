@@ -73,3 +73,21 @@ test("the version root identifies the version", async () => {
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { version: "v1" });
 });
+
+test("the authenticator and photo routes require a signed-in user", async () => {
+  for (const path of ["/profile/totp/enrollment", "/profile/totp/enable", "/profile/face/unlock", "/profile/face"]) {
+    const res = await fetch(`${baseUrl}${API_V1_PREFIX}${path}`, { method: "POST" });
+    assert.equal(res.status, 401, path);
+  }
+  const reset = await fetch(`${baseUrl}${API_V1_PREFIX}/users/000000000000000000000000/totp`, { method: "DELETE" });
+  assert.equal(reset.status, 401);
+});
+
+test("registration authenticator setup rejects an invalid email before doing any work", async () => {
+  const res = await fetch(`${baseUrl}${API_V1_PREFIX}/auth/totp/enrollment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "not-an-email" }),
+  });
+  assert.equal(res.status, 400);
+});

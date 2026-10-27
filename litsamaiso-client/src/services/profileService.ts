@@ -11,6 +11,8 @@ export interface UserProfile {
   faceImageUrl?: string;
   // Whether a face is on file from the profile photo, needed before voting
   hasFaceProfile?: boolean;
+  // Students need an authenticator app before they can take or retake their photo
+  totpEnabled?: boolean;
   role: string;
   institution?: Institution;
   createdAt?: string;
@@ -38,15 +40,21 @@ export const profileService = {
     return unwrapProfile(response.data);
   },
 
-  // Saves a camera photo as the profile photo; the server keeps its face for voter checks
-  uploadFacePhoto: async (photo: Blob): Promise<UserProfile> => {
+  // Saves a camera photo as the profile photo; the server keeps its face for voter checks.
+  // Students send the grant a code from their authenticator app unlocked.
+  uploadFacePhoto: async (photo: Blob, captureGrant?: string): Promise<UserProfile> => {
     const formData = new FormData();
     formData.append('photo', photo, 'profile-photo.jpg');
 
     const response = await apiClient.post<{ data: UserProfile }>(
       '/profile/face',
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...(captureGrant ? { 'X-Photo-Capture-Grant': captureGrant } : {}),
+        },
+      }
     );
 
     return unwrapProfile(response.data);

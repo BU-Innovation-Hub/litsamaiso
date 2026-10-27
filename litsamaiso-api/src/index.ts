@@ -16,6 +16,7 @@ import { seedRolesAndAdmin } from "./utils/seed.js";
 import { initAgenda } from "./scheduler/agenda.js";
 import { syncDueElections } from "./services/electionService.js";
 import { warmUpFaceModels } from "./services/faceService.js";
+import { isSecretBoxConfigured, TOTP_ENCRYPTION_KEY_ENV } from "./utils/secretBox.js";
 
 
 const app = express();
@@ -159,6 +160,13 @@ const startServer = async (): Promise<void> => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
+
+    // Reported here rather than on a student's first registration
+    if (!isSecretBoxConfigured()) {
+      console.error(
+        `${TOTP_ENCRYPTION_KEY_ENV} is missing or not 32 bytes: student registration and profile photos will fail until it is set`,
+      );
+    }
 
     // Not awaited: the API serves requests while the face models load, and a failure only affects face checks
     warmUpFaceModels()

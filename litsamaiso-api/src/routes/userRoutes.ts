@@ -42,4 +42,11 @@ router.delete(
   userController.deleteUser,
 );
 
+// DELETE /users/:id/totp - reset a student's authenticator app (AppAdmin only)
+router.delete(
+  "/:id/totp",
+  requireRole("AppAdmin"),
+  userController.resetUserTotp,
+);
+
 export default router;
