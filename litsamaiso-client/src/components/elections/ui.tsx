@@ -304,6 +304,7 @@ export const Modal = ({
   children,
   footer,
   size = 'md',
+  dismissible = true,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -312,6 +313,8 @@ export const Modal = ({
   children?: React.ReactNode;
   footer?: React.ReactNode;
   size?: 'sm' | 'md' | 'lg';
+  // Without the close button; the footer actions are the only way out
+  dismissible?: boolean;
 }) => (
   <Dialog.Root open={open} onOpenChange={onOpenChange}>
     <Dialog.Portal>
@@ -333,9 +336,11 @@ export const Modal = ({
               <Dialog.Description className="sr-only">{title}</Dialog.Description>
             )}
           </div>
-          <Dialog.Close asChild>
-            <IconButton label="Close" icon={X} />
-          </Dialog.Close>
+          {dismissible && (
+            <Dialog.Close asChild>
+              <IconButton label="Close" icon={X} />
+            </Dialog.Close>
+          )}
         </div>
         {children && <div className="overflow-y-auto px-6 py-5">{children}</div>}
         {footer && (

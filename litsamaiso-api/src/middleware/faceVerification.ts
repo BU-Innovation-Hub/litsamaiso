@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import multer from "multer";
-import { isValidFaceToken } from "../services/faceVerificationService.js";
+import { getFaceTokenIssuedAt } from "../services/faceVerificationService.js";
 
 export const FACE_TOKEN_HEADER = "x-face-token";
 
@@ -32,18 +32,21 @@ export const readFacePhoto = (req: Request, res: Response, next: NextFunction) =
   });
 };
 
-// The ballot opens only after a face check; this makes casting the vote require it too
+// The ballot opens only after a face check; this makes casting the vote require it too.
+// Sets req.faceVerifiedAt, when the ballot opened, which decides if a late ballot is accepted.
 export const requireFaceVerification = (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers[FACE_TOKEN_HEADER];
   const userId = String((req as any).user?._id ?? "");
   const electionId = String(req.params.electionId ?? "");
+  const verifiedAt = typeof token === "string" ? getFaceTokenIssuedAt(token, userId, electionId) : null;
 
-  if (typeof token !== "string" || !isValidFaceToken(token, userId, electionId)) {
+  if (!verifiedAt) {
     res.status(403).json({
       message: "Verify your face before submitting your ballot",
       code: "FACE_VERIFICATION_REQUIRED",
     });
     return;
   }
+  (req as any).faceVerifiedAt = verifiedAt;
   next();
 };

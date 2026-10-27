@@ -149,6 +149,7 @@ const skipReason = (election: ElectionDocument | null, kind: ElectionNotificatio
 export const queueElectionNotification = async (
   electionId: string | Types.ObjectId,
   kind: ElectionNotificationKind,
+  runAt?: Date,
 ): Promise<void> => {
   try {
     await ElectionNotification.create({ electionId, kind, status: "queued" });
@@ -157,16 +158,19 @@ export const queueElectionNotification = async (
     throw error;
   }
   const { getAgenda } = await import("../scheduler/agenda.js");
-  await getAgenda().now("election.notify", { electionId: String(electionId), kind });
+  const data = { electionId: String(electionId), kind };
+  if (runAt) await getAgenda().schedule(runAt, "election.notify", data);
+  else await getAgenda().now("election.notify", data);
 };
 
 // Queue a notification without letting an email problem break the election action that triggered it
 export const queueElectionNotificationSafely = async (
   electionId: string | Types.ObjectId,
   kind: ElectionNotificationKind,
+  runAt?: Date,
 ): Promise<void> => {
   try {
-    await queueElectionNotification(electionId, kind);
+    await queueElectionNotification(electionId, kind, runAt);
   } catch (error) {
     console.error(`[election-email] could not queue ${kind} for election ${String(electionId)}`, error);
   }

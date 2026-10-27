@@ -9,6 +9,7 @@ import { requireDate, requireString, optionalString } from "../utils/validation.
 import { SRC_POSITION_TEMPLATES } from "../constants/srcPositions.js";
 import {
   cancelElectionJobs,
+  lateBallotGraceEndsAt,
   rescheduleCloseJob,
   scheduleElectionJobs,
   scheduleCountJob,
@@ -286,7 +287,8 @@ export const closeElectionByJob = async (electionId: string): Promise<void> => {
   });
 
   await scheduleCountJob(electionId);
-  await queueElectionNotificationSafely(electionId, "CLOSED");
+  // Sent after late ballots are in, so a student who submitted late isn't told they didn't vote
+  await queueElectionNotificationSafely(electionId, "CLOSED", lateBallotGraceEndsAt());
 };
 
 // Brings elections whose start or end time has passed up to date, in case a scheduled job ran late or not at all
@@ -346,7 +348,7 @@ export const closeElectionNow = async (params: {
     details: { source: "manual", endTime: now.toISOString() },
   });
 
-  await queueElectionNotificationSafely(election._id, "CLOSED");
+  await queueElectionNotificationSafely(election._id, "CLOSED", lateBallotGraceEndsAt());
 
   return election;
 };

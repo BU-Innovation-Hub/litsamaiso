@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, CircleCheck, Copy, Hourglass, Lock, ScanFace, ShieldCheck, Vote } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,6 +12,13 @@ import type { Candidate, Election, Position, VoteReceipt } from '../types';
 import { getApiErrorCode, getApiErrorMessage } from '../utils/apiError';
 
 type PositionWithCandidates = Position & { candidates: Candidate[] };
+
+// How often an open ballot checks whether voting has ended. The server takes a ballot opened before
+// the close for 60 seconds after it, which covers one check plus the countdown.
+const CLOSE_CHECK_INTERVAL_MS = 15_000;
+const AUTO_SUBMIT_SECONDS = 5;
+// setTimeout misfires on delays past this, so a far-off close is left to the regular checks
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
 const getPositionTitle = (position: Position) => position.title || position.name || 'Position';
 const getCandidateName = (candidate: Candidate) => candidate.fullName || candidate.name || 'Candidate';
@@ -50,6 +57,10 @@ const VotingPage: React.FC = () => {
   const [verifyingFace, setVerifyingFace] = useState(false);
   // One key per ballot visit, so a retried submit returns the same receipt instead of failing
   const [idempotencyKey] = useState(() => crypto.randomUUID());
+  // Voting ended while the ballot was open: the choices made so far are submitted after a countdown
+  const [votingClosed, setVotingClosed] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const [closingError, setClosingError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadBallot = async () => {
@@ -127,37 +138,101 @@ const VotingPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!id || !faceToken) return;
-    setSubmitting(true);
-    try {
-      const result = await electionService.castVote(id, {
-        selections: positions
-          .filter((p) => p._id && selected[p._id])
-          .map((p) => ({ positionId: p._id as string, candidateId: selected[p._id as string] })),
-        idempotencyKey,
-        faceToken,
-      });
-      setReviewing(false);
-      setReceipt(result);
-      toast.success('Your vote has been recorded');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (error: unknown) {
-      // The face check expired while the ballot was open. Choices are kept for after the next check.
-      if (getApiErrorCode(error) === 'FACE_VERIFICATION_REQUIRED') {
+  // `closing` is set when voting ended mid-ballot, and failures are shown in the closing modal instead
+  const handleSubmit = useCallback(
+    async (closing = false) => {
+      if (!id || !faceToken) return;
+      setSubmitting(true);
+      setClosingError(null);
+      try {
+        const result = await electionService.castVote(id, {
+          selections: positions
+            .filter((p) => p._id && selected[p._id])
+            .map((p) => ({ positionId: p._id as string, candidateId: selected[p._id as string] })),
+          idempotencyKey,
+          faceToken,
+        });
         setReviewing(false);
-        setFaceToken(null);
-        toast.warning('Your face check expired. Verify again to submit your ballot.');
+        setReceipt(result);
+        toast.success('Your vote has been recorded');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (error: unknown) {
+        if ((error as { response?: { status?: number } })?.response?.status === 409) {
+          navigate('/elections', { replace: true, state: { electionCompletedMessage: 'You have already voted in this election.' } });
+          return;
+        }
+        // Voting has ended, so a fresh face check wouldn't help
+        if (closing) {
+          setClosingError(
+            getApiErrorCode(error) === 'FACE_VERIFICATION_REQUIRED'
+              ? 'Your face check expired before voting ended, so your ballot could not be submitted.'
+              : getApiErrorMessage(error, 'Your ballot could not be submitted.'),
+          );
+          return;
+        }
+        // The face check expired while the ballot was open. Choices are kept for after the next check.
+        if (getApiErrorCode(error) === 'FACE_VERIFICATION_REQUIRED') {
+          setReviewing(false);
+          setFaceToken(null);
+          toast.warning('Your face check expired. Verify again to submit your ballot.');
+          return;
+        }
+        toast.error(getApiErrorMessage(error, 'Your vote could not be submitted. Please try again.'));
+      } finally {
+        setSubmitting(false);
+      }
+    },
+    [id, faceToken, positions, selected, idempotencyKey, navigate],
+  );
+
+  // While the ballot is open, watch for voting ending: on the regular checks and right at the end time.
+  // The server decides, so a wrong device clock or an extended end time doesn't end the ballot early.
+  const ballotOpen = Boolean(id && faceToken && !receipt && positions.length > 0 && !votingClosed);
+  const endTime = election?.endTime;
+  useEffect(() => {
+    if (!ballotOpen || !id) return;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const latest = await electionService.getElection(id);
+        if (cancelled) return;
+        if (latest.status === 'OPEN') {
+          setElection(latest);
+          return;
+        }
+        setVotingClosed(true);
+        setSecondsLeft(AUTO_SUBMIT_SECONDS);
+      } catch {
+        // Offline for a moment; the next check tries again
+      }
+    };
+    const interval = window.setInterval(() => void check(), CLOSE_CHECK_INTERVAL_MS);
+    const untilEnd = endTime ? new Date(endTime).getTime() - Date.now() + 1_000 : MAX_TIMEOUT_MS;
+    const atEnd = untilEnd < MAX_TIMEOUT_MS ? window.setTimeout(() => void check(), Math.max(untilEnd, 0)) : undefined;
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.clearTimeout(atEnd);
+    };
+  }, [ballotOpen, id, endTime]);
+
+  // Counts down, then submits the choices made so far. A ballot with no choices has nothing to submit.
+  useEffect(() => {
+    if (secondsLeft === null || chosen === 0 || receipt) return;
+    const timer = window.setTimeout(() => {
+      if (secondsLeft > 1) {
+        setSecondsLeft(secondsLeft - 1);
         return;
       }
-      if ((error as { response?: { status?: number } })?.response?.status === 409) {
-        navigate('/elections', { replace: true, state: { electionCompletedMessage: 'You have already voted in this election.' } });
-        return;
-      }
-      toast.error(getApiErrorMessage(error, 'Your vote could not be submitted. Please try again.'));
-    } finally {
-      setSubmitting(false);
-    }
+      setSecondsLeft(null);
+      void handleSubmit(true);
+    }, 1_000);
+    return () => window.clearTimeout(timer);
+  }, [secondsLeft, chosen, receipt, handleSubmit]);
+
+  const submitClosingBallotNow = () => {
+    setSecondsLeft(null);
+    void handleSubmit(true);
   };
 
   const copyReceipt = async () => {
@@ -420,7 +495,57 @@ const VotingPage: React.FC = () => {
       )}
 
       <Modal
-        open={reviewing}
+        open={votingClosed}
+        onOpenChange={() => undefined}
+        dismissible={false}
+        size="sm"
+        title="Voting has ended"
+        description={
+          chosen === 0
+            ? "The time for this election has passed. You hadn't chosen any candidates, so there's no ballot to submit."
+            : 'The time for this election has passed. Litsamaiso is submitting the choices you made.'
+        }
+        footer={
+          chosen === 0 ? (
+            <Button onClick={() => navigate('/elections', { replace: true })}>Back to elections</Button>
+          ) : closingError ? (
+            <>
+              <Button variant="secondary" onClick={() => navigate('/elections', { replace: true })}>
+                Back to elections
+              </Button>
+              <Button onClick={submitClosingBallotNow}>Try again</Button>
+            </>
+          ) : (
+            <Button loading={submitting} disabled={secondsLeft === null} onClick={submitClosingBallotNow}>
+              Submit now
+            </Button>
+          )
+        }
+      >
+        {chosen > 0 && (
+          <div className="text-center" aria-live="polite">
+            {closingError ? (
+              <p className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{closingError}</p>
+            ) : secondsLeft !== null ? (
+              <>
+                <p className="text-4xl font-bold text-primary-clr">{secondsLeft}</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Submitting your ballot in {secondsLeft} second{secondsLeft === 1 ? '' : 's'}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-slate-500">Submitting your ballot...</p>
+            )}
+            <p className="mt-3 text-xs text-slate-400">
+              {chosen} of {positions.length} chosen
+              {skipped > 0 && ` · ${skipped} skipped`}
+            </p>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={reviewing && !votingClosed}
         onOpenChange={(open) => !submitting && setReviewing(open)}
         title="Review your ballot"
         description="You can't change your vote after submitting."

@@ -26,15 +26,20 @@ export const issueFaceToken = (userId: string, electionId: string) => {
   };
 };
 
-// Valid only for the student it was issued to, in the election it was issued for
-export const isValidFaceToken = (token: string, userId: string, electionId: string): boolean => {
+// When a valid token was issued, i.e. when the student's ballot opened; null if the token isn't valid.
+// Valid only for the student it was issued to, in the election it was issued for.
+export const getFaceTokenIssuedAt = (token: string, userId: string, electionId: string): Date | null => {
   try {
     const payload = jwt.verify(token, getFaceTokenSecret()) as jwt.JwtPayload;
-    return payload.sub === userId && payload.electionId === electionId;
+    if (payload.sub !== userId || payload.electionId !== electionId || !payload.iat) return null;
+    return new Date(payload.iat * 1000);
   } catch {
-    return false;
+    return null;
   }
 };
+
+export const isValidFaceToken = (token: string, userId: string, electionId: string): boolean =>
+  getFaceTokenIssuedAt(token, userId, electionId) !== null;
 
 // Compares the camera photo with the embedding stored from the student's profile photo.
 // Every attempt is audited, so repeated failures on one account stand out.

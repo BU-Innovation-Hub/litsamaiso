@@ -9,6 +9,11 @@ const ELECTION_JOB_NAMES = ["election.open", "election.close", "election.count"]
 const REMINDER_LEAD_MS = 6 * 60 * 60 * 1000;
 const MIN_WINDOW_FOR_REMINDER_MS = 12 * 60 * 60 * 1000;
 
+// A ballot opened before voting closed can still be cast this long after, so a student mid-ballot
+// keeps their choices. Counting and the "voting closed" email wait until it has passed.
+export const LATE_BALLOT_GRACE_MS = 60 * 1000;
+export const lateBallotGraceEndsAt = (): Date => new Date(Date.now() + LATE_BALLOT_GRACE_MS);
+
 const cancelReminderJob = async (electionId: string): Promise<void> => {
   await getAgenda().cancel({ name: "election.notify", "data.electionId": electionId, "data.kind": "REMINDER" });
 };
@@ -60,5 +65,5 @@ export const rescheduleCloseJob = async (electionId: string, endTime: Date): Pro
 
 export const scheduleCountJob = async (electionId: string): Promise<void> => {
   const agenda = getAgenda();
-  await agenda.now("election.count", { electionId });
+  await agenda.schedule(lateBallotGraceEndsAt(), "election.count", { electionId });
 };

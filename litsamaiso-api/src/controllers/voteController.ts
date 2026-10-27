@@ -45,6 +45,7 @@ export const castVoteHandler = async (req: Request, res: Response) => {
       user: (req as any).user,
       electionId: req.params.electionId as string,
       selections,
+      ballotOpenedAt: (req as any).faceVerifiedAt,
       ...(req.ip !== undefined && { ipAddress: req.ip }),
       ...(req.headers["user-agent"] !== undefined && { userAgent: req.headers["user-agent"] as string }),
       ...(idempotencyKey !== undefined && { idempotencyKey }),

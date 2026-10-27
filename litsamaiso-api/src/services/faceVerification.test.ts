@@ -76,7 +76,9 @@ const runMiddleware = (headers: Record<string, string>, userId: string, election
   let statusCode = 200;
   let body: unknown;
   let nextCalled = false;
-  const req = { headers, user: { _id: userId }, params: { electionId } } as unknown as Request;
+  const req = { headers, user: { _id: userId }, params: { electionId } } as unknown as Request & {
+    faceVerifiedAt?: Date;
+  };
   const res = {
     status(code: number) {
       statusCode = code;
@@ -90,7 +92,7 @@ const runMiddleware = (headers: Record<string, string>, userId: string, election
   requireFaceVerification(req, res, () => {
     nextCalled = true;
   });
-  return { statusCode, body, nextCalled };
+  return { statusCode, body, nextCalled, faceVerifiedAt: req.faceVerifiedAt };
 };
 
 test("faceDistance is the Euclidean distance between descriptors", () => {
@@ -191,6 +193,9 @@ test("casting a vote requires a face token for that student and election", () =>
 
   const valid = runMiddleware({ [FACE_TOKEN_HEADER]: faceToken }, "user-1", "election-1");
   assert.equal(valid.nextCalled, true);
+  // When the ballot opened, to the second, so a late ballot can be checked against the close time
+  assert.ok(valid.faceVerifiedAt instanceof Date);
+  assert.ok(Math.abs(valid.faceVerifiedAt.getTime() - Date.now()) < 2_000);
 });
 
 test("the face model reads real photos and rejects unusable ones", async () => {

@@ -10,6 +10,7 @@ import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 import { buildBallotHash, type BallotSelection } from "../utils/ballotHash.js";
 import { syncDueElections } from "./electionService.js";
+import { LATE_BALLOT_GRACE_MS } from "./electionScheduler.js";
 import { withOptionalTransaction } from "../utils/transaction.js";
 
 type VoteReceipt = { receiptId: string; submittedAt: Date };
@@ -50,10 +51,23 @@ const toReceipt = (record: { receiptId: string; submittedAt: Date }): VoteReceip
   submittedAt: record.submittedAt,
 });
 
+// Voting closed moments ago, and this student's ballot was already open when it did.
+// Counting waits out the grace period, so a late ballot is still in the tally.
+export const isLateBallot = (
+  election: { status: string; endTime?: Date | null },
+  ballotOpenedAt: Date | undefined,
+  now = new Date(),
+): boolean => {
+  if (election.status !== "CLOSED" || !election.endTime || !ballotOpenedAt) return false;
+  return ballotOpenedAt < election.endTime && now.getTime() <= election.endTime.getTime() + LATE_BALLOT_GRACE_MS;
+};
+
 export const castVote = async (params: {
   user: any;
   electionId: string;
   selections: BallotSelection[];
+  // When the student's face check opened the ballot
+  ballotOpenedAt?: Date;
   ipAddress?: string;
   userAgent?: string;
   idempotencyKey?: string;
@@ -67,8 +81,9 @@ export const castVote = async (params: {
   });
   if (!election) throw new AppError("Election not found", 404);
 
-  if (election.status !== "OPEN") {
-    throw new AppError("Election is not open", 400);
+  const late = isLateBallot(election, params.ballotOpenedAt);
+  if (election.status !== "OPEN" && !late) {
+    throw new AppError("Election is not open", 400, "ELECTION_NOT_OPEN");
   }
 
   const studentId = params.user.studentId;
@@ -217,6 +232,7 @@ export const castVote = async (params: {
       electionId: election._id?.toString(),
       studentId,
       receiptId: receipt!.receiptId,
+      ...(late && { late: true }),
     },
   });
 
