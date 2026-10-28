@@ -16,10 +16,11 @@ import {
   ShieldCheck,
   Users,
   type LucideIcon,
+  ShieldAlert,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getInstitutionName, getRoleName } from '../utils/userDisplay';
+import { getInstitutionName } from '../utils/userDisplay';
 import { adminIssueService } from '../services/adminIssueService';
 import { accountService, type AccountReports } from '../services/accountService';
 import { electionService } from '../services/electionService';
@@ -29,6 +30,7 @@ import { registryService, type RegistryDashboard } from '../services/registrySer
 import { userService } from '../services/userService';
 import { canAccess, roleAccess, type RoleName } from '../utils/roleAccess';
 import { isAdminDashboardRole } from '../navigation';
+import { IEC_CANNOT_VOTE_MESSAGE } from '../utils/roleChoices';
 import type { Account, Election, Institution, User } from '../types';
 
 interface AdminIssue {
@@ -85,7 +87,7 @@ interface InsightItem {
   icon: LucideIcon;
 }
 
-const dashboardElectionRoles: RoleName[] = ['SAAD', 'Student'];
+const dashboardElectionRoles: RoleName[] = ['SAAD', 'IEC', 'Student'];
 
 const formatStatus = (status?: string) =>
   status ? status.replace(/[_-]/g, ' ') : 'Not available';
@@ -203,8 +205,9 @@ const InsightCard: React.FC<{ insight: InsightItem }> = ({ insight }) => {
 };
 
 const DashboardPage: React.FC = () => {
-  const { user } = useAuth();
-  const roleName = getRoleName(user);
+  const { user, activeRole: roleName, isIecMember } = useAuth();
+  // SAAD and the IEC share the election management dashboard
+  const isElectionAdmin = canAccess(roleName, roleAccess.electionManagement);
   const institutionName = getInstitutionName(user);
   const isAdminShell = isAdminDashboardRole(roleName);
   const [isLoading, setIsLoading] = useState(true);
@@ -361,7 +364,7 @@ const DashboardPage: React.FC = () => {
       ];
     }
 
-    if (roleName === 'SAAD') {
+    if (isElectionAdmin) {
       return [
         {
           label: 'Total elections',
@@ -531,6 +534,7 @@ const DashboardPage: React.FC = () => {
     confirmation?.message,
     elections.length,
     institutions.length,
+    isElectionAdmin,
     openElections,
     pendingIssues,
     rejectedIssues,
@@ -578,7 +582,7 @@ const DashboardPage: React.FC = () => {
       ];
     }
 
-    if (roleName === 'SAAD') {
+    if (isElectionAdmin) {
       return [
         {
           label: 'Manage elections',
@@ -641,7 +645,7 @@ const DashboardPage: React.FC = () => {
     }
 
     return actions.slice(0, 4);
-  }, [canViewAdminIssues, canViewElections, canViewInstitutions, canViewReports, canViewUsers, roleName]);
+  }, [canViewAdminIssues, canViewElections, canViewInstitutions, canViewReports, canViewUsers, isElectionAdmin, roleName]);
 
   const insights = useMemo<InsightItem[]>(() => {
     if (roleName === 'Student') {
@@ -859,7 +863,7 @@ const DashboardPage: React.FC = () => {
                         <p className="text-sm text-slate-500">{formatStatus(election.status)}</p>
                       </div>
                       <Link
-                        to={roleName === 'SAAD' ? '/elections/manage' : '/elections'}
+                        to={isElectionAdmin ? '/elections/manage' : '/elections'}
                         className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-sm font-semibold text-active-clr shadow-sm transition hover:bg-slate-100"
                       >
                         Open
@@ -959,6 +963,15 @@ const DashboardPage: React.FC = () => {
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
                   Continue with confirmation, follow corrections, or check election activity from one place.
                 </p>
+                {isIecMember && (
+                  <p
+                    role="alert"
+                    className="mt-3 flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"
+                  >
+                    <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {IEC_CANNOT_VOTE_MESSAGE}
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap gap-3">
                 <Link to="/confirmation" className="inline-flex items-center gap-2 rounded-full bg-primary-clr px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">

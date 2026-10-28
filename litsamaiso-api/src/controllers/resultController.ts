@@ -7,6 +7,7 @@ import {
   getResultsByPosition,
 } from "../services/resultService.js";
 import { Election } from "../models/Election.js";
+import { activeRoleName } from "../utils/activeRole.js";
 
 const handleError = (res: Response, err: any): void => {
   if (err instanceof AppError) {
@@ -42,11 +43,7 @@ export const getResultsHandler = async (req: Request, res: Response) => {
       return;
     }
 
-    const role = String(
-      ((req as any).user?.role && ((req as any).user.role as any).name) ||
-        (req as any).user?.role ||
-        "",
-    ).toLowerCase();
+    const role = activeRoleName((req as any).user).toLowerCase();
 
     if (role === "student" && !election.resultsPublished) {
       res.status(403).json({ message: "Results not published" });
@@ -78,11 +75,7 @@ export const getResultsWinnersHandler = async (req: Request, res: Response) => {
       return;
     }
 
-    const role = String(
-      ((req as any).user?.role && ((req as any).user.role as any).name) ||
-        (req as any).user?.role ||
-        "",
-    ).toLowerCase();
+    const role = activeRoleName((req as any).user).toLowerCase();
 
     if (role === "student" && !election.resultsPublished) {
       res.status(403).json({ message: "Results not published" });
@@ -109,11 +102,7 @@ export const getResultsByPositionHandler = async (req: Request, res: Response) =
       return;
     }
 
-    const role = String(
-      ((req as any).user?.role && ((req as any).user.role as any).name) ||
-        (req as any).user?.role ||
-        "",
-    ).toLowerCase();
+    const role = activeRoleName((req as any).user).toLowerCase();
 
     if (role === "student" && !election.resultsPublished) {
       res.status(403).json({ message: "Results not published" });

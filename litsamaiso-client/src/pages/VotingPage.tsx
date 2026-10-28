@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, CircleCheck, Copy, Hourglass, Lock, ScanFace, ShieldCheck, Vote } from 'lucide-react';
+import { ArrowLeft, Check, CircleCheck, Copy, Hourglass, Lock, ScanFace, ShieldAlert, ShieldCheck, Vote } from 'lucide-react';
 import { toast } from 'sonner';
 import FaceCapture from '../components/FaceCapture';
 import { formatDate, formatRelative, useNow } from '../components/elections/electionHelpers';
@@ -10,6 +10,8 @@ import { electionService } from '../services/electionService';
 import { profileService } from '../services/profileService';
 import type { Candidate, Election, Position, VoteReceipt } from '../types';
 import { getApiErrorCode, getApiErrorMessage } from '../utils/apiError';
+import { useAuth } from '../hooks/useAuth';
+import { IEC_CANNOT_VOTE_MESSAGE } from '../utils/roleChoices';
 
 type PositionWithCandidates = Position & { candidates: Candidate[] };
 
@@ -42,6 +44,7 @@ const getBallotUnavailableMessage = (election: Election) => {
 
 const VotingPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { isIecMember } = useAuth();
   const navigate = useNavigate();
   const now = useNow(30_000);
   const [election, setElection] = useState<Election | null>(null);
@@ -322,6 +325,24 @@ const VotingPage: React.FC = () => {
           icon={Lock}
           title={election.title}
           description={unavailable}
+          action={
+            <Link to="/elections" className="font-semibold text-active hover:underline">
+              Back to elections
+            </Link>
+          }
+        />
+      </Card>,
+    );
+  }
+
+  // The API refuses the face check and the ballot too; this says why before they try
+  if (isIecMember) {
+    return shell(
+      <Card>
+        <EmptyState
+          icon={ShieldAlert}
+          title={election.title}
+          description={IEC_CANNOT_VOTE_MESSAGE}
           action={
             <Link to="/elections" className="font-semibold text-active hover:underline">
               Back to elections

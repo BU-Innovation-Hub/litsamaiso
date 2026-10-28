@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
+import { ACTIVE_ROLE_HEADER, activeRoleName, holdsRole } from "../utils/activeRole.js";
 
 interface JwtPayload {
   sub: string;
@@ -31,10 +32,31 @@ export const requireAuth = async (
 
   try {
     const decoded = jwt.verify(token as string, String(secret)) as JwtPayload;
-    const user = await User.findById(decoded.sub).populate("role");
+    const user = await User.findById(decoded.sub).populate("role").populate("additionalRoles");
     if (!user) {
       res.status(401).json({ message: "User not found" });
       return;
+    }
+
+    // A user who holds several roles says which one this request is made as. Asking for a role
+    // they don't hold (or no longer hold) is refused rather than quietly falling back.
+    const requested = req.headers[ACTIVE_ROLE_HEADER];
+    if (typeof requested === "string" && requested.trim()) {
+      const wanted = requested.trim().toLowerCase();
+      const primary = String((user.role as any)?.name || "").toLowerCase();
+      if (wanted !== primary) {
+        const held = ((user.additionalRoles ?? []) as any[]).find(
+          (role) => String(role?.name || "").toLowerCase() === wanted,
+        );
+        if (!held) {
+          res.status(403).json({
+            message: "You no longer hold this role",
+            code: "ACTIVE_ROLE_NOT_HELD",
+          });
+          return;
+        }
+        user.$locals.activeRole = held.name;
+      }
     }
 
     // attach user to request for downstream handlers
@@ -54,10 +76,8 @@ export const requireRole = (roles: string[] | string) => {
       return;
     }
 
-    // Resolve role name whether `user.role` is populated object or a string
-    const resolvedRole =
-      (user.role && (user.role as any).name) || (user.role as string) || "";
-    const roleName = String(resolvedRole).toLowerCase();
+    // The role this request is made as (see requireAuth), whether populated or a string
+    const roleName = activeRoleName(user).toLowerCase();
 
     // Compare allowed roles case-insensitively
     const allowedLower = allowed.map((r) => String(r).toLowerCase());
@@ -68,4 +88,17 @@ export const requireRole = (roles: string[] | string) => {
 
     next();
   };
+};
+
+// The IEC runs the election, so its members can't vote in it, even from their Student dashboard.
+// Leaving the IEC lets them vote again, since membership is read fresh on every request.
+export const refuseIecVoters = (req: Request, res: Response, next: NextFunction) => {
+  if (holdsRole((req as any).user, "IEC")) {
+    res.status(403).json({
+      message: "IEC members can't vote while they're on the IEC",
+      code: "IEC_MEMBER_CANNOT_VOTE",
+    });
+    return;
+  }
+  next();
 };

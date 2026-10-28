@@ -10,6 +10,8 @@ import {
 } from "../constants/srcPositions.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
+import { activeRoleName } from "../utils/activeRole.js";
+import { iecStudentIds } from "./iecService.js";
 
 type SpreadsheetRow = Record<string, unknown>;
 
@@ -395,6 +397,7 @@ export const importCandidatesFromSpreadsheet = async (params: {
         .lean()
     : [];
   const activeStudentIds = new Set(activeStudents.map((student) => student.studentId));
+  const iecMemberIds = await iecStudentIds(params.user.institution, importedStudentIds);
 
   parsed.records.forEach((record) => {
     if (!record.studentId) {
@@ -408,6 +411,13 @@ export const importCandidatesFromSpreadsheet = async (params: {
       warnings.push({
         rowNumber: record.rowNumber,
         message: `Skipped ${record.fullName}: student ${record.studentId} is not an active student in the registry`,
+      });
+      return;
+    }
+    if (iecMemberIds.has(record.studentId)) {
+      warnings.push({
+        rowNumber: record.rowNumber,
+        message: `Skipped ${record.fullName}: student ${record.studentId} is on the IEC and cannot stand as a candidate`,
       });
       return;
     }
@@ -482,7 +492,7 @@ export const importCandidatesFromSpreadsheet = async (params: {
     action: "candidate.import",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Election",
     targetId: election._id?.toString(),
     details: {

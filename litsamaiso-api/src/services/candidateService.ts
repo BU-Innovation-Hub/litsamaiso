@@ -6,19 +6,22 @@ import { Student } from "../models/Student.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 import { optionalString, requireString } from "../utils/validation.js";
+import { activeRoleName } from "../utils/activeRole.js";
+import { ensureNotIecMember } from "./iecService.js";
 
 const ensureEditable = (status: string): void => {
   if (["OPEN", "CLOSED", "COUNTING", "RESULTS_PUBLISHED", "ARCHIVED"].includes(status)) {
     throw new AppError("Election is frozen and candidates cannot be edited", 400);
   }
 };
-// Candidates must be active students in the institution's registry
+// Candidates must be active students in the institution's registry, and not on its IEC
 const requireRegistryStudentId = async (institution: any, value: unknown): Promise<string> => {
   const studentId = requireString(value, "studentId", { min: 1 });
   const student = await Student.exists({ institution, studentId, studentStatus: true });
   if (!student) {
     throw new AppError(`Student ${studentId} is not an active student in the registry`, 400);
   }
+  await ensureNotIecMember(institution, studentId);
   return studentId;
 };
 
@@ -73,7 +76,7 @@ export const createCandidate = async (params: {
     action: "candidate.create",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Candidate",
     targetId: (candidate as any)._id?.toString(),
     details: { electionId: election._id?.toString(), positionId: position._id?.toString() },
@@ -136,7 +139,7 @@ export const updateCandidate = async (params: {
     action: "candidate.update",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Candidate",
     targetId: candidate._id?.toString(),
     details: { updates: Object.keys(params.updates) },
@@ -172,17 +175,13 @@ export const softDeleteCandidate = async (params: {
     action: "candidate.delete",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Candidate",
     targetId: candidate._id?.toString(),
   });
 };
 
-const resolveRoleName = (user: any): string => {
-  const resolved =
-    (user?.role && (user.role as any).name) || (user?.role as string) || "";
-  return String(resolved).toLowerCase();
-};
+const resolveRoleName = (user: any): string => activeRoleName(user).toLowerCase();
 
 const ensureStudentCanView = (election: { published?: boolean; archived?: boolean }): void => {
   if (!election.published || election.archived) {
@@ -252,7 +251,7 @@ export const approveCandidate = async (params: {
     action: "candidate.approve",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Candidate",
     targetId: candidate._id?.toString(),
   });
@@ -287,7 +286,7 @@ export const disqualifyCandidate = async (params: {
     action: "candidate.disqualify",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Candidate",
     targetId: candidate._id?.toString(),
   });

@@ -13,6 +13,7 @@ import {
 } from "../services/electionService.js";
 import { Election } from "../models/Election.js";
 import AppError from "../utils/errors.js";
+import { activeRoleName } from "../utils/activeRole.js";
 
 const handleError = (res: Response, err: any): void => {
   if (err instanceof AppError) {
@@ -154,9 +155,7 @@ export const listElectionsHandler = async (req: Request, res: Response) => {
   try {
     const startedAt = Date.now();
     const user = (req as any).user;
-    const isStudent = String(
-      (user?.role && (user.role as any).name) || user?.role || "",
-    ).toLowerCase() === "student";
+    const isStudent = activeRoleName(user).toLowerCase() === "student";
 
     const { page, limit } = req.query as any;
     const pageNum = Math.max(parseInt(page) || 1, 1);
@@ -205,9 +204,7 @@ export const listElectionsHandler = async (req: Request, res: Response) => {
 export const getElectionHandler = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const isStudent = String(
-      (user?.role && (user.role as any).name) || user?.role || "",
-    ).toLowerCase() === "student";
+    const isStudent = activeRoleName(user).toLowerCase() === "student";
 
     const query: Record<string, unknown> = {
       _id: req.params.id,

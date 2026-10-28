@@ -2,20 +2,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
-import { getRoleName, getUserInitials } from '../utils/userDisplay';
+import { getUserInitials } from '../utils/userDisplay';
 import { getVisibleNavItems, isNavItemActive } from '../navigation';
 import { feedbackService } from '../services/feedbackService';
 import { LogoutFeedbackModal } from './LogoutFeedbackModal';
+import { RoleSwitcher } from './RoleSwitcher';
 
 export const Header: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, activeRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
-  const roleName = getRoleName(user);
+  const roleName = activeRole;
   const username = user?.name || user?.email?.split('@')[0] || 'User';
 
   useEffect(() => {
@@ -144,6 +145,7 @@ export const Header: React.FC = () => {
           </nav>
 
           <div className="mt-2 flex items-center gap-3 sm:mt-0 sm:ml-4">
+            <RoleSwitcher onSwitch={closeMobileMenu} />
             <button
               className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white"
               onClick={() => {

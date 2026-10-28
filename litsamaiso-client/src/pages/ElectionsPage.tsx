@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, CalendarClock, Check, CircleCheck, Copy, Hourglass, Inbox, Vote } from 'lucide-react';
+import { BarChart3, CalendarClock, Check, CircleCheck, Copy, Hourglass, Inbox, ShieldAlert, Vote } from 'lucide-react';
 import { toast } from 'sonner';
 import PositionStandings from '../components/elections/PositionStandings';
 import { formatDate, formatRelative, useNow } from '../components/elections/electionHelpers';
@@ -8,6 +8,8 @@ import { Button, Card, EmptyState, Modal, Skeleton, StatusPill } from '../compon
 import { electionService } from '../services/electionService';
 import type { Election, ResultPositionDetail } from '../types';
 import { getApiErrorMessage } from '../utils/apiError';
+import { useAuth } from '../hooks/useAuth';
+import { IEC_CANNOT_VOTE_MESSAGE } from '../utils/roleChoices';
 
 type VoteStatus = { hasVoted: boolean; receiptId?: string; submittedAt?: string };
 
@@ -60,6 +62,7 @@ const ReceiptChip = ({ receiptId, submittedAt }: { receiptId: string; submittedA
 
 const ElectionsPage: React.FC = () => {
   const location = useLocation();
+  const { isIecMember } = useAuth();
   const [elections, setElections] = useState<Election[]>([]);
   const [voteStatuses, setVoteStatuses] = useState<Record<string, VoteStatus>>({});
   const [clockOffsetMs, setClockOffsetMs] = useState(0);
@@ -177,7 +180,7 @@ const ElectionsPage: React.FC = () => {
           {voteStatus?.hasVoted && voteStatus.receiptId && (
             <ReceiptChip receiptId={voteStatus.receiptId} submittedAt={voteStatus.submittedAt} />
           )}
-          {status === 'OPEN' && !voteStatus?.hasVoted && (
+          {status === 'OPEN' && !voteStatus?.hasVoted && !isIecMember && (
             <Link
               to={`/elections/${election._id}/vote`}
               className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-button font-semibold text-white shadow-sm shadow-slate-900/10 transition hover:bg-primary-clr active:scale-[0.99]"
@@ -219,6 +222,15 @@ const ElectionsPage: React.FC = () => {
             <p className="animate-rise-in mt-3 flex items-center gap-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
               <CircleCheck className="h-4 w-4" />
               {notice}
+            </p>
+          )}
+          {isIecMember && (
+            <p
+              role="alert"
+              className="mt-3 flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"
+            >
+              <ShieldAlert className="h-4 w-4 shrink-0" />
+              {IEC_CANNOT_VOTE_MESSAGE}
             </p>
           )}
         </header>

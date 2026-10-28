@@ -5,6 +5,7 @@ export interface UserDocument {
   password: string;
   name?: string;
   role: Types.ObjectId;
+  additionalRoles: Types.ObjectId[];
   institution: Types.ObjectId;
   studentId?: string;
   borrowerNumber?: string;
@@ -29,6 +30,8 @@ const userSchema = new Schema<UserDocument>(
     email: { type: String, required: true, trim: true, unique: true },
     password: { type: String, required: true, select: false },
     role: { type: Schema.Types.ObjectId, ref: "Role", required: true },
+    // Roles held alongside the primary one, e.g. a Student appointed to the IEC
+    additionalRoles: { type: [{ type: Schema.Types.ObjectId, ref: "Role" }], default: [] },
     institution: {
       type: Schema.Types.ObjectId,
       ref: "Institution",

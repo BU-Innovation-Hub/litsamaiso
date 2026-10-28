@@ -9,7 +9,6 @@ import { AdminDashboardShell } from './components/DashboardSidebar';
 import { useAuth } from './hooks/useAuth';
 import { isAdminDashboardRole } from './navigation';
 import { roleAccess } from './utils/roleAccess';
-import { getRoleName } from './utils/userDisplay';
 import { feedbackService } from './services/feedbackService';
 import { LogoutFeedbackModal } from './components/LogoutFeedbackModal';
 
@@ -32,6 +31,7 @@ const BranchCodesPage = lazy(() => import('./pages/BranchCodesPage'));
 const AIEmailComposerPage = lazy(() => import('./pages/AIEmailComposerPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const ChooseRolePage = lazy(() => import('./pages/ChooseRolePage'));
 const StudentRegistryPage = lazy(() => import('./pages/StudentRegistryPage'));
 
 const PageLoader = () => (
@@ -96,8 +96,12 @@ import './index.css';
 
 // Protected Layout Component
 const ProtectedLayout = () => {
-  const { user } = useAuth();
-  const roleName = getRoleName(user);
+  const { activeRole: roleName, needsRoleChoice } = useAuth();
+
+  // Someone holding several roles (a Student on the IEC) picks a dashboard first
+  if (needsRoleChoice) {
+    return <Navigate to="/choose-role" replace />;
+  }
 
   if (isAdminDashboardRole(roleName)) {
     return (
@@ -140,6 +144,7 @@ function App() {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
+            <Route path="/choose-role" element={<ChooseRolePage />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />

@@ -19,7 +19,7 @@ router.get(
 
 router.get(
   "/receipt/:id",
-  requireRole(["Student", "SAAD"]),
+  requireRole(["Student", "SAAD", "IEC"]),
   createRateLimit({ windowMs: 60 * 1000, max: 30, keyPrefix: "vote-receipt" }),
   getVoteReceiptHandler,
 );

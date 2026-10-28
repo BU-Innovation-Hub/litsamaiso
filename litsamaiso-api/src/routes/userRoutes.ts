@@ -42,6 +42,20 @@ router.delete(
   userController.deleteUser,
 );
 
+// POST /users/:id/iec - appoint a student to the IEC
+router.post(
+  "/:id/iec",
+  requireRole(["AppAdmin", "InstitutionAdmin"]),
+  userController.appointIec,
+);
+
+// DELETE /users/:id/iec - remove a student from the IEC
+router.delete(
+  "/:id/iec",
+  requireRole(["AppAdmin", "InstitutionAdmin"]),
+  userController.removeIec,
+);
+
 // DELETE /users/:id/totp - reset a student's authenticator app (AppAdmin only)
 router.delete(
   "/:id/totp",

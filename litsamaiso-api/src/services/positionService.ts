@@ -6,6 +6,7 @@ import { SRC_POSITION_TEMPLATES, normalizePositionLabel } from "../constants/src
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
 import { optionalString, requireNumber, requireString } from "../utils/validation.js";
+import { activeRoleName } from "../utils/activeRole.js";
 
 const ensureEditable = (status: string): void => {
   if (["OPEN", "CLOSED", "COUNTING", "RESULTS_PUBLISHED", "ARCHIVED"].includes(status)) {
@@ -59,7 +60,7 @@ export const createPosition = async (params: {
     action: "position.create",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Position",
     targetId: (position as any)._id?.toString(),
     details: { electionId: election._id?.toString(), title },
@@ -120,7 +121,7 @@ export const ensureDefaultSrcPositions = async (params: {
       action: "position.seed-src-defaults",
       actorId: params.user?._id?.toString(),
       actorEmail: params.user?.email,
-      actorRole: (params.user?.role && (params.user.role as any).name) || params.user?.role,
+      actorRole: activeRoleName(params.user),
       targetCollection: "Election",
       targetId: election._id?.toString(),
       details: { count: created.length },
@@ -170,7 +171,7 @@ export const updatePosition = async (params: {
     action: "position.update",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Position",
     targetId: position._id?.toString(),
     details: { updates: Object.keys(params.updates) },
@@ -212,17 +213,13 @@ export const softDeletePosition = async (params: {
     action: "position.delete",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Position",
     targetId: position._id?.toString(),
   });
 };
 
-const resolveRoleName = (user: any): string => {
-  const resolved =
-    (user?.role && (user.role as any).name) || (user?.role as string) || "";
-  return String(resolved).toLowerCase();
-};
+const resolveRoleName = (user: any): string => activeRoleName(user).toLowerCase();
 
 const ensureStudentCanView = (election: { published?: boolean; archived?: boolean }): void => {
   if (!election.published || election.archived) {

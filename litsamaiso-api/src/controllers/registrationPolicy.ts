@@ -1,5 +1,5 @@
 const PUBLIC_REGISTRATION_ALLOWED_ROLES = new Set(["student"]);
-const PRIVILEGED_ROLES = new Set(["appadmin", "institutionadmin", "finance", "saad"]);
+const PRIVILEGED_ROLES = new Set(["appadmin", "institutionadmin", "finance", "saad", "iec"]);
 
 export type RegistrationErrorCode =
   | "missingFields"

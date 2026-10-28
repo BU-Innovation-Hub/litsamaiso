@@ -9,7 +9,8 @@ export const auditActor = (user: any): AuditActor => {
   if (!user) return actor;
   if (user._id) actor.actorId = String(user._id);
   if (user.email) actor.actorEmail = String(user.email);
-  const role = typeof user.role === "string" ? user.role : user.role?.name;
+  // A Student acting as IEC is logged as IEC, the role the action was taken under
+  const role = user.$locals?.activeRole ?? (typeof user.role === "string" ? user.role : user.role?.name);
   if (role) actor.actorRole = String(role);
   return actor;
 };

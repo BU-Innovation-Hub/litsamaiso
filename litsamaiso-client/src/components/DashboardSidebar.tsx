@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut, Menu, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
-import { getInstitutionName, getRoleName, getUserInitials } from '../utils/userDisplay';
+import { getInstitutionName, getUserInitials } from '../utils/userDisplay';
 import { getVisibleNavItems, isNavItemActive } from '../navigation';
 import { feedbackService } from '../services/feedbackService';
 import { LogoutFeedbackModal } from './LogoutFeedbackModal';
@@ -11,13 +11,13 @@ import { LogoutFeedbackModal } from './LogoutFeedbackModal';
 const sidebarWidth = 'lg:w-72';
 
 export const DashboardSidebar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, activeRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
-  const roleName = getRoleName(user);
+  const roleName = activeRole;
   const institutionName = getInstitutionName(user);
   const username = user?.name || user?.email?.split('@')[0] || 'User';
   const visibleNavItems = getVisibleNavItems(roleName);
