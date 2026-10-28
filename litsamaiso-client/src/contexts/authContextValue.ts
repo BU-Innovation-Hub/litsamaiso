@@ -15,6 +15,8 @@ export interface AuthContextType {
   availableRoles: string[];
   // Holds several roles and hasn't picked one yet
   needsRoleChoice: boolean;
+  // On the IEC, and so not allowed to vote
+  isIecMember: boolean;
   switchRole: (role: string) => void;
 }
 

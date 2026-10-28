@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
-import { ACTIVE_ROLE_HEADER, activeRoleName } from "../utils/activeRole.js";
+import { ACTIVE_ROLE_HEADER, activeRoleName, holdsRole } from "../utils/activeRole.js";
 
 interface JwtPayload {
   sub: string;
@@ -88,4 +88,17 @@ export const requireRole = (roles: string[] | string) => {
 
     next();
   };
+};
+
+// The IEC runs the election, so its members can't vote in it, even from their Student dashboard.
+// Leaving the IEC lets them vote again, since membership is read fresh on every request.
+export const refuseIecVoters = (req: Request, res: Response, next: NextFunction) => {
+  if (holdsRole((req as any).user, "IEC")) {
+    res.status(403).json({
+      message: "IEC members can't vote while they're on the IEC",
+      code: "IEC_MEMBER_CANNOT_VOTE",
+    });
+    return;
+  }
+  next();
 };

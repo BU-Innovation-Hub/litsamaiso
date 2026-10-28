@@ -2,9 +2,9 @@ import test, { afterEach, before, mock } from "node:test";
 import assert from "node:assert/strict";
 import jwt from "jsonwebtoken";
 
-import { requireAuth, requireRole } from "./authMiddleware.js";
+import { refuseIecVoters, requireAuth, requireRole } from "./authMiddleware.js";
 import { User } from "../models/User.js";
-import { activeRoleName, heldRoleNames } from "../utils/activeRole.js";
+import { activeRoleName, heldRoleNames, holdsRole } from "../utils/activeRole.js";
 import { auditActor } from "../utils/auditLog.js";
 
 const studentOnIec = () => ({
@@ -117,4 +117,40 @@ test("auditActor records the role an action was taken under", () => {
   assert.equal(auditActor(user).actorRole, "student");
   user.$locals.activeRole = "IEC";
   assert.equal(auditActor(user).actorRole, "IEC");
+});
+
+const voteAllowed = (user: unknown) => {
+  let passed = false;
+  let status = 200;
+  let body: any;
+  const res: any = {
+    status: (code: number) => ((status = code), res),
+    json: (payload: unknown) => ((body = payload), res),
+  };
+  refuseIecVoters({ user } as any, res, () => {
+    passed = true;
+  });
+  return { passed, status, body };
+};
+
+test("an IEC member can't vote, whichever dashboard they're on", async () => {
+  for (const headers of [{}, { "x-active-role": "Student" }]) {
+    const { req } = await run(headers, studentOnIec());
+    const { passed, status, body } = voteAllowed(req.user);
+    assert.equal(passed, false);
+    assert.equal(status, 403);
+    assert.equal(body.code, "IEC_MEMBER_CANNOT_VOTE");
+  }
+});
+
+test("a student can vote, including once they've left the IEC", () => {
+  assert.equal(voteAllowed({ role: { name: "student" }, additionalRoles: [] }).passed, true);
+  assert.equal(voteAllowed({ ...studentOnIec(), additionalRoles: [] }).passed, true);
+});
+
+test("holdsRole ignores case and unpopulated ids", () => {
+  assert.equal(holdsRole(studentOnIec(), "iec"), true);
+  assert.equal(holdsRole(studentOnIec(), "Student"), true);
+  assert.equal(holdsRole({ role: { name: "student" }, additionalRoles: ["65f0c0ffee"] }, "IEC"), false);
+  assert.equal(holdsRole(null, "IEC"), false);
 });

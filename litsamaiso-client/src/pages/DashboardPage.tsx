@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Users,
   type LucideIcon,
+  ShieldAlert,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
@@ -29,6 +30,7 @@ import { registryService, type RegistryDashboard } from '../services/registrySer
 import { userService } from '../services/userService';
 import { canAccess, roleAccess, type RoleName } from '../utils/roleAccess';
 import { isAdminDashboardRole } from '../navigation';
+import { IEC_CANNOT_VOTE_MESSAGE } from '../utils/roleChoices';
 import type { Account, Election, Institution, User } from '../types';
 
 interface AdminIssue {
@@ -203,7 +205,7 @@ const InsightCard: React.FC<{ insight: InsightItem }> = ({ insight }) => {
 };
 
 const DashboardPage: React.FC = () => {
-  const { user, activeRole: roleName } = useAuth();
+  const { user, activeRole: roleName, isIecMember } = useAuth();
   // SAAD and the IEC share the election management dashboard
   const isElectionAdmin = canAccess(roleName, roleAccess.electionManagement);
   const institutionName = getInstitutionName(user);
@@ -961,6 +963,15 @@ const DashboardPage: React.FC = () => {
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
                   Continue with confirmation, follow corrections, or check election activity from one place.
                 </p>
+                {isIecMember && (
+                  <p
+                    role="alert"
+                    className="mt-3 flex items-center gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800"
+                  >
+                    <ShieldAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {IEC_CANNOT_VOTE_MESSAGE}
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap gap-3">
                 <Link to="/confirmation" className="inline-flex items-center gap-2 rounded-full bg-primary-clr px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5">

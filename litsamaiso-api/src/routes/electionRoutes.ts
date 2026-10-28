@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import multer from "multer";
-import { requireAuth, requireRole } from "../middleware/authMiddleware.js";
+import { refuseIecVoters, requireAuth, requireRole } from "../middleware/authMiddleware.js";
 import { createRateLimit } from "../middleware/rateLimit.js";
 import {
   createElectionHandler,
@@ -182,6 +182,7 @@ router.delete(
 router.post(
   "/:electionId/face-verify",
   requireRole("Student"),
+  refuseIecVoters,
   createRateLimit({ windowMs: 60 * 1000, max: 10, keyPrefix: "face-verify" }),
   readFacePhoto,
   verifyFaceHandler,
@@ -190,6 +191,7 @@ router.post(
 router.post(
   "/:electionId/vote",
   requireRole("Student"),
+  refuseIecVoters,
   createRateLimit({ windowMs: 60 * 1000, max: 5, keyPrefix: "vote" }),
   requireFaceVerification,
   castVoteHandler,

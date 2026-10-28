@@ -61,6 +61,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // The role the app is shown as; anyone with a single role simply has their own
   const activeRole = hasValidChoice ? (chosenRole as string) : primaryRole;
   const needsRoleChoice = availableRoles.length > 1 && !hasValidChoice;
+  // IEC members run elections, so they can't vote in them while they're on the IEC
+  const isIecMember = availableRoles.includes('IEC');
 
   const switchRole = (role: string) => {
     if (!user || !availableRoles.includes(role)) return;
@@ -209,6 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         activeRole,
         availableRoles,
         needsRoleChoice,
+        isIecMember,
         switchRole,
       }}
     >

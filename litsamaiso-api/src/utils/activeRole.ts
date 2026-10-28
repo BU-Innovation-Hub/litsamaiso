@@ -22,3 +22,9 @@ export const heldRoleNames = (user: any): string[] => {
   const names = [nameOf(user?.role), ...additional].filter(Boolean);
   return [...new Set(names)];
 };
+
+// Whether the user holds a role at all, whichever one this request is made as
+export const holdsRole = (user: any, name: string): boolean => {
+  const wanted = name.toLowerCase();
+  return heldRoleNames(user).some((held) => held.toLowerCase() === wanted);
+};

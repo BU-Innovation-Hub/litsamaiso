@@ -22,3 +22,7 @@ const roleChoices: Record<string, RoleChoice> = {
 
 export const getRoleChoice = (role: string): RoleChoice =>
   roleChoices[role] ?? { label: role, description: '', icon: GraduationCap };
+
+// Shown on the Student dashboard to someone on the IEC, who can't vote while a member
+export const IEC_CANNOT_VOTE_MESSAGE =
+  "You're on the IEC, so you can't vote while you're a member. Switch to IEC from the header to run elections.";
