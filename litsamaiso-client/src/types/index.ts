@@ -5,6 +5,10 @@ export interface User {
   name?: string;
   email: string;
   role: Role;
+  // Every role held, primary first; more than one means the user picks which to work as
+  availableRoles?: string[];
+  // Roles held on top of the primary one, as returned by the users admin list
+  additionalRoles?: Role[];
   institution?: Institution;
   studentId?: string;
   borrowerNumber?: string;
@@ -20,7 +24,7 @@ export interface User {
 
 export interface Role {
   _id: string;
-  name: 'Student' | 'InstitutionAdmin' | 'AppAdmin' | 'Finance' | 'SAAD' | 'Registry';
+  name: 'Student' | 'InstitutionAdmin' | 'AppAdmin' | 'Finance' | 'SAAD' | 'IEC' | 'Registry';
   permissions?: string[];
 }
 

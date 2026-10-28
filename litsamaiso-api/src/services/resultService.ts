@@ -11,6 +11,7 @@ import {
 } from "../models/ResultSnapshot.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
+import { activeRoleName } from "../utils/activeRole.js";
 
 const snapshotHash = (payload: string): string => {
   const secret = process.env.ELECTION_HMAC_SECRET;
@@ -178,7 +179,7 @@ export const computeElectionResults = async (
     action: "results.count",
     actorId: options?.actor?._id?.toString(),
     actorEmail: options?.actor?.email,
-    actorRole: (options?.actor?.role && (options?.actor?.role as any).name) || options?.actor?.role,
+    actorRole: activeRoleName(options?.actor),
     targetCollection: "ResultSnapshot",
     targetId: snapshot._id?.toString(),
     details: { electionId: election._id?.toString(), source: options?.source || "manual" },

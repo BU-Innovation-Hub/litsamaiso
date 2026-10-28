@@ -4,6 +4,7 @@ import axios, {
   type AxiosInstance,
   type InternalAxiosRequestConfig,
 } from 'axios';
+import { ACTIVE_ROLE_HEADER, getStoredActiveRole, notifyActiveRoleRevoked } from './activeRole';
 
 const DEFAULT_API_BASE_URL = 'http://localhost:5000';
 const API_V1_PATH = '/api/v1';
@@ -113,6 +114,10 @@ api.interceptors.request.use(
     const token = getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+      const activeRole = getStoredActiveRole();
+      if (activeRole) {
+        config.headers[ACTIVE_ROLE_HEADER] = activeRole;
+      }
     }
     config.metadata = { startedAt: Date.now() };
     return config;
@@ -141,6 +146,9 @@ api.interceptors.response.use(
     });
     if (error.response?.status === 401 && !isAuthEndpoint) {
       notifyAuthExpired();
+    }
+    if ((error.response?.data as { code?: string } | undefined)?.code === 'ACTIVE_ROLE_NOT_HELD') {
+      notifyActiveRoleRevoked();
     }
     return Promise.reject(error);
   }

@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { KeyRound, Search, ShieldOff, Trash2, UserCog, Users } from 'lucide-react';
+import { ClipboardCheck, KeyRound, Search, ShieldOff, Trash2, UserCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { userService } from '../services/userService';
 import { institutionService } from '../services/institutionService';
 import type { Role, User, Institution } from '../types';
 import { getApiErrorMessage } from '../utils/apiError';
-import { getInstitutionName, getRoleName } from '../utils/userDisplay';
+import { getInstitutionName, getRoleName, normalizeRoleName } from '../utils/userDisplay';
 import { useAuth } from '../hooks/useAuth';
 import PasswordInput from '../components/ui/PasswordInput';
 
 const PAGE_SIZE = 200;
 const getUserId = (user: User) => user.id || user._id || '';
+const isIecRole = (role: Role) => normalizeRoleName(role.name) === 'IEC';
+const isIecMember = (user: User) => (user.additionalRoles ?? []).some(isIecRole);
 
 const UsersPage: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -22,6 +24,8 @@ const UsersPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
+  // IEC is appointed on top of a Student role, so it is never offered as an account's own role
+  const assignableRoles = roles.filter((role) => !isIecRole(role));
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -112,7 +116,7 @@ const UsersPage: React.FC = () => {
 
   const openCreateModal = async () => {
     // prepare form defaults
-    const defaultRole = roles.find((r) => r.name !== 'AppAdmin' && r.name !== 'Student')?.name || roles[0]?.name || '';
+    const defaultRole = assignableRoles.find((r) => r.name !== 'AppAdmin' && r.name !== 'Student')?.name || assignableRoles[0]?.name || '';
     if (isAppAdmin) {
       try {
         const insts = await institutionService.getInstitutions();
@@ -158,6 +162,19 @@ const UsersPage: React.FC = () => {
       await loadUsers();
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Failed to update user role'));
+    }
+  };
+
+  const handleIecToggle = async (targetUser: User, member: boolean) => {
+    const userId = getUserId(targetUser);
+    if (!userId) return;
+
+    try {
+      await userService.setIecMembership(userId, member);
+      toast.success(member ? `${targetUser.email} appointed to the IEC` : `${targetUser.email} removed from the IEC`);
+      await loadUsers();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to change IEC membership'));
     }
   };
 
@@ -312,6 +329,7 @@ const UsersPage: React.FC = () => {
                   users.map((user) => {
                     const userRole = getRoleName(user);
                     const roleId = typeof user.role === 'string' ? user.role : user.role?._id;
+                    const onIec = isIecMember(user);
 
                     return (
                       <tr key={getUserId(user)}>
@@ -324,7 +342,7 @@ const UsersPage: React.FC = () => {
                               className="rounded border border-gray-300 px-2 py-1 text-sm"
                             >
                               <option value="">{userRole || 'Select role'}</option>
-                              {roles.map((role) => (
+                              {assignableRoles.map((role) => (
                                 <option key={role._id} value={role._id}>
                                   {role.name}
                                 </option>
@@ -332,6 +350,11 @@ const UsersPage: React.FC = () => {
                             </select>
                           ) : (
                             userRole || '-'
+                          )}
+                          {onIec && (
+                            <span className="ml-2 rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-active-clr">
+                              IEC
+                            </span>
                           )}
                         </td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{getInstitutionName(user) || '-'}</td>
@@ -360,6 +383,18 @@ const UsersPage: React.FC = () => {
                                 onClick={() => setTotpResetTarget(user)}
                               >
                                 <ShieldOff className="h-4 w-4" />
+                              </button>
+                            )}
+                            {userRole === 'Student' && (
+                              <button
+                                className={onIec ? 'text-active-clr hover:text-red-700' : 'text-gray-400 hover:text-active-clr'}
+                                title={onIec ? 'Remove from IEC' : 'Appoint to IEC'}
+                                aria-label={`${onIec ? 'Remove from' : 'Appoint to'} IEC: ${user.email}`}
+                                aria-pressed={onIec}
+                                type="button"
+                                onClick={() => handleIecToggle(user, !onIec)}
+                              >
+                                <ClipboardCheck className="h-4 w-4" />
                               </button>
                             )}
                             <button
@@ -512,7 +547,7 @@ const UsersPage: React.FC = () => {
                   className="w-full rounded-md border border-gray-300 px-3 py-2"
                 >
                   <option value="">Select role</option>
-                  {roles
+                  {assignableRoles
                     .filter((r) => r.name !== 'AppAdmin')
                     .map((role) => (
                       <option key={role._id} value={role.name}>{role.name}</option>

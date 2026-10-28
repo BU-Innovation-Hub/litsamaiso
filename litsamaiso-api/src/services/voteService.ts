@@ -12,14 +12,11 @@ import { buildBallotHash, type BallotSelection } from "../utils/ballotHash.js";
 import { syncDueElections } from "./electionService.js";
 import { LATE_BALLOT_GRACE_MS } from "./electionScheduler.js";
 import { withOptionalTransaction } from "../utils/transaction.js";
+import { activeRoleName } from "../utils/activeRole.js";
 
 type VoteReceipt = { receiptId: string; submittedAt: Date };
 
-const resolveRoleName = (user: any): string => {
-  const resolved =
-    (user?.role && (user.role as any).name) || (user?.role as string) || "";
-  return String(resolved).toLowerCase();
-};
+const resolveRoleName = (user: any): string => activeRoleName(user).toLowerCase();
 
 const ensureStudentEligibility = async (params: {
   studentId: string;
@@ -226,7 +223,7 @@ export const castVote = async (params: {
     action: "vote.cast",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "VoterRecord",
     details: {
       electionId: election._id?.toString(),

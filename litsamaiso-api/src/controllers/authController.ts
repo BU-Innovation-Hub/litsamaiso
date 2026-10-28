@@ -23,6 +23,7 @@ import {
   isPublicRegistrationAllowed,
   normalizeRoleName,
 } from "./registrationPolicy.js";
+import { heldRoleNames } from "../utils/activeRole.js";
 
 const signToken = (userId: string, rememberMe: boolean): string => {
   const secret = process.env.JWT_SECRET;
@@ -348,6 +349,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   )
     .select("+password")
     .populate("role", "name")
+    .populate("additionalRoles", "name")
     .populate("institution", "name email locked lockedReason");
 
   // The identifier is recorded even when no account matches, to show guessing
@@ -400,6 +402,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       id: user._id,
       email: user.email,
       role: user.role,
+      // More than one entry means the user picks which role to work as (a Student on the IEC)
+      availableRoles: heldRoleNames(user),
       institution: user.institution,
       studentId: user.studentId,
       borrowerNumber: user.borrowerNumber,

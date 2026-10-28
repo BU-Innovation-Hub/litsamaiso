@@ -3,8 +3,9 @@ import { User } from "../models/User.js";
 import { Role } from "../models/Role.js";
 import { auditActor, recordAudit } from "../utils/auditLog.js";
 import bcrypt from "bcryptjs";
-import { isValidObjectId } from "mongoose";
+import { isValidObjectId, Types } from "mongoose";
 import { resetTotp } from "../services/totpService.js";
+import { appointIecMember, removeIecMember } from "../services/iecService.js";
 import AppError from "../utils/errors.js";
 
 // Helper: get id string from ObjectId, populated doc, or string
@@ -68,7 +69,10 @@ export const listUsers = async (req: Request, res: Response): Promise<void> => {
       res.json({ users: [] });
       return;
     }
-    query.role = roleId;
+    // Matches the primary role or an additional one, so filtering by IEC finds its students.
+    // Cast to an ObjectId so the role counts aggregate below matches it too.
+    const roleObjectId = new Types.ObjectId(roleId);
+    query.$and = [{ $or: [{ role: roleObjectId }, { additionalRoles: roleObjectId }] }];
   }
 
   // Search filter: email, studentId, or name
@@ -84,15 +88,19 @@ export const listUsers = async (req: Request, res: Response): Promise<void> => {
 
   const [users, total, roleCountsAggregate] = await Promise.all([
     User.find(query)
-      .select("email role institution studentId faceImageUrl name totpEnabledAt")
+      .select("email role additionalRoles institution studentId faceImageUrl name totpEnabledAt")
       .populate("role", "name")
+      .populate("additionalRoles", "name")
       .populate("institution", "name email")
       .skip(skip)
       .limit(lim),
     User.countDocuments(query),
     User.aggregate([
       { $match: query },
-      { $lookup: { from: "roles", localField: "role", foreignField: "_id", as: "roleDoc" } },
+      // Count additional roles too, so the IEC shows up alongside the primary roles
+      { $project: { roleIds: { $concatArrays: [["$role"], { $ifNull: ["$additionalRoles", []] }] } } },
+      { $unwind: "$roleIds" },
+      { $lookup: { from: "roles", localField: "roleIds", foreignField: "_id", as: "roleDoc" } },
       { $unwind: "$roleDoc" },
       { $group: { _id: "$roleDoc.name", count: { $sum: 1 } } },
     ]),
@@ -117,8 +125,9 @@ export const getUser = async (req: Request, res: Response): Promise<void> => {
   const currentUser = (req as any).user;
 
   const user = await User.findById(id)
-    .select("email role institution studentId faceImageUrl name totpEnabledAt")
+    .select("email role additionalRoles institution studentId faceImageUrl name totpEnabledAt")
     .populate("role", "name")
+    .populate("additionalRoles", "name")
     .populate("institution", "name email");
   if (!user) {
     res.status(404).json({ message: "User not found" });
@@ -202,6 +211,11 @@ export const updateUser = async (
         }
         if (!roleDoc) {
           res.status(400).json({ message: "Role not found" });
+          return;
+        }
+        // IEC is held by students on top of their Student role, never as an account's own role
+        if (String(roleDoc.name).toLowerCase() === "iec") {
+          res.status(400).json({ message: "Appoint students to the IEC instead of making it their role" });
           return;
         }
         user.role = roleDoc._id;
@@ -303,3 +317,43 @@ export const resetUserTotp = async (
     res.status(500).json({ message: "The authenticator app could not be reset. Please try again." });
   }
 };
+
+// Appoint a student to, or remove them from, their institution's IEC; audit-logged
+const changeIecMembership = (change: typeof appointIecMember) =>
+  async (req: Request, res: Response): Promise<void> => {
+    const id = String(req.params.id ?? "");
+    if (!isValidObjectId(id)) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const target = await User.findById(id).select("institution");
+    if (!target) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+    if (!canOperateOn((req as any).user, target)) {
+      res.status(403).json({ message: "Forbidden" });
+      return;
+    }
+
+    try {
+      await change({ actor: (req as any).user, userId: id });
+      const user = await User.findById(id)
+        .select("email role additionalRoles institution studentId faceImageUrl name totpEnabledAt")
+        .populate("role", "name")
+        .populate("additionalRoles", "name")
+        .populate("institution", "name email");
+      res.json({ user });
+    } catch (err: unknown) {
+      if (err instanceof AppError) {
+        res.status(err.statusCode).json({ message: err.message, code: err.code });
+        return;
+      }
+      console.error("Failed to change IEC membership", err);
+      res.status(500).json({ message: "IEC membership could not be changed. Please try again." });
+    }
+  };
+
+export const appointIec = changeIecMembership(appointIecMember);
+export const removeIec = changeIecMembership(removeIecMember);

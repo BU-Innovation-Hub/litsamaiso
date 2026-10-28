@@ -4,6 +4,7 @@ import { PositionTemplate, type PositionTemplateDocument } from "../models/Posit
 import { SRC_POSITION_TEMPLATES, normalizePositionLabel } from "../constants/srcPositions.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
+import { activeRoleName } from "../utils/activeRole.js";
 
 const requireInstitution = (user: any): Types.ObjectId => {
   if (!user?.institution) throw new AppError("User is not linked to an institution", 400);
@@ -51,7 +52,7 @@ export const importSrcPositionTemplates = async (params: {
       action: "position-template.import-src",
       actorId: params.user._id?.toString(),
       actorEmail: params.user.email,
-      actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+      actorRole: activeRoleName(params.user),
       targetCollection: "PositionTemplate",
       details: { count: payloads.length },
     });

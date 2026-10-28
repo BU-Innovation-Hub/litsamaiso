@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { getInstitutionName, getRoleName } from '../utils/userDisplay';
+import { getInstitutionName } from '../utils/userDisplay';
 import { adminIssueService } from '../services/adminIssueService';
 import { accountService, type AccountReports } from '../services/accountService';
 import { electionService } from '../services/electionService';
@@ -85,7 +85,7 @@ interface InsightItem {
   icon: LucideIcon;
 }
 
-const dashboardElectionRoles: RoleName[] = ['SAAD', 'Student'];
+const dashboardElectionRoles: RoleName[] = ['SAAD', 'IEC', 'Student'];
 
 const formatStatus = (status?: string) =>
   status ? status.replace(/[_-]/g, ' ') : 'Not available';
@@ -203,8 +203,9 @@ const InsightCard: React.FC<{ insight: InsightItem }> = ({ insight }) => {
 };
 
 const DashboardPage: React.FC = () => {
-  const { user } = useAuth();
-  const roleName = getRoleName(user);
+  const { user, activeRole: roleName } = useAuth();
+  // SAAD and the IEC share the election management dashboard
+  const isElectionAdmin = canAccess(roleName, roleAccess.electionManagement);
   const institutionName = getInstitutionName(user);
   const isAdminShell = isAdminDashboardRole(roleName);
   const [isLoading, setIsLoading] = useState(true);
@@ -361,7 +362,7 @@ const DashboardPage: React.FC = () => {
       ];
     }
 
-    if (roleName === 'SAAD') {
+    if (isElectionAdmin) {
       return [
         {
           label: 'Total elections',
@@ -531,6 +532,7 @@ const DashboardPage: React.FC = () => {
     confirmation?.message,
     elections.length,
     institutions.length,
+    isElectionAdmin,
     openElections,
     pendingIssues,
     rejectedIssues,
@@ -578,7 +580,7 @@ const DashboardPage: React.FC = () => {
       ];
     }
 
-    if (roleName === 'SAAD') {
+    if (isElectionAdmin) {
       return [
         {
           label: 'Manage elections',
@@ -641,7 +643,7 @@ const DashboardPage: React.FC = () => {
     }
 
     return actions.slice(0, 4);
-  }, [canViewAdminIssues, canViewElections, canViewInstitutions, canViewReports, canViewUsers, roleName]);
+  }, [canViewAdminIssues, canViewElections, canViewInstitutions, canViewReports, canViewUsers, isElectionAdmin, roleName]);
 
   const insights = useMemo<InsightItem[]>(() => {
     if (roleName === 'Student') {
@@ -859,7 +861,7 @@ const DashboardPage: React.FC = () => {
                         <p className="text-sm text-slate-500">{formatStatus(election.status)}</p>
                       </div>
                       <Link
-                        to={roleName === 'SAAD' ? '/elections/manage' : '/elections'}
+                        to={isElectionAdmin ? '/elections/manage' : '/elections'}
                         className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-2 text-sm font-semibold text-active-clr shadow-sm transition hover:bg-slate-100"
                       >
                         Open

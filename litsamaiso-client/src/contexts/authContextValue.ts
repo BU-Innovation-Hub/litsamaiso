@@ -9,6 +9,13 @@ export interface AuthContextType {
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   setUser: (user: User | null) => void;
+  // The role the signed-in user is working as; differs from their own role only for
+  // someone holding several, such as a Student on the IEC
+  activeRole: string;
+  availableRoles: string[];
+  // Holds several roles and hasn't picked one yet
+  needsRoleChoice: boolean;
+  switchRole: (role: string) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);

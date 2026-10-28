@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Navigate, Outlet } from 'react-router-dom';
-import { getRoleName } from '../utils/userDisplay';
 import { canAccess, type RoleName } from '../utils/roleAccess';
 
 export const ProtectedRoute: React.FC = () => {
@@ -33,8 +32,7 @@ export const PublicRoute: React.FC = () => {
 };
 
 export const RoleRoute: React.FC<{ allowedRoles: readonly RoleName[] }> = ({ allowedRoles }) => {
-  const { user, isAuthenticated, isLoading } = useAuth();
-  const roleName = getRoleName(user);
+  const { isAuthenticated, isLoading, activeRole: roleName } = useAuth();
 
   if (isLoading) {
     return (

@@ -17,6 +17,7 @@ import {
 } from "./electionScheduler.js";
 import { copyPositionTemplatesToElection } from "./positionTemplateService.js";
 import { queueElectionNotificationSafely } from "./electionNotificationService.js";
+import { activeRoleName } from "../utils/activeRole.js";
 
 const ensureEditable = (election: ElectionDocument): void => {
   if (["OPEN", "CLOSED", "COUNTING", "RESULTS_PUBLISHED", "ARCHIVED"].includes(election.status)) {
@@ -29,7 +30,7 @@ const DELETABLE_STATUSES: ElectionStatus[] = ["DRAFT", "SCHEDULED"];
 const actorFields = (user: any) => ({
   actorId: user?._id?.toString(),
   actorEmail: user?.email,
-  actorRole: (user?.role && (user.role as any).name) || user?.role,
+  actorRole: activeRoleName(user),
 });
 
 const findInstitutionElection = async (user: any, electionId: string) => {
@@ -83,7 +84,7 @@ export const createElection = async (params: {
     action: "election.create",
     actorId: params.user._id?.toString(),
     actorEmail: params.user.email,
-    actorRole: (params.user.role && (params.user.role as any).name) || params.user.role,
+    actorRole: activeRoleName(params.user),
     targetCollection: "Election",
     targetId: election._id?.toString(),
     details: { title },

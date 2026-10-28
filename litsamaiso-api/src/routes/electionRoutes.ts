@@ -107,74 +107,74 @@ const uploadCandidateSpreadsheet = (
 // Apply authentication middleware to all routes in this router
 router.use(requireAuth);
 
-router.get("/", requireRole(["SAAD", "Student"]), listElectionsHandler);
+router.get("/", requireRole(["SAAD", "IEC", "Student"]), listElectionsHandler);
 // Institution-level standard positions; registered before "/:id" so the path isn't read as an election id
-router.get("/position-templates", requireRole("SAAD"), listPositionTemplatesHandler);
-router.post("/position-templates/import", requireRole("SAAD"), importSrcPositionTemplatesHandler);
-router.get("/:id", requireRole(["SAAD", "Student"]), getElectionHandler);
+router.get("/position-templates", requireRole(["SAAD", "IEC"]), listPositionTemplatesHandler);
+router.post("/position-templates/import", requireRole(["SAAD", "IEC"]), importSrcPositionTemplatesHandler);
+router.get("/:id", requireRole(["SAAD", "IEC", "Student"]), getElectionHandler);
 
-router.post("/", requireRole("SAAD"), createElectionHandler);
-router.patch("/:id", requireRole("SAAD"), updateElectionHandler);
-router.post("/:id/schedule", requireRole("SAAD"), scheduleElectionHandler);
+router.post("/", requireRole(["SAAD", "IEC"]), createElectionHandler);
+router.patch("/:id", requireRole(["SAAD", "IEC"]), updateElectionHandler);
+router.post("/:id/schedule", requireRole(["SAAD", "IEC"]), scheduleElectionHandler);
 // Kept as an alias of schedule: scheduling is the only way to make an election visible
-router.post("/:id/publish", requireRole("SAAD"), scheduleElectionHandler);
-router.get("/:id/readiness", requireRole("SAAD"), getScheduleReadinessHandler);
-router.post("/:id/close", requireRole("SAAD"), closeElectionHandler);
-router.post("/:id/extend", requireRole("SAAD"), extendElectionHandler);
-router.post("/:id/archive", requireRole("SAAD"), archiveElectionHandler);
-router.post("/:id/publish-results", requireRole("SAAD"), publishResultsHandler);
-router.delete("/:id", requireRole("SAAD"), deleteElectionHandler);
+router.post("/:id/publish", requireRole(["SAAD", "IEC"]), scheduleElectionHandler);
+router.get("/:id/readiness", requireRole(["SAAD", "IEC"]), getScheduleReadinessHandler);
+router.post("/:id/close", requireRole(["SAAD", "IEC"]), closeElectionHandler);
+router.post("/:id/extend", requireRole(["SAAD", "IEC"]), extendElectionHandler);
+router.post("/:id/archive", requireRole(["SAAD", "IEC"]), archiveElectionHandler);
+router.post("/:id/publish-results", requireRole(["SAAD", "IEC"]), publishResultsHandler);
+router.delete("/:id", requireRole(["SAAD", "IEC"]), deleteElectionHandler);
 
 router.post(
   "/:electionId/positions",
-  requireRole("SAAD"),
+  requireRole(["SAAD", "IEC"]),
   createPositionHandler,
 );
 router.get(
   "/:electionId/positions",
-  requireRole(["SAAD", "Student"]),
+  requireRole(["SAAD", "IEC", "Student"]),
   listPositionsByElectionHandler,
 );
-router.get("/positions/:id", requireRole(["SAAD", "Student"]), getPositionHandler);
-router.patch("/positions/:id", requireRole("SAAD"), updatePositionHandler);
-router.delete("/positions/:id", requireRole("SAAD"), deletePositionHandler);
+router.get("/positions/:id", requireRole(["SAAD", "IEC", "Student"]), getPositionHandler);
+router.patch("/positions/:id", requireRole(["SAAD", "IEC"]), updatePositionHandler);
+router.delete("/positions/:id", requireRole(["SAAD", "IEC"]), deletePositionHandler);
 
 router.post(
   "/:electionId/positions/:positionId/candidates",
-  requireRole("SAAD"),
+  requireRole(["SAAD", "IEC"]),
   uploadCandidateImage,
   createCandidateHandler,
 );
 router.post(
   "/:electionId/candidates/import",
-  requireRole("SAAD"),
+  requireRole(["SAAD", "IEC"]),
   uploadCandidateSpreadsheet,
   importCandidatesHandler,
 );
 router.get(
   "/positions/:positionId/candidates",
-  requireRole(["SAAD", "Student"]),
+  requireRole(["SAAD", "IEC", "Student"]),
   listCandidatesByPositionHandler,
 );
 router.patch(
   "/candidates/:id",
-  requireRole("SAAD"),
+  requireRole(["SAAD", "IEC"]),
   uploadCandidateImage,
   updateCandidateHandler,
 );
 router.post(
   "/candidates/:id/approve",
-  requireRole("SAAD"),
+  requireRole(["SAAD", "IEC"]),
   approveCandidateHandler,
 );
 router.post(
   "/candidates/:id/disqualify",
-  requireRole("SAAD"),
+  requireRole(["SAAD", "IEC"]),
   disqualifyCandidateHandler,
 );
 router.delete(
   "/candidates/:id",
-  requireRole("SAAD"),
+  requireRole(["SAAD", "IEC"]),
   deleteCandidateHandler,
 );
 
@@ -197,22 +197,22 @@ router.post(
 
 router.get(
   "/:electionId/results",
-  requireRole(["SAAD", "Student"]),
+  requireRole(["SAAD", "IEC", "Student"]),
   getResultsHandler,
 );
 router.get(
   "/:electionId/results/winners",
-  requireRole(["SAAD", "Student"]),
+  requireRole(["SAAD", "IEC", "Student"]),
   getResultsWinnersHandler,
 );
 router.get(
   "/:electionId/results/positions/:positionId",
-  requireRole(["SAAD", "Student"]),
+  requireRole(["SAAD", "IEC", "Student"]),
   getResultsByPositionHandler,
 );
 router.post(
   "/:electionId/results/recompute",
-  requireRole("SAAD"),
+  requireRole(["SAAD", "IEC"]),
   recomputeResultsHandler,
 );
 

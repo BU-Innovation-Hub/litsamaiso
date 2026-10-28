@@ -12,6 +12,7 @@ import {
 import { uploadFileBuffer } from "../utils/cloudinary.js";
 import { auditActor, recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
+import { heldRoleNames } from "../utils/activeRole.js";
 
 const getRoleName = (role: any): string =>
   String((role && role.name) || role || "Student");
@@ -30,6 +31,8 @@ const serializeProfile = (user: any) => ({
   // Students need an authenticator app before they can take or retake their photo
   totpEnabled: Boolean(user.totpEnabledAt),
   role: getRoleName(user.role),
+  // More than one entry means the user picks which role to work as (a Student on the IEC)
+  availableRoles: heldRoleNames(user),
   institution: user.institution,
   createdAt: user.createdAt,
   updatedAt: user.updatedAt,
@@ -53,6 +56,7 @@ export const getProfile = async (
 
   const user = await User.findById(currentUser._id)
     .populate("role", "name")
+    .populate("additionalRoles", "name")
     .populate("institution", "name email")
     .select("+faceDescriptor");
 
@@ -113,6 +117,7 @@ export const updateProfile = async (
     { new: true, runValidators: true },
   )
     .populate("role", "name")
+    .populate("additionalRoles", "name")
     .populate("institution", "name email")
     .select("+faceDescriptor");
 
@@ -176,6 +181,7 @@ export const saveFacePhoto = async (
       { new: true, runValidators: true },
     )
       .populate("role", "name")
+    .populate("additionalRoles", "name")
       .populate("institution", "name email")
       .select("+faceDescriptor");
 

@@ -1,11 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import type { User } from '../types';
 import { authService } from '../services/authService';
 import { accountService } from '../services/accountService';
 import { feedbackService } from '../services/feedbackService';
 import { AuthContext } from './authContextValue';
 import { onAuthExpired } from '../lib/api';
+import {
+  clearStoredActiveRole,
+  getStoredActiveRole,
+  onActiveRoleRevoked,
+  storeActiveRole,
+} from '../lib/activeRole';
+import { getRoleName, normalizeRoleName, sanitizeUserForStorage } from '../utils/userDisplay';
 import posthog from 'posthog-js';
 
 const clearStoredAuth = () => {
@@ -40,6 +48,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const location = useLocation();
   const [user, setUser] = useState<User | null>(() => getStoredUser());
   const [isLoading, setIsLoading] = useState(false);
+  const [chosenRole, setChosenRole] = useState<string | null>(() =>
+    getStoredActiveRole(getStoredUser()?.id)
+  );
+
+  const primaryRole = getRoleName(user);
+  const availableRoles = useMemo(() => {
+    const names = (user?.availableRoles ?? []).map(normalizeRoleName);
+    return [...new Set([primaryRole, ...names].filter(Boolean))];
+  }, [user?.availableRoles, primaryRole]);
+  const hasValidChoice = Boolean(chosenRole && availableRoles.includes(chosenRole));
+  // The role the app is shown as; anyone with a single role simply has their own
+  const activeRole = hasValidChoice ? (chosenRole as string) : primaryRole;
+  const needsRoleChoice = availableRoles.length > 1 && !hasValidChoice;
+
+  const switchRole = (role: string) => {
+    if (!user || !availableRoles.includes(role)) return;
+    storeActiveRole(user.id, role);
+    setChosenRole(role);
+  };
+
+  // The API refused the role being sent, e.g. they were removed from the IEC while signed in
+  useEffect(() => {
+    return onActiveRoleRevoked(() => {
+      clearStoredActiveRole();
+      setChosenRole(null);
+      setUser((current) => {
+        if (!current) return current;
+        const updated = { ...current, availableRoles: [getRoleName(current)] };
+        try {
+          localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(updated)));
+        } catch {
+          // Storage can be unavailable on some mobile WebKit contexts.
+        }
+        return updated;
+      });
+      toast.info('You no longer have that role, so you are back on your own dashboard.');
+      navigate('/dashboard', { replace: true });
+    });
+  }, [navigate]);
 
   useEffect(() => {
     return onAuthExpired(() => {
@@ -83,6 +130,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         rememberMe,
       });
       setUser(response.user);
+      // Keep the role this user last worked as; a different user on this device starts fresh
+      const rememberedRole = getStoredActiveRole(response.user.id);
+      if (!rememberedRole) clearStoredActiveRole();
+      setChosenRole(rememberedRole);
       posthog.identify(response.user.id, {
         email: response.user.email,
         name: response.user.name,
@@ -155,6 +206,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         register,
         logout,
         setUser,
+        activeRole,
+        availableRoles,
+        needsRoleChoice,
+        switchRole,
       }}
     >
       {children}

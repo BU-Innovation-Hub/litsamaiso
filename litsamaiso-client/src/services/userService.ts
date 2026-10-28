@@ -60,6 +60,14 @@ export const userService = {
     return response.data;
   },
 
+  // Appoints a student to, or removes them from, their institution's IEC (AppAdmin, InstitutionAdmin)
+  setIecMembership: async (userId: string, member: boolean) => {
+    const response = member
+      ? await apiClient.post<{ user: User }>(`/users/${userId}/iec`)
+      : await apiClient.delete<{ user: User }>(`/users/${userId}/iec`);
+    return response.data;
+  },
+
   // Change password
   changePassword: async (oldPassword: string, newPassword: string) => {
     const response = await apiClient.post('/users/change-password', {

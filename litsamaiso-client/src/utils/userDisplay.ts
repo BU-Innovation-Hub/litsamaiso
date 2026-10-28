@@ -7,6 +7,7 @@ export const normalizeRoleName = (roleName: string): string => {
   if (normalized === 'institutionadmin') return 'InstitutionAdmin';
   if (normalized === 'finance') return 'Finance';
   if (normalized === 'saad') return 'SAAD';
+  if (normalized === 'iec') return 'IEC';
   if (normalized === 'registry') return 'Registry';
   if (normalized === 'student') return 'Student';
   return roleName;

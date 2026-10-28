@@ -253,6 +253,12 @@ export const createInstitutionRoleUser = async (req: Request, res: Response): Pr
       return;
     }
 
+    // IEC is held by students on top of their Student role, never as an account's own role
+    if (String(role).trim().toLowerCase() === "iec") {
+      res.status(400).json({ message: "IEC members are appointed from student accounts on the Users page" });
+      return;
+    }
+
     const institution = await Institution.findById(id);
     if (!institution) {
       res.status(404).json({ message: "Institution not found" });
