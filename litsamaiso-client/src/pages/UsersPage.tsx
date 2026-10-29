@@ -464,7 +464,7 @@ const UsersPage: React.FC = () => {
                 type="button"
                 onClick={handleTotpReset}
                 disabled={resettingTotp}
-                className="rounded-md bg-amber-600 px-4 py-2 font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                className="rounded-md bg-primary-clr px-4 py-2 font-semibold text-white hover:bg-active transition-colors disabled:opacity-50"
               >
                 {resettingTotp ? 'Resetting...' : 'Reset authenticator'}
               </button>
