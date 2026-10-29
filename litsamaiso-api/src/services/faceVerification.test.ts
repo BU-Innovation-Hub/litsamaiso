@@ -102,7 +102,7 @@ test("faceDistance is the Euclidean distance between descriptors", () => {
   assert.throws(() => faceDistance([], []));
 });
 
-test("the match threshold defaults to 0.4 and can be tuned from the environment up to 0.6", () => {
+test("the match threshold defaults to 0.45 and can be tuned from the environment up to 0.6", () => {
   const realWarn = console.warn;
   const warnings: string[] = [];
   console.warn = (message: string) => {
@@ -115,18 +115,18 @@ test("the match threshold defaults to 0.4 and can be tuned from the environment 
   };
 
   try {
-    assert.equal(thresholdFor(undefined), 0.4);
-    assert.equal(thresholdFor(""), 0.4);
+    assert.equal(thresholdFor(undefined), 0.45);
+    assert.equal(thresholdFor(""), 0.45);
     assert.equal(thresholdFor("0.35"), 0.35);
     assert.equal(thresholdFor("0.6"), 0.6);
     assert.deepEqual(warnings, []);
 
-    // Settings that would loosen or break the check fall back to 0.4, with one warning each
-    assert.equal(thresholdFor("4"), 0.4);
-    assert.equal(thresholdFor("4"), 0.4);
-    assert.equal(thresholdFor("0.61"), 0.4);
-    assert.equal(thresholdFor("0"), 0.4);
-    assert.equal(thresholdFor("not-a-number"), 0.4);
+    // Settings that would loosen or break the check fall back to 0.45, with one warning each
+    assert.equal(thresholdFor("4"), 0.45);
+    assert.equal(thresholdFor("4"), 0.45);
+    assert.equal(thresholdFor("0.61"), 0.45);
+    assert.equal(thresholdFor("0"), 0.45);
+    assert.equal(thresholdFor("not-a-number"), 0.45);
     assert.equal(warnings.length, 4);
     assert.match(warnings[0] ?? "", /FACE_MATCH_THRESHOLD=4 is ignored/);
   } finally {
