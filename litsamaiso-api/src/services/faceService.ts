@@ -12,14 +12,15 @@ const require = createRequire(import.meta.url);
 // The client sends 640px camera frames. Bigger images would permanently grow the WASM heap.
 const MAX_PHOTO_SIDE = 1280;
 // Face embeddings closer than this (Euclidean distance) are treated as the same person.
-// Two different people in face-api's sample photos came out 0.49 apart, so 0.5 was too loose.
-const DEFAULT_MATCH_THRESHOLD = 0.4;
+// The closest two different people in face-api's sample photos came out 0.49 apart, so 0.5 was
+// too loose; 0.4 was stricter than needed for real students, so this sits between the two.
+const DEFAULT_MATCH_THRESHOLD = 0.45;
 // face-api's own cut-off for "same person". Different people are usually 0.6 to 0.9 apart, so a
 // FACE_MATCH_THRESHOLD above this is a mistake (say "4" for "0.4") that would let almost anyone through.
 const MAX_MATCH_THRESHOLD = 0.6;
 // The detector's confidence that it found a face. Dim, blurred or turned-away faces score lower,
 // and their embeddings drift too far to compare: clear camera frames score 0.75 and up.
-const MIN_FACE_SCORE = 0.6;
+const MIN_FACE_SCORE = 0.55;
 // The face's height or width, whichever is smaller, as a share of the photo's shorter side.
 // Smaller faces are too far from the camera to compare reliably.
 const MIN_FACE_SHARE = 0.25;

@@ -105,7 +105,7 @@ Configure environment variables:
 | `SYSTEM_INSTITUTION_EMAIL` | No | — | Institution email for the AppAdmin seed |
 | `GOOGLE_GENERATIVE_AI_API_KEY` | No | — | Google Gemini API key for AI account validation |
 | `ELECTION_HMAC_SECRET` | No | — | HMAC secret for ballot hashing and result snapshot integrity |
-| `FACE_MATCH_THRESHOLD` | No | `0.4` | Largest face-embedding distance accepted as the same person when a voter's face is checked. Lower is stricter. Must be above 0 and at most `0.6`; any other value is ignored with a warning in the server log, and `0.4` is used |
+| `FACE_MATCH_THRESHOLD` | No | `0.45` | Largest face-embedding distance accepted as the same person when a voter's face is checked. Lower is stricter. Must be above 0 and at most `0.6`; any other value is ignored with a warning in the server log, and `0.45` is used |
 | `CLOUDINARY_CLOUD_NAME` | No | — | Cloudinary cloud name for image/file uploads |
 | `CLOUDINARY_API_KEY` | No | — | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | No | — | Cloudinary API secret |
