@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ClipboardCheck, KeyRound, Search, ShieldOff, Trash2, UserCog, Users } from 'lucide-react';
+import { ClipboardCheck, Search, Trash2, UserCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { userService } from '../services/userService';
 import { institutionService } from '../services/institutionService';
@@ -8,6 +8,7 @@ import { getApiErrorMessage } from '../utils/apiError';
 import { getInstitutionName, getRoleName, normalizeRoleName } from '../utils/userDisplay';
 import { useAuth } from '../hooks/useAuth';
 import PasswordInput from '../components/ui/PasswordInput';
+import UserRowActions from '../components/users/UserRowActions';
 
 const PAGE_SIZE = 200;
 const getUserId = (user: User) => user.id || user._id || '';
@@ -360,52 +361,43 @@ const UsersPage: React.FC = () => {
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{getInstitutionName(user) || '-'}</td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">{user.studentId || '-'}</td>
                         <td className="whitespace-nowrap px-6 py-4 text-sm">
-                          <div className="flex items-center gap-3">
-                            {isAppAdmin && (
+                          {isAppAdmin ? (
+                            <UserRowActions
+                              user={user}
+                              isStudent={userRole === 'Student'}
+                              onIec={onIec}
+                              onResetPassword={() => {
+                                setPasswordTarget(user);
+                                setPasswordForm({ password: '', confirmPassword: '' });
+                              }}
+                              onResetTotp={() => setTotpResetTarget(user)}
+                              onToggleIec={() => handleIecToggle(user, !onIec)}
+                              onDelete={() => setDeleteTarget(user)}
+                            />
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              {userRole === 'Student' && (
+                                <button
+                                  className={onIec ? 'text-active-clr hover:text-red-700' : 'text-gray-400 hover:text-active-clr'}
+                                  title={onIec ? 'Remove from IEC' : 'Appoint to IEC'}
+                                  aria-label={`${onIec ? 'Remove from' : 'Appoint to'} IEC: ${user.email}`}
+                                  aria-pressed={onIec}
+                                  type="button"
+                                  onClick={() => handleIecToggle(user, !onIec)}
+                                >
+                                  <ClipboardCheck className="h-4 w-4" />
+                                </button>
+                              )}
                               <button
-                                className="text-primary-clr hover:text-active"
-                                title="Reset password"
+                                className="text-red-600 hover:text-red-900"
+                                title="Delete user"
                                 type="button"
-                                onClick={() => {
-                                  setPasswordTarget(user);
-                                  setPasswordForm({ password: '', confirmPassword: '' });
-                                }}
+                                onClick={() => setDeleteTarget(user)}
                               >
-                                <KeyRound className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4" />
                               </button>
-                            )}
-                            {isAppAdmin && userRole === 'Student' && user.totpEnabledAt && (
-                              <button
-                                className="text-amber-600 hover:text-amber-800"
-                                title="Reset authenticator app"
-                                aria-label={`Reset authenticator app for ${user.email}`}
-                                type="button"
-                                onClick={() => setTotpResetTarget(user)}
-                              >
-                                <ShieldOff className="h-4 w-4" />
-                              </button>
-                            )}
-                            {userRole === 'Student' && (
-                              <button
-                                className={onIec ? 'text-active-clr hover:text-red-700' : 'text-gray-400 hover:text-active-clr'}
-                                title={onIec ? 'Remove from IEC' : 'Appoint to IEC'}
-                                aria-label={`${onIec ? 'Remove from' : 'Appoint to'} IEC: ${user.email}`}
-                                aria-pressed={onIec}
-                                type="button"
-                                onClick={() => handleIecToggle(user, !onIec)}
-                              >
-                                <ClipboardCheck className="h-4 w-4" />
-                              </button>
-                            )}
-                            <button
-                              className="text-red-600 hover:text-red-900"
-                              title="Delete user"
-                              type="button"
-                              onClick={() => setDeleteTarget(user)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
