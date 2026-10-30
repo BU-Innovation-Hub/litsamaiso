@@ -38,6 +38,8 @@ export interface Institution {
   locked?: boolean;
   lockedAt?: string;
   lockedReason?: string;
+  // Whether students need an authenticator app; a missing value counts as on
+  totpRequired?: boolean;
   createdAt?: string;
 }
 

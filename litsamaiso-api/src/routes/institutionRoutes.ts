@@ -25,6 +25,9 @@ router.post("/:id/lock", requireRole("AppAdmin"), institutionController.lockInst
 // POST /institutions/:id/unlock - unlock an institution (AppAdmin)
 router.post("/:id/unlock", requireRole("AppAdmin"), institutionController.unlockInstitution);
 
+// PUT /institutions/:id/totp - turn the student authenticator app on or off (AppAdmin)
+router.put("/:id/totp", requireRole("AppAdmin"), institutionController.setInstitutionTotp);
+
 // GET /institutions/:id/users - list users for an institution (AppAdmin or InstitutionAdmin for their own)
 router.get("/:id/users", institutionController.getInstitutionUsers);
 

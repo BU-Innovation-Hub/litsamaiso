@@ -220,9 +220,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     }
   }
 
-  // Students set up an authenticator app as they register; it's needed to take their profile photo
+  // Students set up an authenticator app as they register, unless their institution has turned it off.
+  // The page learns which applies from TOTP_REQUIRED, after the student's details have been checked.
   let totpFields: ReturnType<typeof confirmEnrollmentCode> | undefined;
-  if (roleName === "student") {
+  if (roleName === "student" && institution.totpRequired !== false) {
     if (!totpEnrollmentToken || !totpCode) {
       res.status(400).json({
         message: getFriendlyRegistrationErrorMessage("totpRequired"),

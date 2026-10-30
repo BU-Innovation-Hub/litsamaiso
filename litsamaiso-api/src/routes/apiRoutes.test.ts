@@ -81,6 +81,8 @@ test("the authenticator and photo routes require a signed-in user", async () => 
   }
   const reset = await fetch(`${baseUrl}${API_V1_PREFIX}/users/000000000000000000000000/totp`, { method: "DELETE" });
   assert.equal(reset.status, 401);
+  const setting = await fetch(`${baseUrl}${API_V1_PREFIX}/institutions/000000000000000000000000/totp`, { method: "PUT" });
+  assert.equal(setting.status, 401);
 });
 
 test("registration authenticator setup rejects an invalid email before doing any work", async () => {

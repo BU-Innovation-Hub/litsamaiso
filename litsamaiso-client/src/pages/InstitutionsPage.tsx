@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Building2, ChevronUp, KeyRound, Lock, Pencil, LayersPlus, Search, Trash2, Unlock, Users } from 'lucide-react';
+import { Building2, ChevronUp, KeyRound, Lock, Pencil, LayersPlus, Search, ShieldCheck, ShieldOff, Trash2, Unlock, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Institution, User } from '../types';
 import { institutionService, type InstitutionUsersResponse } from '../services/institutionService';
@@ -27,6 +27,7 @@ const InstitutionsPage: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [lockTarget, setLockTarget] = useState<Institution | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Institution | null>(null);
+  const [totpTarget, setTotpTarget] = useState<Institution | null>(null);
   const [lockReason, setLockReason] = useState('');
   const [openActionsId, setOpenActionsId] = useState('');
   const [usersTarget, setUsersTarget] = useState<Institution | null>(null);
@@ -138,6 +139,20 @@ const InstitutionsPage: React.FC = () => {
       await loadInstitutions();
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Failed to update institution lock'));
+    }
+  };
+
+  const handleTotpChange = async () => {
+    if (!totpTarget) return;
+
+    const required = totpTarget.totpRequired === false;
+    try {
+      await institutionService.setInstitutionTotp(totpTarget._id, required);
+      toast.success(required ? 'Authenticator app turned on' : 'Authenticator app turned off');
+      setTotpTarget(null);
+      await loadInstitutions();
+    } catch (error: unknown) {
+      toast.error(getApiErrorMessage(error, 'Failed to update the authenticator setting'));
     }
   };
 
@@ -403,6 +418,14 @@ const InstitutionsPage: React.FC = () => {
                           >
                             {institution.locked ? 'Locked' : 'Active'}
                           </span>
+                          <span
+                            className={`rounded px-2 py-0.5 text-xs font-semibold ${institution.totpRequired === false
+                              ? 'bg-gray-100 text-gray-600'
+                              : 'bg-green-100 text-green-700'
+                              }`}
+                          >
+                            {institution.totpRequired === false ? 'Authenticator off' : 'Authenticator on'}
+                          </span>
                         </div>
                         {institution.locked && institution.lockedReason && (
                           <p className="mt-1 text-xs text-red-600">
@@ -430,7 +453,7 @@ const InstitutionsPage: React.FC = () => {
                       </button>
 
                       {openActionsId === institution._id && (
-                        <div className="absolute right-0 top-12 z-20 w-44 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+                        <div className="absolute right-0 top-12 z-20 w-56 overflow-hidden rounded-md border border-gray-200 bg-white py-1 shadow-lg">
                           <button
                             type="button"
                             onClick={() => {
@@ -472,6 +495,18 @@ const InstitutionsPage: React.FC = () => {
                           >
                             {institution.locked ? <Unlock className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                             {institution.locked ? 'Unlock' : 'Lock'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenActionsId('');
+                              setTotpTarget(institution);
+                            }}
+                            className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-gray-50 ${institution.totpRequired === false ? 'text-green-700' : 'text-amber-700'
+                              }`}
+                          >
+                            {institution.totpRequired === false ? <ShieldCheck className="h-4 w-4" /> : <ShieldOff className="h-4 w-4" />}
+                            {institution.totpRequired === false ? 'Turn on authenticator' : 'Turn off authenticator'}
                           </button>
                           <button
                             type="button"
@@ -537,6 +572,38 @@ const InstitutionsPage: React.FC = () => {
                   }`}
               >
                 {lockTarget.locked ? 'Unlock' : 'Lock'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {totpTarget && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {totpTarget.totpRequired === false ? 'Turn on authenticator app' : 'Turn off authenticator app'}
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              {totpTarget.totpRequired === false
+                ? `Students at ${totpTarget.name} will need an authenticator app to register and to change their photo. Students who haven't set one up will do so the next time they change their photo.`
+                : `Students at ${totpTarget.name} won't need an authenticator app to register or change their photo. Someone with a student's password could then replace that student's photo and pass the face check when voting. This also applies to any election open now.`}
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setTotpTarget(null)}
+                className="rounded-md border px-4 py-2 font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleTotpChange}
+                className={`rounded-md px-4 py-2 font-semibold text-white ${totpTarget.totpRequired === false ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
+              >
+                {totpTarget.totpRequired === false ? 'Turn on' : 'Turn off'}
               </button>
             </div>
           </div>
