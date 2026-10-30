@@ -170,20 +170,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // Doesn't set isLoading: the route guards replace the page while it's true, and the register page
+  // has to survive a refused submit to keep the student's details or move on to the authenticator step
   const register = async (data: Parameters<typeof authService.register>[0]) => {
-    setIsLoading(true);
-    try {
-      const response = await authService.register(data);
-      if (response.token) {
-        setUser(response.user);
-        posthog.identify(response.user.id, {
-          email: response.user.email,
-          name: response.user.name,
-          role: response.user.role,
-        });
-      }
-    } finally {
-      setIsLoading(false);
+    const response = await authService.register(data);
+    if (response.token) {
+      setUser(response.user);
+      posthog.identify(response.user.id, {
+        email: response.user.email,
+        name: response.user.name,
+        role: response.user.role,
+      });
     }
   };
 

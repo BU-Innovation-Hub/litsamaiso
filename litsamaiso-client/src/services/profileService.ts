@@ -13,6 +13,8 @@ export interface UserProfile {
   hasFaceProfile?: boolean;
   // Students need an authenticator app before they can take or retake their photo
   totpEnabled?: boolean;
+  // False when the student's institution has turned the authenticator app off
+  totpRequired?: boolean;
   role: string;
   institution?: Institution;
   createdAt?: string;

@@ -4,11 +4,18 @@ import type { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 
 import { AuditLog } from "../models/AuditLog.js";
+import { Institution } from "../models/Institution.js";
+import { Role } from "../models/Role.js";
+import { Student } from "../models/Student.js";
 import { User } from "../models/User.js";
-import { login, requestPasswordReset, resetPassword } from "./authController.js";
+import { login, register, requestPasswordReset, resetPassword } from "./authController.js";
 
 const realCreate = AuditLog.create;
 const realFindOne = User.findOne;
+const realUserCreate = User.create;
+const realRoleFindOne = Role.findOne;
+const realStudentFindOne = Student.findOne;
+const realInstitutionFindById = Institution.findById;
 let recorded: Array<Record<string, any>> = [];
 
 before(() => {
@@ -19,6 +26,10 @@ before(() => {
 afterEach(() => {
   AuditLog.create = realCreate;
   User.findOne = realFindOne;
+  User.create = realUserCreate;
+  Role.findOne = realRoleFindOne;
+  Student.findOne = realStudentFindOne;
+  Institution.findById = realInstitutionFindById;
 });
 
 // Captures audit entries instead of writing them, and makes User.findOne return `user`
@@ -59,6 +70,79 @@ const student = async (overrides: Record<string, unknown> = {}) => ({
   role: { name: "Student" },
   institution: { locked: false },
   ...overrides,
+});
+
+// A student registering with a matching record at `institution`; returns what was saved and answered
+const callRegister = async (institution: Record<string, unknown>, body: Record<string, unknown> = {}) => {
+  stub(null);
+  const created: Array<Record<string, any>> = [];
+  User.create = (async (data: Record<string, any>) => {
+    created.push(data);
+    return { _id: "user-1", ...data };
+  }) as any;
+  Role.findOne = (async () => ({ _id: "role-1", name: "Student" })) as any;
+  Student.findOne = (() => ({
+    lean: async () => ({ studentId: "2024001", email: "student@example.com", institution: "institution-1" }),
+  })) as any;
+  Institution.findById = (async () => ({ _id: "institution-1", ...institution })) as any;
+
+  let statusCode = 200;
+  let payload: any;
+  const req = {
+    body: {
+      email: "student@example.com",
+      password: "right-password",
+      role: "Student",
+      studentId: "2024001",
+      financialInfoConsent: true,
+      ...body,
+    },
+    get: () => undefined,
+  } as unknown as Request;
+  const res = {
+    status(code: number) {
+      statusCode = code;
+      return this;
+    },
+    json(value: unknown) {
+      payload = value;
+      return this;
+    },
+  } as unknown as Response;
+  await register(req, res);
+  return { statusCode, payload, created };
+};
+
+test("with the authenticator off a student registers with no code and no authenticator fields", async () => {
+  const { statusCode, created } = await callRegister({ totpRequired: false });
+  assert.equal(statusCode, 201);
+  assert.equal(created.length, 1);
+  assert.equal(created[0]?.totpSecretEncrypted, undefined);
+  assert.equal(created[0]?.totpEnabledAt, undefined);
+});
+
+test("with the authenticator off a stale setup sent with the registration is ignored", async () => {
+  const { statusCode, created } = await callRegister(
+    { totpRequired: false },
+    { totpEnrollmentToken: "stale-token", totpCode: "000000" },
+  );
+  assert.equal(statusCode, 201);
+  assert.equal(created[0]?.totpSecretEncrypted, undefined);
+});
+
+test("with the authenticator on, or never set, a student with no code is asked for one", async () => {
+  for (const institution of [{ totpRequired: true }, {}]) {
+    const { statusCode, payload, created } = await callRegister(institution);
+    assert.equal(statusCode, 400, JSON.stringify(institution));
+    assert.equal(payload.code, "TOTP_REQUIRED");
+    assert.equal(created.length, 0);
+  }
+});
+
+test("a student's details are checked before the authenticator is asked for", async () => {
+  const { statusCode, payload } = await callRegister({ totpRequired: true }, { email: "other@example.com" });
+  assert.equal(statusCode, 400);
+  assert.notEqual(payload.code, "TOTP_REQUIRED");
 });
 
 test("a successful login is audited", async () => {

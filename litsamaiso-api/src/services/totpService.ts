@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes } from "node:crypto";
 import jwt from "jsonwebtoken";
 import { Secret, TOTP } from "otpauth";
 import QRCode from "qrcode";
+import { Institution } from "../models/Institution.js";
 import { User } from "../models/User.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
@@ -69,6 +70,13 @@ const lockedOut = (until: Date) =>
     429,
     "TOTP_LOCKED",
   );
+
+// Only an institution that explicitly turned it off is exempt, so anything unknown stays protected
+export const isTotpRequired = async (institutionId: unknown): Promise<boolean> => {
+  if (!institutionId) return true;
+  const institution = await Institution.findById(institutionId).select("totpRequired").lean();
+  return institution?.totpRequired !== false;
+};
 
 // Apps show codes as "123 456"; accept them however they're pasted
 export const normalizeCode = (code: unknown): string =>

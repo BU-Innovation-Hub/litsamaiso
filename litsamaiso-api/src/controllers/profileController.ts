@@ -28,8 +28,10 @@ const serializeProfile = (user: any) => ({
   faceImageUrl: user.faceImageUrl || "",
   // Only whether a face is on file; the embedding itself never leaves the server
   hasFaceProfile: (user.faceDescriptor?.length ?? 0) > 0,
-  // Students need an authenticator app before they can take or retake their photo
+  // Students need an authenticator app before they can take or retake their photo,
+  // unless their institution has turned it off
   totpEnabled: Boolean(user.totpEnabledAt),
+  totpRequired: user.institution?.totpRequired !== false,
   role: getRoleName(user.role),
   // More than one entry means the user picks which role to work as (a Student on the IEC)
   availableRoles: heldRoleNames(user),
@@ -57,7 +59,7 @@ export const getProfile = async (
   const user = await User.findById(currentUser._id)
     .populate("role", "name")
     .populate("additionalRoles", "name")
-    .populate("institution", "name email")
+    .populate("institution", "name email totpRequired")
     .select("+faceDescriptor");
 
   if (!user) {
@@ -118,7 +120,7 @@ export const updateProfile = async (
   )
     .populate("role", "name")
     .populate("additionalRoles", "name")
-    .populate("institution", "name email")
+    .populate("institution", "name email totpRequired")
     .select("+faceDescriptor");
 
   if (!updatedUser) {
@@ -182,7 +184,7 @@ export const saveFacePhoto = async (
     )
       .populate("role", "name")
     .populate("additionalRoles", "name")
-      .populate("institution", "name email")
+      .populate("institution", "name email totpRequired")
       .select("+faceDescriptor");
 
     if (!updatedUser) {

@@ -13,7 +13,7 @@ const ENROLLMENT_REUSE_MARGIN_MS = 60 * 1000;
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
-  const { register, isLoading } = useAuth();
+  const { register } = useAuth();
   const role = 'Student';
   const [formData, setFormData] = useState({
     email: '',
@@ -23,10 +23,12 @@ const RegisterPage: React.FC = () => {
   });
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [consentChecked, setConsentChecked] = useState(false);
-  // Students set up an authenticator app after the details step; it's needed to take their profile photo
+  // Students whose institution uses an authenticator app set it up after the details step;
+  // it's needed to take their profile photo
   const [step, setStep] = useState<'details' | 'authenticator'>('details');
   const [enrollment, setEnrollment] = useState<(Enrollment & { email: string }) | null>(null);
   const [preparingAuthenticator, setPreparingAuthenticator] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const consentModalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,19 +98,8 @@ const RegisterPage: React.FC = () => {
     }
   };
 
-  const handleConsentSubmit = async () => {
-    if (!consentChecked) {
-      toast.error('Please confirm you have read the financial information consent.');
-      return;
-    }
-
-    setShowConsentModal(false);
-    if (await prepareAuthenticator()) setStep('authenticator');
-  };
-
-  // The code is sent with the registration, so it's checked while it's still current
-  const handleRegister = async (totpCode: string) => {
-    if (!enrollment) return;
+  const submitRegistration = async (totp?: { totpEnrollmentToken: string; totpCode: string }) => {
+    setSubmitting(true);
     try {
       await register({
         email: formData.email,
@@ -116,12 +107,41 @@ const RegisterPage: React.FC = () => {
         role,
         studentId: formData.studentId || undefined,
         financialInfoConsent: true,
-        totpEnrollmentToken: enrollment.enrollmentToken,
-        totpCode,
+        ...totp,
       });
+    } finally {
+      setSubmitting(false);
+    }
 
-      toast.success('Account created successfully! Please sign in.');
-      navigate('/login');
+    toast.success('Account created successfully! Please sign in.');
+    navigate('/login');
+  };
+
+  // Only the server knows the student's institution, so it decides whether the authenticator step
+  // is needed. It answers TOTP_REQUIRED only after the student's details have passed its checks.
+  const handleConsentSubmit = async () => {
+    if (!consentChecked) {
+      toast.error('Please confirm you have read the financial information consent.');
+      return;
+    }
+
+    setShowConsentModal(false);
+    try {
+      await submitRegistration();
+    } catch (error: unknown) {
+      if (getApiErrorCode(error) === 'TOTP_REQUIRED') {
+        if (await prepareAuthenticator()) setStep('authenticator');
+        return;
+      }
+      toast.error(getApiErrorMessage(error, 'Registration failed'));
+    }
+  };
+
+  // The code is sent with the registration, so it's checked while it's still current
+  const handleRegister = async (totpCode: string) => {
+    if (!enrollment) return;
+    try {
+      await submitRegistration({ totpEnrollmentToken: enrollment.enrollmentToken, totpCode });
     } catch (error: unknown) {
       if (getApiErrorCode(error) === 'TOTP_ENROLLMENT_EXPIRED') {
         toast.warning('That setup expired. Remove the old entry from your app and scan the new QR code.');
@@ -178,7 +198,7 @@ const RegisterPage: React.FC = () => {
               <TotpEnrollment
                 enrollment={enrollment}
                 loading={preparingAuthenticator}
-                busy={isLoading}
+                busy={submitting}
                 submitLabel="Create Account"
                 onConfirm={handleRegister}
                 onRegenerate={() => void prepareAuthenticator(true)}
@@ -187,7 +207,7 @@ const RegisterPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setStep('details')}
-                disabled={isLoading}
+                disabled={submitting}
                 className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-primary-clr disabled:opacity-50"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -252,7 +272,7 @@ const RegisterPage: React.FC = () => {
                   />
                 </div>
 
-                {preparingAuthenticator ? (
+                {preparingAuthenticator || submitting ? (
                   <div className="flex w-full items-center justify-center rounded-md bg-button py-3">
                     <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
                   </div>

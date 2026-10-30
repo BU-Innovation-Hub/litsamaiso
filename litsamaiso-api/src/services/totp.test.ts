@@ -1,4 +1,4 @@
-import test, { before } from "node:test";
+import test, { afterEach, before } from "node:test";
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import type { Request, Response } from "express";
@@ -7,13 +7,34 @@ import { Secret, TOTP } from "otpauth";
 import {
   confirmEnrollmentCode,
   createEnrollment,
+  isTotpRequired,
   matchCode,
   normalizeCode,
   readEnrollmentToken,
 } from "./totpService.js";
 import { decryptSecret, encryptSecret } from "../utils/secretBox.js";
-import { PHOTO_CAPTURE_GRANT_HEADER, requirePhotoCaptureGrant } from "../middleware/totpVerification.js";
+import {
+  PHOTO_CAPTURE_GRANT_HEADER,
+  requirePhotoCaptureGrant,
+  requireTotpInstitution,
+} from "../middleware/totpVerification.js";
+import { Institution } from "../models/Institution.js";
 import AppError from "../utils/errors.js";
+
+const realFindInstitution = Institution.findById;
+
+afterEach(() => {
+  Institution.findById = realFindInstitution;
+});
+
+// Makes Institution.findById find `institution`, through the query chain isTotpRequired uses
+const stubInstitution = (institution: unknown) => {
+  const query: any = {
+    select: () => query,
+    lean: async () => institution,
+  };
+  Institution.findById = (() => query) as any;
+};
 
 before(() => {
   process.env.JWT_SECRET = "test-secret";
@@ -169,4 +190,71 @@ test("only students need a capture grant to save their profile photo", async () 
   const emptyGrant = await runGrantMiddleware({ _id: "u2", role: "student" }, { [PHOTO_CAPTURE_GRANT_HEADER]: "" });
   assert.equal(emptyGrant.nextCalled, false);
   assert.equal(emptyGrant.statusCode, 403);
+});
+
+test("only an institution that turned it off is exempt from the authenticator", async () => {
+  stubInstitution({ totpRequired: false });
+  assert.equal(await isTotpRequired("institution-1"), false);
+
+  stubInstitution({ totpRequired: true });
+  assert.equal(await isTotpRequired("institution-1"), true);
+
+  // Saved before the setting existed
+  stubInstitution({});
+  assert.equal(await isTotpRequired("institution-1"), true);
+
+  // Deleted, or the student has none
+  stubInstitution(null);
+  assert.equal(await isTotpRequired("institution-1"), true);
+  assert.equal(await isTotpRequired(undefined), true);
+});
+
+test("a student at an institution with it off saves a photo with no grant", async () => {
+  stubInstitution({ totpRequired: false });
+  const result = await runGrantMiddleware({ _id: "u2", role: { name: "Student" }, institution: "institution-1" });
+  assert.equal(result.nextCalled, true);
+  assert.equal(result.statusCode, 200);
+});
+
+test("a student at an institution with it on still needs a grant", async () => {
+  for (const institution of [{ totpRequired: true }, {}, null]) {
+    stubInstitution(institution);
+    const result = await runGrantMiddleware({ _id: "u2", role: { name: "Student" }, institution: "institution-1" });
+    assert.equal(result.nextCalled, false, JSON.stringify(institution));
+    assert.equal(result.statusCode, 403);
+    assert.equal((result.body as { code?: string }).code, "PHOTO_CAPTURE_GRANT_REQUIRED");
+  }
+});
+
+const runInstitutionGate = async (user: unknown) => {
+  let statusCode = 200;
+  let body: unknown;
+  let nextCalled = false;
+  const req = { user } as unknown as Request;
+  const res = {
+    status(code: number) {
+      statusCode = code;
+      return this;
+    },
+    json(payload: unknown) {
+      body = payload;
+      return this;
+    },
+  } as unknown as Response;
+  await requireTotpInstitution(req, res, () => {
+    nextCalled = true;
+  });
+  return { statusCode, body, nextCalled };
+};
+
+test("the authenticator routes refuse a student whose institution turned it off", async () => {
+  stubInstitution({ totpRequired: false });
+  const refused = await runInstitutionGate({ _id: "u2", institution: "institution-1" });
+  assert.equal(refused.nextCalled, false);
+  assert.equal(refused.statusCode, 409);
+  assert.equal((refused.body as { code?: string }).code, "TOTP_DISABLED");
+
+  stubInstitution({});
+  const allowed = await runInstitutionGate({ _id: "u2", institution: "institution-1" });
+  assert.equal(allowed.nextCalled, true);
 });

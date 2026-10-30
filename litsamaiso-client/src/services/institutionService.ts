@@ -63,6 +63,14 @@ export const institutionService = {
     return response.data.institution;
   },
 
+  setInstitutionTotp: async (institutionId: string, required: boolean) => {
+    const response = await apiClient.put<{ institution: Institution }>(
+      `/institutions/${institutionId}/totp`,
+      { required },
+    );
+    return response.data.institution;
+  },
+
   deleteInstitution: async (institutionId: string) => {
     const response = await apiClient.delete<{
       message: string;

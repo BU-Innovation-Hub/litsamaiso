@@ -33,7 +33,8 @@ const ProfilePage: React.FC = () => {
   const [updating, setUpdating] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [savingPhoto, setSavingPhoto] = useState(false);
-  // A student's camera opens only after a code from their authenticator app unlocks one photo save
+  // A student's camera opens only after a code from their authenticator app unlocks one photo save,
+  // unless their institution has turned the app off
   const [captureGrant, setCaptureGrant] = useState<string | null>(null);
   // Set when the server asks for a code, so the dialog follows the server even if the role check here disagrees
   const [codeRequired, setCodeRequired] = useState(false);
@@ -81,6 +82,17 @@ const ProfilePage: React.FC = () => {
   const setTotpEnabled = (totpEnabled: boolean) =>
     setProfile((previous) => (previous ? { ...previous, totpEnabled } : previous));
 
+  // The setting can change while this page is open; the server's answer replaces what was loaded
+  const setTotpRequired = (totpRequired: boolean) =>
+    setProfile((previous) => (previous ? { ...previous, totpRequired } : previous));
+
+  const handleTotpDisabled = () => {
+    setTotpRequired(false);
+    setCodeRequired(false);
+    setMoveAuthenticatorOpen(false);
+    toast.info('Your institution no longer uses an authenticator app.');
+  };
+
   // Closing the camera also drops the grant, so reopening it asks for a new code
   const setPhotoModalOpen = (open: boolean) => {
     if (savingPhoto) return;
@@ -106,6 +118,7 @@ const ProfilePage: React.FC = () => {
       if (getApiErrorCode(error) === 'PHOTO_CAPTURE_GRANT_REQUIRED') {
         setCaptureGrant(null);
         setCodeRequired(true);
+        setTotpRequired(true);
         toast.warning('Enter a new code from your authenticator app to take your photo.');
         return;
       }
@@ -157,7 +170,8 @@ const ProfilePage: React.FC = () => {
   }
 
   const isStudent = normalizeRoleName(profile.role || '') === 'Student';
-  const showCamera = Boolean(captureGrant) || !(isStudent || codeRequired);
+  const needsAuthenticator = isStudent && profile.totpRequired !== false;
+  const showCamera = Boolean(captureGrant) || !(needsAuthenticator || codeRequired);
   const displayName = getDisplayName(previewProfile);
   const institutionName = previewProfile.institution?.name || 'Botho University';
   const initials = getInitials(displayName);
@@ -371,7 +385,7 @@ const ProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {isStudent && (
+            {needsAuthenticator && (
               <div className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 p-4">
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100">
@@ -442,6 +456,7 @@ const ProfilePage: React.FC = () => {
                 mode="unlock"
                 totpEnabled={Boolean(profile.totpEnabled)}
                 onStatusChange={setTotpEnabled}
+                onDisabled={handleTotpDisabled}
                 onUnlocked={setCaptureGrant}
               />
             )}
@@ -457,6 +472,7 @@ const ProfilePage: React.FC = () => {
               mode="move"
               totpEnabled={Boolean(profile.totpEnabled)}
               onStatusChange={setTotpEnabled}
+              onDisabled={handleTotpDisabled}
               onMoved={() => setMoveAuthenticatorOpen(false)}
             />
           </Modal>

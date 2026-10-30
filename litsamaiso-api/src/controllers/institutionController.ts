@@ -25,7 +25,7 @@ export const listInstitutions = async (
     const skip = (pageNum - 1) * lim;
 
     const [institutions, total] = await Promise.all([
-      Institution.find().select("name email locked lockedReason").skip(skip).limit(lim),
+      Institution.find().select("name email locked lockedReason totpRequired").skip(skip).limit(lim),
       Institution.countDocuments(),
     ]);
 
@@ -411,6 +411,50 @@ export const unlockInstitution = async (req: Request, res: Response): Promise<vo
   }
 };
 
+// Turns the student authenticator app on or off. Students' saved keys are kept either way,
+// so turning it back on doesn't make them set up again.
+export const setInstitutionTotp = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const required = (req.body as any)?.required;
+
+    if (typeof required !== 'boolean') {
+      res.status(400).json({ message: 'required must be true or false' });
+      return;
+    }
+
+    const institution = await Institution.findById(id);
+    if (!institution) {
+      res.status(404).json({ message: 'Institution not found' });
+      return;
+    }
+
+    const currentUser = (req as any).user;
+    const currentRole = (currentUser?.role && (currentUser.role as any).name) || (currentUser?.role as string);
+    if (String(currentRole) !== 'AppAdmin') {
+      res.status(403).json({ message: 'Forbidden' });
+      return;
+    }
+
+    if ((institution.totpRequired !== false) !== required) {
+      institution.totpRequired = required;
+      await institution.save();
+
+      await recordAudit({
+        ...auditActor(currentUser),
+        action: required ? "institution.totp.enable" : "institution.totp.disable",
+        targetCollection: "Institution",
+        targetId: String(institution._id),
+        details: { name: institution.name },
+      });
+    }
+
+    res.json({ institution });
+  } catch (err: any) {
+    res.status(500).json({ message: err.message || 'Failed to update the authenticator setting' });
+  }
+};
+
 export const deleteInstitution = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
@@ -484,4 +528,4 @@ export const deleteInstitution = async (req: Request, res: Response): Promise<vo
   }
 };
 
-export default { listInstitutions, createInstitution, updateInstitution, getInstitutionUsers, createInstitutionRoleUser, lockInstitution, unlockInstitution, deleteInstitution };
+export default { listInstitutions, createInstitution, updateInstitution, getInstitutionUsers, createInstitutionRoleUser, lockInstitution, unlockInstitution, setInstitutionTotp, deleteInstitution };

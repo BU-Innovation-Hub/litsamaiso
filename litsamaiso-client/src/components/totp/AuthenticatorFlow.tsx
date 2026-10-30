@@ -11,6 +11,8 @@ type AuthenticatorFlowProps = {
   mode: 'unlock' | 'move';
   totpEnabled: boolean;
   onStatusChange: (enabled: boolean) => void;
+  // The student's institution turned the authenticator app off since the page loaded
+  onDisabled: () => void;
   // 'unlock' only: the grant that lets one profile photo be saved
   onUnlocked?: (captureGrant: string) => void;
   // 'move' only
@@ -23,6 +25,7 @@ const AuthenticatorFlow: React.FC<AuthenticatorFlowProps> = ({
   mode,
   totpEnabled,
   onStatusChange,
+  onDisabled,
   onUnlocked,
   onMoved,
 }) => {
@@ -40,6 +43,10 @@ const AuthenticatorFlow: React.FC<AuthenticatorFlowProps> = ({
       setEnrollment(await totpService.startProfileEnrollment(currentCode));
       setStep('enroll');
     } catch (error) {
+      if (getApiErrorCode(error) === 'TOTP_DISABLED') {
+        onDisabled();
+        return;
+      }
       toast.error(getApiErrorMessage(error, 'Your authenticator setup could not be started'));
     } finally {
       setLoadingEnrollment(false);
@@ -55,7 +62,9 @@ const AuthenticatorFlow: React.FC<AuthenticatorFlowProps> = ({
         if (!cancelled) setEnrollment(next);
       })
       .catch((error: unknown) => {
-        if (!cancelled) toast.error(getApiErrorMessage(error, 'Your authenticator setup could not be started'));
+        if (cancelled) return;
+        if (getApiErrorCode(error) === 'TOTP_DISABLED') onDisabled();
+        else toast.error(getApiErrorMessage(error, 'Your authenticator setup could not be started'));
       })
       .finally(() => {
         if (!cancelled) setLoadingEnrollment(false);
@@ -64,6 +73,8 @@ const AuthenticatorFlow: React.FC<AuthenticatorFlowProps> = ({
     return () => {
       cancelled = true;
     };
+    // Runs once on open, so a new onDisabled from the parent doesn't restart the setup
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setupOnOpen]);
 
   // Codes are checked on the server; the app may have been reset by an admin since the page loaded
@@ -86,6 +97,10 @@ const AuthenticatorFlow: React.FC<AuthenticatorFlowProps> = ({
         await handleNotEnrolled();
         return;
       }
+      if (getApiErrorCode(error) === 'TOTP_DISABLED') {
+        onDisabled();
+        return;
+      }
       toast.error(getApiErrorMessage(error, 'Your code could not be checked'));
     } finally {
       setBusy(false);
@@ -103,6 +118,10 @@ const AuthenticatorFlow: React.FC<AuthenticatorFlowProps> = ({
       else onMoved?.();
     } catch (error) {
       const errorCode = getApiErrorCode(error);
+      if (errorCode === 'TOTP_DISABLED') {
+        onDisabled();
+        return;
+      }
       if (errorCode === 'TOTP_ENROLLMENT_EXPIRED') {
         toast.warning('That setup expired. Scan the new QR code.');
         await startEnrollment();

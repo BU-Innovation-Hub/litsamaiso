@@ -6,6 +6,7 @@ export interface InstitutionDocument {
   locked?: boolean;
   lockedReason?: string | undefined;
   lockedAt?: Date | undefined;
+  totpRequired?: boolean;
 }
 
 const institutionSchema = new Schema<InstitutionDocument>(
@@ -15,6 +16,8 @@ const institutionSchema = new Schema<InstitutionDocument>(
     locked: { type: Boolean, default: false },
     lockedReason: { type: String, trim: true },
     lockedAt: { type: Date },
+    // Whether students need an authenticator app. Institutions saved before this field count as on.
+    totpRequired: { type: Boolean, default: true },
   },
   {
     timestamps: true,
