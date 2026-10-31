@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { BarChart3, CalendarClock, Check, CircleCheck, Copy, Hourglass, Inbox, ShieldAlert, Vote } from 'lucide-react';
 import { toast } from 'sonner';
 import PositionStandings from '../components/elections/PositionStandings';
+import { VotingPhotoPrompt } from '../components/VotingPhotoPrompt';
 import { formatDate, formatRelative, useNow } from '../components/elections/electionHelpers';
 import { Button, Card, EmptyState, Modal, Skeleton, StatusPill } from '../components/elections/ui';
 import { electionService } from '../services/electionService';
@@ -62,7 +63,7 @@ const ReceiptChip = ({ receiptId, submittedAt }: { receiptId: string; submittedA
 
 const ElectionsPage: React.FC = () => {
   const location = useLocation();
-  const { isIecMember } = useAuth();
+  const { isIecMember, needsVotingPhoto } = useAuth();
   const [elections, setElections] = useState<Election[]>([]);
   const [voteStatuses, setVoteStatuses] = useState<Record<string, VoteStatus>>({});
   const [clockOffsetMs, setClockOffsetMs] = useState(0);
@@ -233,6 +234,7 @@ const ElectionsPage: React.FC = () => {
               {IEC_CANNOT_VOTE_MESSAGE}
             </p>
           )}
+          {needsVotingPhoto && <VotingPhotoPrompt returnTo="/elections" className="mt-3" />}
         </header>
 
         {isLoading ? (

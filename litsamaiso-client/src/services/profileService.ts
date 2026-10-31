@@ -79,6 +79,7 @@ export const mergeProfileIntoUser = (
   studentId: profile.studentId,
   studentCardUrl: profile.studentCardUrl,
   faceImageUrl: profile.faceImageUrl,
+  hasFaceProfile: profile.hasFaceProfile,
   institution: profile.institution || currentUser?.institution,
   createdAt: profile.createdAt,
   updatedAt: profile.updatedAt,

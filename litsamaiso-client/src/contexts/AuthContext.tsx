@@ -5,6 +5,7 @@ import type { User } from '../types';
 import { authService } from '../services/authService';
 import { accountService } from '../services/accountService';
 import { feedbackService } from '../services/feedbackService';
+import { profileService } from '../services/profileService';
 import { AuthContext } from './authContextValue';
 import { onAuthExpired } from '../lib/api';
 import {
@@ -63,6 +64,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const needsRoleChoice = availableRoles.length > 1 && !hasValidChoice;
   // IEC members run elections, so they can't vote in them while they're on the IEC
   const isIecMember = availableRoles.includes('IEC');
+  const canVote = activeRole === 'Student' && !isIecMember;
+  // Stays false until the profile has loaded, so the prompt never flashes at someone with a photo
+  const needsVotingPhoto = canVote && user?.hasFaceProfile === false;
+  const userId = user?.id;
+
+  // The login response doesn't say whether a face is on file, and it can change on another device
+  useEffect(() => {
+    if (!canVote || !userId) return;
+    let cancelled = false;
+    profileService
+      .getProfile()
+      .then((profile) => {
+        if (cancelled) return;
+        setUser((current) => {
+          if (!current || current.id !== userId) return current;
+          const updated = {
+            ...current,
+            hasFaceProfile: Boolean(profile.hasFaceProfile),
+            studentCardUrl: profile.studentCardUrl,
+          };
+          try {
+            localStorage.setItem('user', JSON.stringify(sanitizeUserForStorage(updated)));
+          } catch {
+            // Storage can be unavailable on some mobile WebKit contexts.
+          }
+          return updated;
+        });
+      })
+      .catch(() => {
+        // The prompts stay as they were; the voting page checks again before opening a ballot
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canVote, userId]);
 
   const switchRole = (role: string) => {
     if (!user || !availableRoles.includes(role)) return;
@@ -209,6 +245,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         availableRoles,
         needsRoleChoice,
         isIecMember,
+        needsVotingPhoto,
         switchRole,
       }}
     >

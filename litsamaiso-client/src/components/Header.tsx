@@ -7,9 +7,17 @@ import { getVisibleNavItems, isNavItemActive } from '../navigation';
 import { feedbackService } from '../services/feedbackService';
 import { LogoutFeedbackModal } from './LogoutFeedbackModal';
 import { RoleSwitcher } from './RoleSwitcher';
+import { Avatar } from './elections/ui';
+
+const AttentionDot: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <span
+    className={`block h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-white ${className}`}
+    aria-hidden="true"
+  />
+);
 
 export const Header: React.FC = () => {
-  const { user, logout, activeRole } = useAuth();
+  const { user, logout, activeRole, needsVotingPhoto } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -81,7 +89,7 @@ export const Header: React.FC = () => {
   };
 
   const navLinkClass = (href: string) =>
-    `p-2 sm:p-0 rounded transition-colors ${
+    `block whitespace-nowrap rounded p-2 transition-colors lg:p-0 ${
       isNavItemActive(location.pathname, href)
         ? 'text-active font-semibold'
         : 'text-primary-clr hover:text-active'
@@ -93,7 +101,7 @@ export const Header: React.FC = () => {
     <div className="fixed top-0 z-50 w-full pb-8 backdrop-blur-md">
       <header
         ref={headerRef}
-        className="mx-auto mt-6 flex w-[90%] flex-wrap items-center justify-between rounded-4xl bg-white p-4 shadow-xl md:w-[80%]"
+        className="mx-auto mt-6 flex w-[92%] flex-wrap items-center justify-between rounded-4xl bg-white p-4 shadow-xl xl:w-[80%]"
         style={{ boxShadow: '0 0 25px -5px rgba(129, 129, 129, 0.3)' }}
       >
         <Link to="/" className="flex items-center gap-2" onClick={closeMobileMenu}>
@@ -102,12 +110,13 @@ export const Header: React.FC = () => {
         </Link>
 
         <button
-          className="flex flex-col items-center justify-center sm:hidden"
+          className="relative flex h-10 w-10 flex-col items-center justify-center lg:hidden"
           onClick={() => setIsMenuOpen((open) => !open)}
-          aria-label="Toggle menu"
+          aria-label={needsVotingPhoto ? 'Toggle menu, your profile photo is needed' : 'Toggle menu'}
           aria-expanded={isMenuOpen}
           aria-controls="mobile-navigation-menu"
         >
+          {needsVotingPhoto && !isMenuOpen && <AttentionDot className="absolute right-0 top-1.5" />}
           <span
             className={`block h-0.5 w-6 rounded-sm bg-primary-clr transition-all duration-300 ease-out ${
               isMenuOpen ? 'translate-y-1 rotate-45' : '-translate-y-0.5'
@@ -129,9 +138,9 @@ export const Header: React.FC = () => {
           id="mobile-navigation-menu"
           className={`${
             isMenuOpen ? 'flex' : 'hidden'
-          } mt-4 w-full flex-col sm:mt-0 sm:flex sm:w-auto sm:flex-row sm:items-center sm:gap-6`}
+          } mt-2 max-h-[calc(100dvh-7rem)] w-full flex-col overflow-y-auto lg:mt-0 lg:flex lg:max-h-none lg:w-auto lg:flex-row lg:items-center lg:gap-6 lg:overflow-visible`}
         >
-          <nav className="flex flex-col justify-center gap-4 text-sm font-medium sm:flex-row">
+          <nav className="flex flex-col justify-center gap-1 text-sm font-medium lg:flex-row lg:gap-4">
             {visibleNavItems.map((item) => (
               <Link
                 key={item.id}
@@ -139,26 +148,43 @@ export const Header: React.FC = () => {
                 className={navLinkClass(item.href)}
                 onClick={closeMobileMenu}
               >
-                {item.label}
+                <span className="inline-flex items-center gap-1.5">
+                  {item.label}
+                  {item.id === 'profile' && needsVotingPhoto && (
+                    <>
+                      <AttentionDot className="ring-0" />
+                      <span className="sr-only">, your photo is needed</span>
+                    </>
+                  )}
+                </span>
               </Link>
             ))}
           </nav>
 
-          <div className="mt-2 flex items-center gap-3 sm:mt-0 sm:ml-4">
+          <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3 lg:mt-0 lg:ml-4 lg:flex-nowrap lg:border-0 lg:pt-0">
             <RoleSwitcher onSwitch={closeMobileMenu} />
-            <button
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white"
-              onClick={() => {
-                closeMobileMenu();
-                navigate('/profile');
-              }}
-              type="button"
-              aria-label="Open profile"
+            <Link
+              to="/profile"
+              onClick={closeMobileMenu}
+              title="Open your profile"
+              className="flex min-w-0 items-center gap-2 rounded-full py-0.5 pl-0.5 pr-2 transition hover:bg-slate-100"
             >
-              {getUserInitials(username)}
-            </button>
-            <span className="text-sm font-medium">{username}</span>
-            <button type="button" onClick={handleLogout} aria-label="Logout">
+              <Avatar
+                name={username}
+                initials={getUserInitials(username)}
+                imageUrl={user?.studentCardUrl}
+                size="sm"
+                className="bg-blue-600 text-sm text-white ring-0"
+              />
+              <span className="max-w-40 truncate text-sm font-medium">{username}</span>
+              <span className="sr-only">, open your profile</span>
+            </Link>
+            <button
+              type="button"
+              onClick={handleLogout}
+              aria-label="Logout"
+              className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center lg:ml-0 lg:h-auto lg:w-auto"
+            >
               <img src="/logout.png" alt="" width={24} height={24} />
             </button>
           </div>

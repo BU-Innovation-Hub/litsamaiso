@@ -12,7 +12,7 @@ export const RoleSwitcher: React.FC<{ onSwitch?: () => void }> = ({ onSwitch }) 
 
   return (
     <label className="flex items-center gap-2 text-sm">
-      <span className="text-muted-foreground">Viewing as</span>
+      <span className="whitespace-nowrap text-muted-foreground lg:hidden xl:inline">Viewing as</span>
       <select
         value={activeRole}
         onChange={(event) => {

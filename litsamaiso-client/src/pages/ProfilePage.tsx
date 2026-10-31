@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Camera, CheckCircle, Hash, Loader2, Mail, Save, Smartphone, User } from 'lucide-react';
 import { toast } from 'sonner';
 import FaceCapture from '../components/FaceCapture';
+import { VotingPhotoPrompt, type PhotoSetupState } from '../components/VotingPhotoPrompt';
 import AuthenticatorFlow from '../components/totp/AuthenticatorFlow';
 import { Modal } from '../components/elections/ui';
 import Button from '../components/ui/button';
@@ -27,7 +29,11 @@ const getDisplayName = (profile: UserProfile | null) =>
   profile?.name || profile?.email?.split('@')[0] || 'User';
 
 const ProfilePage: React.FC = () => {
-  const { user, setUser } = useAuth();
+  const { user, setUser, isIecMember } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const photoSetup = location.state as PhotoSetupState | null;
+  const openPhotoStep = Boolean(photoSetup?.setupPhoto);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -56,6 +62,8 @@ const ProfilePage: React.FC = () => {
           email: data.email,
           studentCardUrl: data.studentCardUrl || '',
         });
+        // They came here from a "Take my photo" link, so don't make them look for the button again
+        if (openPhotoStep && !data.hasFaceProfile) setCameraOpen(true);
       } catch (error) {
         toast.error(getApiErrorMessage(error, 'Failed to fetch profile'));
       } finally {
@@ -64,7 +72,7 @@ const ProfilePage: React.FC = () => {
     };
 
     void fetchProfile();
-  }, []);
+  }, [openPhotoStep]);
 
   const previewProfile = useMemo(
     () =>
@@ -113,6 +121,7 @@ const ProfilePage: React.FC = () => {
       setCameraOpen(false);
       setCaptureGrant(null);
       toast.success('Profile photo saved');
+      if (photoSetup?.returnTo) navigate(photoSetup.returnTo, { replace: true });
     } catch (error) {
       // The grant was already used or has expired: back to the code step
       if (getApiErrorCode(error) === 'PHOTO_CAPTURE_GRANT_REQUIRED') {
@@ -170,6 +179,7 @@ const ProfilePage: React.FC = () => {
   }
 
   const isStudent = normalizeRoleName(profile.role || '') === 'Student';
+  const needsVotingPhoto = isStudent && !isIecMember && !profile.hasFaceProfile;
   const needsAuthenticator = isStudent && profile.totpRequired !== false;
   const showCamera = Boolean(captureGrant) || !(needsAuthenticator || codeRequired);
   const displayName = getDisplayName(previewProfile);
@@ -178,6 +188,9 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-purple-100 via-blue-50 to-indigo-100 px-4 pb-10 pt-32 sm:px-6 lg:px-8">
+      {needsVotingPhoto && (
+        <VotingPhotoPrompt onTakePhoto={() => setCameraOpen(true)} className="mx-auto mb-6 max-w-7xl" />
+      )}
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-start gap-8 lg:grid-cols-[1.05fr_0.95fr]">
         <section className="flex justify-center">
           <div className="relative w-full max-w-lg pt-6">
@@ -441,7 +454,7 @@ const ProfilePage: React.FC = () => {
                 ? "It's shown on your profile and used to confirm it's you when you vote."
                 : profile.totpEnabled
                   ? 'Enter a code from your authenticator app to open the camera.'
-                  : 'Changing your photo needs a code from an authenticator app. You only set it up once.'
+                  : 'A code from an authenticator app keeps your photo safe, so nobody else can change it. You only set this up once.'
             }
           >
             {/* The camera isn't started until a student's code has unlocked it */}

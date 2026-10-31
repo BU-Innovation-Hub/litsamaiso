@@ -202,11 +202,14 @@ const initialsOf = (name: string) =>
 
 export const Avatar = ({
   name,
+  initials,
   imageUrl,
   size = 'md',
   className,
 }: {
   name: string;
+  // Shown instead of the ones worked out from the name
+  initials?: string;
   imageUrl?: string;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -224,7 +227,7 @@ export const Avatar = ({
       {imageUrl && !failed ? (
         <img src={imageUrl} alt="" className="h-full w-full object-cover" onError={() => setFailed(true)} />
       ) : (
-        initialsOf(name) || '?'
+        initials || initialsOf(name) || '?'
       )}
     </span>
   );

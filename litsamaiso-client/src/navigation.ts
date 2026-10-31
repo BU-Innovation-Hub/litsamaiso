@@ -10,6 +10,7 @@ import {
   MailPlus,
   MessageSquareWarning,
   ClipboardList,
+  UserRound,
   Users,
   type LucideIcon,
 } from 'lucide-react';
@@ -107,6 +108,14 @@ export const navigationItems: NavigationItem[] = [
     href: '/branch-codes',
     roles: roleAccess.branchCodes,
     icon: GitBranch,
+  },
+  {
+    // The admin sidebar already has a labelled account panel, so only the top bar needs this
+    id: 'profile',
+    label: 'Profile',
+    href: '/profile',
+    roles: ['SAAD', 'IEC', 'Student'],
+    icon: UserRound,
   },
 ];
 

@@ -19,6 +19,7 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { VotingPhotoPrompt } from '../components/VotingPhotoPrompt';
 import { useAuth } from '../hooks/useAuth';
 import { getInstitutionName } from '../utils/userDisplay';
 import { adminIssueService } from '../services/adminIssueService';
@@ -205,7 +206,7 @@ const InsightCard: React.FC<{ insight: InsightItem }> = ({ insight }) => {
 };
 
 const DashboardPage: React.FC = () => {
-  const { user, activeRole: roleName, isIecMember } = useAuth();
+  const { user, activeRole: roleName, isIecMember, needsVotingPhoto } = useAuth();
   // SAAD and the IEC share the election management dashboard
   const isElectionAdmin = canAccess(roleName, roleAccess.electionManagement);
   const institutionName = getInstitutionName(user);
@@ -746,6 +747,8 @@ const DashboardPage: React.FC = () => {
         aria-hidden="true"
       />
       <div className="relative mx-auto max-w-7xl space-y-6">
+        {needsVotingPhoto && <VotingPhotoPrompt className="mt-5" />}
+
         <section className="overflow-hidden rounded-4xl border border-white/70 bg-white/88 shadow-xl shadow-slate-900/5 backdrop-blur mt-5">
           <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
             <div className="p-6 sm:p-8 lg:p-10">

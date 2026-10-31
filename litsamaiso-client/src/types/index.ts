@@ -15,6 +15,8 @@ export interface User {
   studentCardUrl?: string;
   faceDescriptor?: number[];
   faceImageUrl?: string;
+  // Whether a face is on file for voting; unknown until the profile has loaded
+  hasFaceProfile?: boolean;
   financialInfoConsentAt?: string;
   // Set when a student has an authenticator app; returned by the users admin list
   totpEnabledAt?: string;

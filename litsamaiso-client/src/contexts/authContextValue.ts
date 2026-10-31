@@ -17,6 +17,8 @@ export interface AuthContextType {
   needsRoleChoice: boolean;
   // On the IEC, and so not allowed to vote
   isIecMember: boolean;
+  // A student who can vote but has no profile photo to check their face against yet
+  needsVotingPhoto: boolean;
   switchRole: (role: string) => void;
 }
 

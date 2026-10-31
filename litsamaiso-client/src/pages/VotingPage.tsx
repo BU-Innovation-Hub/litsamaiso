@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, CircleCheck, Copy, Hourglass, Lock, ScanFace, ShieldAlert, ShieldCheck, Vote } from 'lucide-react';
 import { toast } from 'sonner';
 import FaceCapture from '../components/FaceCapture';
+import { TakePhotoLink } from '../components/VotingPhotoPrompt';
 import { formatDate, formatRelative, useNow } from '../components/elections/electionHelpers';
 import { Avatar, Button, Card, EmptyState, Modal, ProgressBar, Skeleton } from '../components/elections/ui';
 import { cn } from '../lib/utils';
@@ -387,12 +388,8 @@ const VotingPage: React.FC = () => {
             <EmptyState
               icon={ScanFace}
               title="Take your profile photo first"
-              description="Voting checks your face against your profile photo, and you haven't taken one yet."
-              action={
-                <Link to="/profile" className="font-semibold text-active hover:underline">
-                  Go to your profile
-                </Link>
-              }
+              description="Voting checks your face against your profile photo, and you haven't taken one yet. You'll come straight back to this ballot afterwards."
+              action={<TakePhotoLink returnTo={`/elections/${id}/vote`} />}
             />
           )}
         </Card>
