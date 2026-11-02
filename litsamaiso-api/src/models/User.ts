@@ -15,6 +15,7 @@ export interface UserDocument {
   financialInfoConsentAt?: Date;
   passwordResetTokenHash?: string;
   passwordResetTokenExpiresAt?: Date;
+  passwordChangedAt?: Date;
   totpSecretEncrypted?: string;
   totpEnabledAt?: Date;
   totpLastUsedStep?: number;
@@ -46,6 +47,8 @@ const userSchema = new Schema<UserDocument>(
     financialInfoConsentAt: { type: Date },
     passwordResetTokenHash: { type: String, select: false },
     passwordResetTokenExpiresAt: { type: Date, select: false },
+    // Login tokens issued before this no longer work, so a reset ends every existing session
+    passwordChangedAt: { type: Date },
     // Authenticator app (TOTP) key, encrypted with TOTP_ENCRYPTION_KEY. Only students have one.
     totpSecretEncrypted: { type: String, select: false },
     totpEnabledAt: { type: Date },

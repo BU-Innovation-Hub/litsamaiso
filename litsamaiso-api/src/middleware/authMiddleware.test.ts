@@ -24,9 +24,10 @@ const resolvesTo = (user: unknown) => {
   return query;
 };
 
-const run = async (headers: Record<string, string>, user: unknown) => {
+const run = async (headers: Record<string, string>, user: unknown, tokenClaims: Record<string, unknown> = {}) => {
   mock.method(User, "findById", () => resolvesTo(user));
-  const req: any = { headers: { authorization: `Bearer ${jwt.sign({ sub: "user-1" }, "test-secret")}`, ...headers } };
+  const token = jwt.sign({ sub: "user-1", ...tokenClaims }, "test-secret");
+  const req: any = { headers: { authorization: `Bearer ${token}`, ...headers } };
   let status = 200;
   let body: any;
   const res: any = {
@@ -62,6 +63,28 @@ before(() => {
 
 afterEach(() => {
   mock.restoreAll();
+});
+
+test("a session from before a password change is refused", async () => {
+  const changedAt = new Date("2026-11-02T12:00:00.500Z");
+  const user = { ...studentOnIec(), passwordChangedAt: changedAt };
+  const { status, passed } = await run({}, user, { iat: changedAt.getTime() / 1000 - 60 });
+  assert.equal(passed, false);
+  assert.equal(status, 401);
+});
+
+test("logging in during the same second as a password change works", async () => {
+  const changedAt = new Date("2026-11-02T12:00:00.500Z");
+  const user = { ...studentOnIec(), passwordChangedAt: changedAt };
+  const { passed } = await run({}, user, { iat: Math.floor(changedAt.getTime() / 1000) });
+  assert.equal(passed, true);
+});
+
+test("a session from after a password change works", async () => {
+  const changedAt = new Date("2026-11-02T12:00:00.500Z");
+  const user = { ...studentOnIec(), passwordChangedAt: changedAt };
+  const { passed } = await run({}, user, { iat: Math.floor(changedAt.getTime() / 1000) + 60 });
+  assert.equal(passed, true);
 });
 
 test("without the header a user acts as their primary role", async () => {

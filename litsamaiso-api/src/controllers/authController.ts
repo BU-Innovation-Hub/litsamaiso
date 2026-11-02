@@ -503,6 +503,7 @@ export const resetPassword = async (
   }
 
   user.password = await bcrypt.hash(password, 10);
+  user.passwordChangedAt = new Date();
   user.passwordResetTokenHash = undefined as any;
   user.passwordResetTokenExpiresAt = undefined as any;
   await user.save();

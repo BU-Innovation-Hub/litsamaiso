@@ -189,6 +189,7 @@ export const updateUser = async (
     const hashed = await bcrypt.hash(pw, 10);
     // assign hashed password directly (password field is select:false)
     (user as any).password = hashed;
+    user.passwordChangedAt = new Date();
   }
 
   // Only AppAdmin can change role or institution

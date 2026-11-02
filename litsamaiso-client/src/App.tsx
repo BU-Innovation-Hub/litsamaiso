@@ -131,12 +131,13 @@ function App() {
         <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
+          {/* Outside PublicRoute: a reset link has to show the form even if this browser has a session */}
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
           {/* Public Routes */}
           <Route element={<PublicRoute />}>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/sign-in" element={<Navigate to="/login" replace />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/sign-up" element={<Navigate to="/register" replace />} />
