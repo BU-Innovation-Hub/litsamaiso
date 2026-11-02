@@ -5,7 +5,7 @@ import { Candidate } from "../models/Candidate.js";
 import { ResultSnapshot } from "../models/ResultSnapshot.js";
 import { recordAudit } from "../utils/auditLog.js";
 import AppError from "../utils/errors.js";
-import { requireDate, requireString, optionalString } from "../utils/validation.js";
+import { requireAcademicYear, requireDate, requireString, optionalString } from "../utils/validation.js";
 import { SRC_POSITION_TEMPLATES } from "../constants/srcPositions.js";
 import {
   cancelElectionJobs,
@@ -55,13 +55,13 @@ export const createElection = async (params: {
 }): Promise<ElectionDocument> => {
   const title = requireString(params.title, "title", { min: 3 });
   const description = optionalString(params.description);
-  const academicYear = optionalString(params.academicYear);
+  const academicYear = requireAcademicYear(params.academicYear);
   const timezone = optionalString(params.timezone) || "UTC";
 
   const payload: Partial<ElectionDocument> = {
     title,
     ...(description !== undefined && { description }),
-    ...(academicYear !== undefined && { academicYear }),
+    academicYear,
     timezone,
     createdBy: new Types.ObjectId(params.user._id),
     institution: new Types.ObjectId(params.user.institution),
@@ -110,8 +110,7 @@ export const updateElection = async (params: {
     if (v !== undefined) election.description = v;
   }
   if (params.updates.academicYear !== undefined) {
-    const v = optionalString(params.updates.academicYear);
-    if (v !== undefined) election.academicYear = v;
+    election.academicYear = requireAcademicYear(params.updates.academicYear);
   }
   if (params.updates.timezone !== undefined) {
     const v = optionalString(params.updates.timezone);

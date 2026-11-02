@@ -1,4 +1,5 @@
 import { model, Schema, type Types } from "mongoose";
+import { ACADEMIC_YEAR_MESSAGE, isAcademicYear } from "../utils/validation.js";
 
 export type ElectionStatus =
   | "DRAFT"
@@ -34,7 +35,12 @@ const electionSchema = new Schema<ElectionDocument>(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
-    academicYear: { type: String, trim: true },
+    // Required by the API, not here, so an older election with no year can still change status
+    academicYear: {
+      type: String,
+      trim: true,
+      validate: { validator: isAcademicYear, message: ACADEMIC_YEAR_MESSAGE },
+    },
     status: {
       type: String,
       required: true,

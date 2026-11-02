@@ -5,7 +5,15 @@ import { electionService } from '../../services/electionService';
 import type { Election, Position } from '../../types';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { cn } from '../../lib/utils';
-import { formatDate, formatRelative, getStatus, useNow, type ElectionStatus } from './electionHelpers';
+import {
+  academicYearInputProps,
+  currentAcademicYear,
+  formatDate,
+  formatRelative,
+  getStatus,
+  useNow,
+  type ElectionStatus,
+} from './electionHelpers';
 import { Button, Card, EmptyState, Field, Modal, Pill, Skeleton, StatusPill, ToggleRow, inputClass } from './ui';
 
 type ElectionListProps = {
@@ -208,7 +216,13 @@ const ElectionList: React.FC<ElectionListProps> = ({ elections, loading, onCreat
   );
 };
 
-const emptyForm = { title: '', academicYear: '', description: '', timezone: 'Africa/Gaborone', notifyStudents: true };
+const emptyForm = () => ({
+  title: '',
+  academicYear: currentAcademicYear(),
+  description: '',
+  timezone: 'Africa/Gaborone',
+  notifyStudents: true,
+});
 
 const CreateElectionModal = ({
   open,
@@ -234,7 +248,7 @@ const CreateElectionModal = ({
       toast.success(`“${election.title}” created`, {
         description: standardCount ? `${standardCount} standard positions added.` : 'Add positions to get started.',
       });
-      setForm(emptyForm);
+      setForm(emptyForm());
       onCreated(election);
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, 'Could not create the election'));
@@ -262,7 +276,7 @@ const CreateElectionModal = ({
             <input
               value={form.academicYear}
               onChange={(e) => setForm((p) => ({ ...p, academicYear: e.target.value }))}
-              placeholder="2026/2027"
+              {...academicYearInputProps}
               className={inputClass}
             />
           </Field>

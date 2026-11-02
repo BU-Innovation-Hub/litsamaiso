@@ -12,6 +12,20 @@ export const getStatus = (election: Election): ElectionStatus => election.status
 export const isEditable = (election: Election) => EDITABLE_STATUSES.includes(getStatus(election));
 export const hasResults = (election: Election) => RESULT_STATUSES.includes(getStatus(election));
 
+// The year the forms start on, as in 2026/2027
+export const currentAcademicYear = () => {
+  const year = new Date().getFullYear();
+  return `${year}/${year + 1}`;
+};
+
+// The API has the final say, and also checks that the two years are consecutive
+export const academicYearInputProps = {
+  required: true,
+  pattern: '\\d{4}/\\d{4}',
+  title: 'Two consecutive years, written like 2026/2027',
+  placeholder: '2026/2027',
+};
+
 export const STATUS_LABELS: Record<ElectionStatus, string> = {
   DRAFT: 'Draft',
   SCHEDULED: 'Scheduled',

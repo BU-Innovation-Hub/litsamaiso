@@ -28,6 +28,20 @@ export const optionalString = (value: unknown): string | undefined => {
   return str ? str : undefined;
 };
 
+// Written one way everywhere: two consecutive years, as in 2026/2027
+export const isAcademicYear = (value: string): boolean => {
+  const match = /^(\d{4})\/(\d{4})$/.exec(value);
+  return Boolean(match) && Number(match?.[2]) === Number(match?.[1]) + 1;
+};
+
+export const ACADEMIC_YEAR_MESSAGE = "Academic year must be two consecutive years, written like 2026/2027";
+
+export const requireAcademicYear = (value: unknown): string => {
+  const year = requireString(value, "Academic year");
+  if (!isAcademicYear(year)) throw new AppError(ACADEMIC_YEAR_MESSAGE);
+  return year;
+};
+
 export const requireBoolean = (value: unknown, field: string): boolean => {
   if (value === undefined || value === null) {
     throw new AppError(`${field} is required`);

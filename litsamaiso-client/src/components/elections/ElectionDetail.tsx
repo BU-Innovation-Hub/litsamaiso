@@ -24,6 +24,8 @@ import PositionsTab from './PositionsTab';
 import ResultsTab from './ResultsTab';
 import { exportResultsPdf } from './resultsPdf';
 import {
+  academicYearInputProps,
+  currentAcademicYear,
   formatDuration,
   formatRelative,
   fromDateTimeLocalValue,
@@ -614,7 +616,7 @@ const EditElectionModal = ({
   const [form, setForm] = useState({
     title: election.title || '',
     description: election.description || '',
-    academicYear: election.academicYear || '',
+    academicYear: election.academicYear || currentAcademicYear(),
     timezone: election.timezone || 'Africa/Gaborone',
     notifyStudents: election.notifyStudents !== false,
   });
@@ -643,6 +645,7 @@ const EditElectionModal = ({
             <input
               value={form.academicYear}
               onChange={(e) => setForm((p) => ({ ...p, academicYear: e.target.value }))}
+              {...academicYearInputProps}
               className={inputClass}
             />
           </Field>

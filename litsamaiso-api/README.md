@@ -367,6 +367,7 @@ States: `DRAFT`, `SCHEDULED`, `OPEN`, `CLOSED`, `COUNTING`, `RESULTS_PUBLISHED`,
 Fields:
 
 - `title`, `description`, `academicYear`, `timezone` — string
+- `academicYear` is required, and must be two consecutive years written like `2026/2027`. Other formats are rejected.
 - `startTime`, `endTime` — Date
 - `status` — enum above
 - `published` — boolean, set when scheduled (visible to students)
