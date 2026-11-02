@@ -182,3 +182,21 @@ test("password reset requests and failed resets are audited", async () => {
   assert.equal(recorded[0]?.action, "auth.passwordReset.failed");
   assert.deepEqual(recorded[0]?.details, { email: "a@example.com", reason: "invalid_or_expired_token" });
 });
+
+test("a password reset ends existing sessions and doesn't start a new one", async () => {
+  const user: any = await student({ save: async () => undefined });
+  stub(user);
+  let payload: any;
+  const res: any = {
+    status: () => res,
+    json: (value: unknown) => ((payload = value), res),
+  };
+  const before = Date.now();
+  await resetPassword(
+    { body: { email: "student@example.com", token: "good", password: "new-password" }, get: () => undefined } as any,
+    res,
+  );
+  assert.ok(user.passwordChangedAt.getTime() >= before);
+  assert.equal(await bcrypt.compare("new-password", user.password), true);
+  assert.deepEqual(payload, { message: "Password reset successful" });
+});

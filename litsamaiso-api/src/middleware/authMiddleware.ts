@@ -38,6 +38,13 @@ export const requireAuth = async (
       return;
     }
 
+    // iat is in whole seconds, so compare in seconds or a login right after a reset would be refused
+    const passwordChangedAt = user.passwordChangedAt?.getTime();
+    if (passwordChangedAt && (decoded.iat ?? 0) < Math.floor(passwordChangedAt / 1000)) {
+      res.status(401).json({ message: "Password changed, please log in again" });
+      return;
+    }
+
     // A user who holds several roles says which one this request is made as. Asking for a role
     // they don't hold (or no longer hold) is refused rather than quietly falling back.
     const requested = req.headers[ACTIVE_ROLE_HEADER];

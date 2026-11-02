@@ -47,7 +47,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<User | null>(() => getStoredUser());
+  const [user, setUser] = useState<User | null>(() => {
+    // A saved session would send a reset link to the dashboard, or to /login if it has expired,
+    // and bounce the redirect to /login after the reset. The token is single use, so start signed out.
+    if (location.pathname === '/reset-password' && new URLSearchParams(location.search).has('token')) {
+      clearStoredAuth();
+    }
+    return getStoredUser();
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [chosenRole, setChosenRole] = useState<string | null>(() =>
     getStoredActiveRole(getStoredUser()?.id)
