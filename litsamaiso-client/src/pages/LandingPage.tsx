@@ -216,7 +216,7 @@ const LandingPage = () => {
           width={72}
           height={72}
           squares={[28, 16]}
-          className="opacity-[0.06]"
+          className="hidden opacity-[0.06] md:block"
           squaresClassName="stroke-gray-400"
         />
 
@@ -486,7 +486,7 @@ const LandingPage = () => {
             width={34}
             height={34}
             cr={0.55}
-            className="opacity-[0.055]"
+            className="hidden opacity-[0.055] md:block"
           />
           <div className="relative mx-auto max-w-7xl px-5 md:px-8">
             <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
@@ -552,7 +552,7 @@ const LandingPage = () => {
             height={30}
             cr={0.7}
             glow
-            className="opacity-[0.055]"
+            className="hidden opacity-[0.055] md:block"
           />
           <div className="relative mx-auto max-w-5xl px-5 text-center md:px-8">
             <div className="rounded-4xl border border-gray-200 bg-white px-6 py-14 shadow-md md:px-12">
@@ -618,6 +618,8 @@ const CapabilityVisual = ({ type }: { type: string }) => {
           src={bentoMockup}
           alt="Confirmation command center dashboard"
           className="-mx-6 -mb-6 w-[calc(100%+3rem)] max-w-none object-cover"
+          loading="lazy"
+          decoding="async"
         />
       </div>
     );
@@ -722,6 +724,8 @@ const TeamPhoto = ({
       src={member.image}
       alt={member.name}
       className="absolute inset-0 h-full w-full object-cover opacity-88 grayscale-10"
+      loading="lazy"
+      decoding="async"
     />
     <div className="absolute inset-0 bg-linear-to-t from-gray-900/70 via-gray-900/20 to-transparent" />
     <figcaption className="absolute inset-x-0 bottom-0 p-5">

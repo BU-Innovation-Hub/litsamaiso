@@ -9,6 +9,7 @@ import { AdminDashboardShell } from './components/DashboardSidebar';
 import { useAuth } from './hooks/useAuth';
 import { isAdminDashboardRole } from './navigation';
 import { roleAccess } from './utils/roleAccess';
+import { isReloadingForNewBuild } from './lib/pageHealth';
 import { feedbackService } from './services/feedbackService';
 import { LogoutFeedbackModal } from './components/LogoutFeedbackModal';
 
@@ -39,6 +40,25 @@ const PageLoader = () => (
     <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-active-clr" />
   </div>
 );
+
+const AppErrorFallback = () => {
+  if (isReloadingForNewBuild()) {
+    return <PageLoader />;
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
+      <p className="text-destructive">Something went wrong. Reloading the page usually fixes it.</p>
+      <button
+        type="button"
+        onClick={() => window.location.reload()}
+        className="rounded-lg bg-button px-4 py-2 text-sm font-semibold text-white"
+      >
+        Reload
+      </button>
+    </div>
+  );
+};
 
 const GlobalFeedbackPromptHost = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -123,7 +143,7 @@ const ProtectedLayout = () => {
 
 function App() {
   return (
-    <PostHogErrorBoundary fallback={<div className="flex items-center justify-center min-h-screen text-destructive">Something went wrong. Please try again later.</div>}>
+    <PostHogErrorBoundary fallback={AppErrorFallback}>
     <BrowserRouter>
       <AuthProvider>
         <GlobalFeedbackPromptHost />

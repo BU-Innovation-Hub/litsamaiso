@@ -108,7 +108,7 @@ const formatDate = (date?: string) => {
 const clampPercent = (value?: number) => Math.max(0, Math.min(100, Math.round(value ?? 0)));
 
 const EmptyState: React.FC<{ title: string; description: string }> = ({ title, description }) => (
-  <div className="rounded-2xl border border-dashed border-slate-300 bg-white/75 p-8 text-center shadow-sm backdrop-blur">
+  <div className="rounded-2xl border border-dashed border-slate-300 bg-white/75 p-8 text-center shadow-sm md:backdrop-blur">
     <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
       <Sparkles className="h-5 w-5" aria-hidden="true" />
     </div>
@@ -118,7 +118,7 @@ const EmptyState: React.FC<{ title: string; description: string }> = ({ title, d
 );
 
 const LoadingCard: React.FC = () => (
-  <div className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm backdrop-blur">
+  <div className="rounded-3xl border border-white/70 bg-white/85 p-5 shadow-sm md:backdrop-blur">
     <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
     <div className="mt-4 h-8 w-16 animate-pulse rounded bg-slate-200" />
     <div className="mt-3 h-3 w-36 animate-pulse rounded bg-slate-100" />
@@ -130,7 +130,7 @@ const MetricCard: React.FC<{ card: KpiCard }> = ({ card }) => {
   const Icon = card.icon;
 
   return (
-    <article className="group relative overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-5 shadow-sm backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-xl">
+    <article className="group relative overflow-hidden rounded-3xl border border-white/70 bg-white/90 p-5 shadow-sm md:backdrop-blur transition duration-300 hover:-translate-y-1 hover:shadow-xl">
       <div className={`absolute inset-x-0 top-0 h-1 bg-linear-to-r ${card.accent}`} />
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -749,7 +749,7 @@ const DashboardPage: React.FC = () => {
       <div className="relative mx-auto max-w-7xl space-y-6">
         {needsVotingPhoto && <VotingPhotoPrompt className="mt-5" />}
 
-        <section className="overflow-hidden rounded-4xl border border-white/70 bg-white/88 shadow-xl shadow-slate-900/5 backdrop-blur mt-5">
+        <section className="overflow-hidden rounded-4xl border border-white/70 bg-white/88 shadow-xl shadow-slate-900/5 md:backdrop-blur mt-5">
           <div className="grid gap-0 lg:grid-cols-[1.35fr_0.65fr]">
             <div className="p-6 sm:p-8 lg:p-10">
               <div className="flex flex-wrap items-center gap-3">
@@ -801,7 +801,7 @@ const DashboardPage: React.FC = () => {
         </section>
 
         {loadError && (
-          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/95 p-4 text-sm text-amber-800 shadow-sm backdrop-blur">
+          <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/95 p-4 text-sm text-amber-800 shadow-sm md:backdrop-blur">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <p>{loadError}</p>
           </div>
@@ -822,7 +822,7 @@ const DashboardPage: React.FC = () => {
 
         {roleName !== 'Student' && (
           <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.12fr_0.88fr]">
-            <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm backdrop-blur sm:p-6">
+            <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm md:backdrop-blur sm:p-6">
             <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase text-active-clr">Operational flow</p>
@@ -884,7 +884,7 @@ const DashboardPage: React.FC = () => {
             </div>
             </div>
 
-            <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm backdrop-blur sm:p-6">
+            <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm md:backdrop-blur sm:p-6">
             <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase text-active-clr">Live work</p>
@@ -958,7 +958,7 @@ const DashboardPage: React.FC = () => {
         )}
 
         {roleName === 'Student' && (
-          <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm backdrop-blur sm:p-6">
+          <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-sm md:backdrop-blur sm:p-6">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase text-active-clr">Student actions</p>

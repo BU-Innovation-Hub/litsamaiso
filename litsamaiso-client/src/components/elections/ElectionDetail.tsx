@@ -229,7 +229,7 @@ const ElectionDetail: React.FC<ElectionDetailProps> = ({ election, onBack, onEle
         <span className="truncate font-medium text-primary-clr">{election.title}</span>
       </nav>
 
-      <div className="rounded-3xl border border-white/70 bg-white/90 shadow-sm backdrop-blur">
+      <div className="rounded-3xl border border-white/70 bg-white/90 shadow-sm md:backdrop-blur">
         <div className="flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">

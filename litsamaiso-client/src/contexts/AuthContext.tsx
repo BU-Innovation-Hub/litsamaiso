@@ -42,6 +42,28 @@ const getStoredUser = (): User | null => {
   }
 };
 
+const promptForFeedbackIfDue = async () => {
+  try {
+    const confirmationStatus = await accountService.getConfirmationStatus();
+    if (!confirmationStatus.confirmed) {
+      return;
+    }
+
+    const feedbackStatus = await feedbackService.getStatus();
+    if (feedbackStatus.hasSubmittedFeedback) {
+      return;
+    }
+
+    window.dispatchEvent(
+      new CustomEvent('litsamaiso:feedback-prompt', {
+        detail: { reason: 'login' },
+      })
+    );
+  } catch {
+    // Ignore prompt gating failures and keep the login flow stable.
+  }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -186,27 +208,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       });
 
       if (response.user?.role?.name === 'Student') {
-        try {
-          const confirmationStatus = await accountService.getConfirmationStatus();
-          if (!confirmationStatus.confirmed) {
-            return;
-          }
-
-          const feedbackStatus = await feedbackService.getStatus();
-          if (feedbackStatus.hasSubmittedFeedback) {
-            return;
-          }
-
-          window.setTimeout(() => {
-            window.dispatchEvent(
-              new CustomEvent('litsamaiso:feedback-prompt', {
-                detail: { reason: 'login' },
-              })
-            );
-          }, 0);
-        } catch {
-          // Ignore prompt gating failures and keep the login flow stable.
-        }
+        // Not awaited: the route guards show a spinner until login returns, which delays the dashboard
+        void promptForFeedbackIfDue();
       }
     } finally {
       setIsLoading(false);
