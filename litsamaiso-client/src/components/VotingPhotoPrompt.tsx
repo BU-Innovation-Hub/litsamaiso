@@ -31,7 +31,7 @@ export const VotingPhotoPrompt: React.FC<{
 }> = ({ returnTo, onTakePhoto, className }) => (
   <section
     className={cn(
-      'animate-rise-in flex flex-col gap-4 rounded-3xl border border-amber-200 bg-amber-50/95 p-5 shadow-sm backdrop-blur sm:flex-row sm:items-center sm:justify-between',
+      'animate-rise-in flex flex-col gap-4 rounded-3xl border border-amber-200 bg-amber-50/95 p-5 shadow-sm md:backdrop-blur sm:flex-row sm:items-center sm:justify-between',
       className,
     )}
   >

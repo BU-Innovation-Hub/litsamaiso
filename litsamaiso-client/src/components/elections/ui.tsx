@@ -11,7 +11,7 @@ export const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-primary-clr placeholder:text-slate-400 transition focus:border-active focus:outline-none focus:ring-4 focus:ring-active/10 disabled:bg-slate-50';
 
 export const Card = ({ className, children }: { className?: string; children: React.ReactNode }) => (
-  <section className={cn('rounded-3xl border border-white/70 bg-white/90 shadow-sm backdrop-blur', className)}>
+  <section className={cn('rounded-3xl border border-white/70 bg-white/90 shadow-sm md:backdrop-blur', className)}>
     {children}
   </section>
 );

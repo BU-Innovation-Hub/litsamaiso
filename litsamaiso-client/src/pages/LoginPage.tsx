@@ -28,7 +28,8 @@ const LoginPage: React.FC = () => {
     try {
       await login(formData.email, formData.password, formData.rememberMe);
       toast.success("Signed in successfully!");
-      navigate("/dashboard");
+      // PublicRoute has already redirected by now, so a push would add a second /dashboard to history
+      navigate("/dashboard", { replace: true });
     } catch (error: unknown) {
       toast.error(getApiErrorMessage(error, "Login failed"));
     }

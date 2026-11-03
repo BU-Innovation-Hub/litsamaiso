@@ -425,7 +425,7 @@ const VotingPage: React.FC = () => {
               return (
                 <section
                   key={positionId}
-                  className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-sm backdrop-blur transition sm:p-6"
+                  className="rounded-3xl border border-white/70 bg-white/90 p-5 shadow-sm md:backdrop-blur transition sm:p-6"
                 >
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div>
@@ -494,7 +494,7 @@ const VotingPage: React.FC = () => {
       )}
 
       {positions.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 md:backdrop-blur">
           <div className="mx-auto flex max-w-3xl items-center gap-4 px-4 py-3">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-primary-clr">
