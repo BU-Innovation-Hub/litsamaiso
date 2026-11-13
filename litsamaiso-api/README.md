@@ -268,6 +268,29 @@ curl -X GET "http://<HOST>/feedback" \
   - **Running**: SAAD can close voting early or extend the end time while an election is open.
   - **Results**: Closing triggers counting. SAAD reviews the results, then publishes them. Published results are final and cannot be recounted. Draft and scheduled elections can be deleted; later ones can only be archived.
 
+## Room Allocation (Timetabling)
+
+- Purpose: Registry builds a weekly class timetable for a semester, with rooms allocated automatically.
+- Routes: `/api/v1/timetabling/*`, for Registry (and AppAdmin with `institutionId`, as with `/registry`).
+- Core Entities:
+  - **Room**: Code, building, seats, whether it is a computer lab, and whether it is in use. `POST /timetabling/rooms/generate` creates a numbered series (prefix `LAB-`, first number `01`, count 3 gives `LAB-01` to `LAB-03`) and skips codes that exist.
+  - **Lecturer**: A record Registry manages, not a login account.
+  - **CourseModule**: A module in one academic year and semester, with one lecturer, its enrolled students, classes per week, hours per class, and whether it needs a computer lab. Students are enrolled by pasting student numbers from the Student Registry.
+  - **TimetableRun**: One generated timetable (`draft`, `published` or `archived`), with the classes that could not be placed and why.
+  - **ClassSession**: One weekly class: a module in a room on a day and time.
+- Rules (`src/constants/timetabling.ts`), enforced by `src/services/timetableSolver.ts` for both generating and Registry's manual moves:
+  - Classes run Monday to Saturday, 07:00–19:00, in whole hours.
+  - No room clashes. The database also enforces this with a unique index on each hour a class holds a room.
+  - No module clashes: modules that share a student, or the same module, are never on at the same time.
+  - A lecturer with more than one class in a day gets at least a 2-hour break between them.
+  - A module that needs computers only goes in a computer lab; other modules use ordinary rooms first. A room must seat every enrolled student.
+- Key Workflows:
+  - **Import from Excel** (`POST /timetabling/import`, template at `GET /timetabling/import/template`): one workbook with any of a Rooms, Lecturers, Modules and Enrolments sheet, or a CSV of one of them. Sheets and columns are recognised by name, so a sheet Registry already keeps (e.g. "Room", "Seats") works too. Rooms match on code, lecturers on email and modules on code within the chosen semester, and a match is updated from the row; a blank cell keeps what is there. Nothing is deleted and enrolments are only added. Without `apply=true` it only reports what it would change and which rows it would skip and why; with it, the changes are saved in one transaction where the database supports one. Logic in `src/services/timetablingImportService.ts`.
+  - **Generate** (`POST /timetabling/runs`): places the hardest classes first (labs, big classes, many shared students) in the smallest room that fits, spreading a module's classes over different days. It replaces the semester's previous draft. Classes no time and room can satisfy are listed with the reason instead of being forced in.
+  - **Adjust**: `PUT /timetabling/sessions/:id` moves a class and `POST /timetabling/runs/:id/sessions` places a waiting one. Both are refused with the clash as the message if they would break a rule.
+  - **Publish** (`POST /timetabling/runs/:id/publish`): archives the previously published timetable. A draft is re-checked against today's data first (e.g. a student joined a module, a room was made smaller), and is refused while it has clashes.
+- Sample data: `npm run seed:timetabling` adds 18 rooms (4 computer labs, 1 not in use), 13 lecturers, 545 students (numbers `TT00001`–`TT00545`) and 27 modules for eight programme cohorts to this semester, for trying the feature out. It writes to `MONGO_URI` and refuses a database not on this machine unless given `--confirm-host=<host>`. Pass `--institution "<name>"`, `--year 2026/2027` or `--semester 2` to choose where it goes, and `--remove` to take it all out again.
+
 ## Models
 
 ### Account

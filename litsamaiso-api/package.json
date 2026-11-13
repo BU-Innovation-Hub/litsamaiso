@@ -6,6 +6,7 @@
     "scripts": {
         "dev": "tsx watch src/index.ts",
         "seed:src": "tsx src/scripts/seedSrcPositions.ts",
+        "seed:timetabling": "tsx src/scripts/seedTimetablingSample.ts",
         "cleanup:registry-financial": "tsx src/scripts/cleanupRegistryFinancialClearance.ts",
         "backfill:user-borrowers": "tsx src/scripts/backfillUserBorrowerNumbers.ts",
         "import:borrowers": "tsx src/scripts/importBorrowerNumbers.ts",

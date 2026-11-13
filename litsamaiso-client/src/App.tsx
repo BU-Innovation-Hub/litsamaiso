@@ -33,6 +33,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ChooseRolePage = lazy(() => import('./pages/ChooseRolePage'));
 const StudentRegistryPage = lazy(() => import('./pages/StudentRegistryPage'));
+const RoomAllocationPage = lazy(() => import('./pages/RoomAllocationPage'));
 
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center">
@@ -151,6 +152,7 @@ function App() {
               <Route path="/profile" element={<ProfilePage />} />
               <Route element={<RoleRoute allowedRoles={roleAccess.registry} />}>
                 <Route path="/student-registry" element={<StudentRegistryPage />} />
+                <Route path="/room-allocation" element={<RoomAllocationPage />} />
               </Route>
               <Route element={<RoleRoute allowedRoles={roleAccess.elections} />}>
                 <Route path="/elections" element={<ElectionsPage />} />
