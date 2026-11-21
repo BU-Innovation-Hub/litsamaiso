@@ -60,8 +60,8 @@ test("sheets that aren't recognised are listed, not guessed", () => {
 test("rooms are added, updated or left alone, and a blank cell keeps what is there", () => {
   const existing = nothing();
   const a101 = new Types.ObjectId();
-  existing.rooms.push({ _id: a101, code: "A101", building: "Block A", capacity: 40, isComputerized: false, active: false });
-  existing.rooms.push({ _id: new Types.ObjectId(), code: "A102", building: "Block A", capacity: 30, isComputerized: false, active: true });
+  existing.rooms.push({ _id: a101, code: "A101", building: "Block A", capacity: 40, isComputerized: false, roomType: "30-seater", active: false });
+  existing.rooms.push({ _id: new Types.ObjectId(), code: "A102", building: "Block A", capacity: 30, isComputerized: false, roomType: "30-seater", active: true });
   const result = plan({
     Rooms: [
       ["Room code", "Building", "Capacity", "Computer lab", "In use"],
@@ -143,7 +143,7 @@ test("updating a module changes only what the file changes", () => {
   const lecturer = new Types.ObjectId();
   const module = new Types.ObjectId();
   existing.lecturers.push({ _id: lecturer, name: "Ms Ann Dube", email: "ann.dube@example.com" });
-  existing.modules.push({ _id: module, code: "CSC101", name: "Programming", lecturer, requiresComputers: true, sessionsPerWeek: 2, durationHours: 2, students: [] });
+  existing.modules.push({ _id: module, code: "CSC101", name: "Programming", lecturer, requiresComputers: true, sessionsPerWeek: 2, durationHours: 2, credits: 10, batches: 1, preferredRoomType: "any", specificRequirements: "", students: [] });
   const result = plan({ Modules: [["Module code", "Module name", "Lecturer email", "Hours per class"], ["CSC101", "", "", 3]] }, existing);
   assert.deepEqual(result.modules.update, [{ _id: module, changes: { durationHours: 3 } }]);
 });
@@ -154,7 +154,7 @@ test("enrolments add students once, to modules in the file or already in the ter
   const csc101 = new Types.ObjectId();
   const [thato, lerato, neo] = [new Types.ObjectId(), new Types.ObjectId(), new Types.ObjectId()];
   existing.lecturers.push({ _id: lecturer, name: "Ms Ann Dube", email: "ann.dube@example.com" });
-  existing.modules.push({ _id: csc101, code: "CSC101", name: "Programming", lecturer, requiresComputers: false, sessionsPerWeek: 2, durationHours: 2, students: [thato] });
+  existing.modules.push({ _id: csc101, code: "CSC101", name: "Programming", lecturer, requiresComputers: false, sessionsPerWeek: 2, durationHours: 2, credits: 10, batches: 1, preferredRoomType: "any", specificRequirements: "", students: [thato] });
   existing.students.push({ _id: thato, studentId: "2001" }, { _id: lerato, studentId: "2002" }, { _id: neo, studentId: "2003" });
   const result = plan({
     Modules: [["Module code", "Module name", "Lecturer email"], ["CSC102", "Fundamentals", "ann.dube@example.com"]],

@@ -7,6 +7,7 @@ export interface UnplacedSessionRecord {
   module: Types.ObjectId;
   moduleCode: string;
   session: number;
+  batch: number;
   reason: string;
 }
 
@@ -44,6 +45,7 @@ const timetableRunSchema = new Schema<TimetableRunDocument>(
           module: { type: Schema.Types.ObjectId, ref: "CourseModule", required: true },
           moduleCode: { type: String, required: true },
           session: { type: Number, required: true },
+          batch: { type: Number, default: 1 },
           reason: { type: String, required: true },
         },
       ],

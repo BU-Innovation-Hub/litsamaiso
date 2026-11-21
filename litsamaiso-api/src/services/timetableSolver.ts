@@ -23,6 +23,7 @@ export type SolverRoom = {
   code: string;
   capacity: number;
   isComputerized: boolean;
+  roomType: string;
   active?: boolean;
 };
 
@@ -35,11 +36,15 @@ export type SolverModule = {
   requiresComputers: boolean;
   sessionsPerWeek: number;
   durationHours: number;
+  credits: number;
+  batches: number;
+  preferredRoomType: string;
+  specificRequirements: string;
 };
 
 export type Slot = { day: number; startHour: number; endHour: number };
-export type Placement = Slot & { moduleId: string; roomId: string };
-export type UnplacedSession = { moduleId: string; session: number; reason: string };
+export type Placement = Slot & { moduleId: string; roomId: string; batch: number };
+export type UnplacedSession = { moduleId: string; session: number; batch: number; reason: string };
 export type SolverResult = { placements: Placement[]; unplaced: UnplacedSession[] };
 
 export type ClashKind = "hours" | "module" | "lecturer" | "students" | "room";
@@ -122,6 +127,14 @@ export const timeClash = (
     };
   }
 
+  const sameDaySessions = others.filter((p) => p.day === slot.day && ctx.modules.get(p.moduleId)?.lecturerId === module.lecturerId);
+  if (sameDaySessions.length >= 2) {
+    return {
+      kind: "lecturer",
+      message: `${module.lecturerName} can have at most 2 classes per day (already has ${sameDaySessions.length})`,
+    };
+  }
+
   const sharing = ctx.sharedStudents.get(moduleId);
   for (const other of others) {
     if (other.day !== slot.day) continue;
@@ -167,6 +180,17 @@ export const roomClash = (
   if (module.requiresComputers && !room.isComputerized) {
     return { kind: "room", message: `${module.code} needs a computer lab, and ${room.code} has no computers` };
   }
+
+  if (module.preferredRoomType && module.preferredRoomType !== "any") {
+    const roomTypeMatch = checkRoomTypePreference(module.preferredRoomType, room.roomType, room.isComputerized);
+    if (!roomTypeMatch) {
+      return {
+        kind: "room",
+        message: `${module.code} prefers ${module.preferredRoomType}, but ${room.code} is a ${room.roomType}`,
+      };
+    }
+  }
+
   const size = new Set(module.studentIds).size;
   if (room.capacity < size) {
     return { kind: "room", message: `${room.code} seats ${room.capacity}, but ${module.code} has ${size} students` };
@@ -180,6 +204,13 @@ export const roomClash = (
   return null;
 };
 
+const checkRoomTypePreference = (preferred: string, roomType: string | undefined, isComputerized: boolean): boolean => {
+  if (preferred === "computer lab") return isComputerized;
+  if (preferred === "lecture theatre") return roomType === "lecture theatre";
+  if (preferred === "30-seater") return roomType === "30-seater" || (!roomType && !isComputerized);
+  return true;
+};
+
 export const checkPlacement = (ctx: TimetableContext, placement: Placement, others: Placement[]): Clash | null =>
   timeClash(ctx, placement.moduleId, placement, others) ?? roomClash(ctx, placement.moduleId, placement.roomId, placement, others);
 
@@ -187,8 +218,15 @@ export const checkPlacement = (ctx: TimetableContext, placement: Placement, othe
 // will do. Modules that don't need computers try ordinary rooms first so labs stay free.
 export const suitableRooms = (module: SolverModule, rooms: SolverRoom[]): SolverRoom[] => {
   const size = new Set(module.studentIds).size;
+  const passesRoomTypeCheck = (room: SolverRoom) => {
+    if (module.preferredRoomType && module.preferredRoomType !== "any") {
+      return checkRoomTypePreference(module.preferredRoomType, room.roomType, room.isComputerized);
+    }
+    return true;
+  };
+
   return rooms
-    .filter((room) => room.active !== false && room.capacity >= size && (!module.requiresComputers || room.isComputerized))
+    .filter((room) => room.active !== false && room.capacity >= size && (!module.requiresComputers || room.isComputerized) && passesRoomTypeCheck(room))
     .sort(
       (a, b) =>
         Number(a.isComputerized) - Number(b.isComputerized) ||
@@ -209,10 +247,10 @@ const seededRandom = (seed: number) => {
   };
 };
 
-type Task = { module: SolverModule; session: number; rooms: SolverRoom[] };
+type Task = { module: SolverModule; session: number; batch: number; rooms: SolverRoom[] };
 
 const unplaceableReason = (task: Task, rules: TimetableRules): string | null => {
-  const { module } = task;
+  const { module, batch } = task;
   if (module.durationHours > rules.dayEndHour - rules.dayStartHour) {
     return `A ${module.durationHours}-hour session doesn't fit in the teaching day`;
   }
@@ -234,7 +272,8 @@ const noSlotReason = (task: Task, counts: Record<ClashKind, number>, rules: Time
   if (counts.room) {
     parts.push(`${counts.room} have no free ${task.module.requiresComputers ? "computer lab" : "room"} big enough`);
   }
-  return `No time slot works: ${parts.join("; ")}`;
+  const batchInfo = task.module.batches > 1 ? ` (batch ${task.batch}/${task.module.batches})` : "";
+  return `No time slot works for ${task.module.code}${batchInfo}: ${parts.join("; ")}`;
 };
 
 const placeAll = (ctx: TimetableContext, tasks: Task[], random: (() => number) | null): SolverResult => {
@@ -244,10 +283,10 @@ const placeAll = (ctx: TimetableContext, tasks: Task[], random: (() => number) |
   const unplaced: UnplacedSession[] = [];
 
   for (const task of tasks) {
-    const { module } = task;
+    const { module, batch } = task;
     const reason = unplaceableReason(task, rules);
     if (reason) {
-      unplaced.push({ moduleId: module.id, session: task.session, reason });
+      unplaced.push({ moduleId: module.id, session: task.session, batch, reason });
       continue;
     }
 
@@ -287,7 +326,7 @@ const placeAll = (ctx: TimetableContext, tasks: Task[], random: (() => number) |
         counts.room += 1;
         continue;
       }
-      placed = { ...slot, moduleId: module.id, roomId: room.id };
+      placed = { ...slot, moduleId: module.id, roomId: room.id, batch: task.batch };
       break;
     }
 
@@ -295,7 +334,7 @@ const placeAll = (ctx: TimetableContext, tasks: Task[], random: (() => number) |
       placements.push(placed);
       byDay[placed.day]?.push(placed);
     } else {
-      unplaced.push({ moduleId: module.id, session: task.session, reason: noSlotReason(task, counts, rules) });
+      unplaced.push({ moduleId: module.id, session: task.session, batch: task.batch, reason: noSlotReason(task, counts, rules) });
     }
   }
   return { placements, unplaced };
@@ -326,10 +365,16 @@ export const generateTimetable = (
 
   // Hardest sessions first: computer labs, few usable rooms, many shared students, big
   // classes, busy lecturers. Ties break on the module code so results are repeatable.
+  // Each batch gets its own session, so a module with 3 batches and 2 sessions/week = 6 tasks
   const tasks: Task[] = modules
     .flatMap((module) => {
       const usable = suitableRooms(module, rooms);
-      return Array.from({ length: module.sessionsPerWeek }, (_, index) => ({ module, session: index + 1, rooms: usable }));
+      const totalSessions = module.sessionsPerWeek * module.batches;
+      return Array.from({ length: totalSessions }, (_, index) => {
+        const batch = Math.floor(index / module.sessionsPerWeek) + 1;
+        const sessionInBatch = (index % module.sessionsPerWeek) + 1;
+        return { module, session: sessionInBatch, batch, rooms: usable };
+      });
     })
     .sort(
       (a, b) =>

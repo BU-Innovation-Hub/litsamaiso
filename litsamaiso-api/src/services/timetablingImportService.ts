@@ -38,6 +38,7 @@ const COLUMNS: Record<ImportKind, Record<string, Column>> = {
     building: { label: "Building", aliases: ["building", "block", "location"], help: "Optional." },
     capacity: { label: "Capacity", aliases: ["capacity", "seats", "number of seats", "size"], required: true, help: "Number of seats. Required for a new room." },
     isComputerized: { label: "Computer lab", aliases: ["computer lab", "computerised", "computerized", "computers", "lab"], help: "Yes or No. Blank means No for a new room." },
+    roomType: { label: "Room type", aliases: ["room type", "type"], help: "lecture theatre, 30-seater, computer lab, or lab. Defaults to 30-seater." },
     active: { label: "In use", aliases: ["in use", "active", "available"], help: "Yes or No. Blank means Yes for a new room. A room not in use is left off timetables." },
   },
   lecturers: {
@@ -47,11 +48,15 @@ const COLUMNS: Record<ImportKind, Record<string, Column>> = {
   },
   modules: {
     code: { label: "Module code", aliases: ["module code", "code", "course code", "module"], required: true, help: "Required. For example CSC101." },
-    name: { label: "Module name", aliases: ["module name", "name", "title", "module title", "course name"], required: true, help: "Required for a new module." },
-    lecturer: { label: "Lecturer email", aliases: ["lecturer email", "lecturer", "lecturer name", "email"], required: true, help: "Required for a new module. The lecturer must be on the Lecturers sheet or already added. Their name works too if no other lecturer has it." },
+    name: { label: "Module name", aliases: ["module name", "name", "title", "module title", "course name"], help: "Optional. Required for a new module." },
+    lecturer: { label: "Lecturer email", aliases: ["lecturer email", "lecturer", "lecturer name", "email"], help: "Optional. The lecturer must be on the Lecturers sheet or already added. Their name works too if no other lecturer has it." },
     sessionsPerWeek: { label: "Classes per week", aliases: ["classes per week", "sessions per week", "classes", "sessions"], help: `1 to ${MAX_SESSIONS_PER_WEEK}. Blank means ${NEW_MODULE_DEFAULTS.sessionsPerWeek} for a new module.` },
     durationHours: { label: "Hours per class", aliases: ["hours per class", "hours per session", "hours", "duration", "class length"], help: `1 to ${MAX_SESSION_HOURS}. Blank means ${NEW_MODULE_DEFAULTS.durationHours} for a new module.` },
     requiresComputers: { label: "Computer lab", aliases: ["computer lab", "needs computer lab", "needs computers", "computers", "lab"], help: "Yes or No. Blank means No for a new module." },
+    credits: { label: "Credits", aliases: ["credits", "no credits", "credit"], help: "Module credits. Default is 10." },
+    batches: { label: "Batches", aliases: ["batches", "no. of projected batches", "number of batches"], help: "Number of parallel class groups. Default is 1." },
+    preferredRoomType: { label: "Room type preference", aliases: ["room type", "preferred room type", "room type (lecture theatre/30 seater)"], help: "lecture theatre, 30-seater, computer lab, or any." },
+    specificRequirements: { label: "Specific requirements", aliases: ["specific requirements", "requirements", "notes"], help: "Any special room requirements." },
   },
   enrolments: {
     module: { label: "Module code", aliases: ["module code", "module", "code", "course code"], required: true, help: "Required. A module on the Modules sheet or already in the semester." },
@@ -179,9 +184,9 @@ export const parseWorkbook = (buffer: Buffer): { sheets: ImportSheet[]; ignored:
 // ---------------------------------------------------------------------------
 
 type Id = Types.ObjectId;
-type RoomRecord = { _id: Id; code: string; building?: string | null; capacity: number; isComputerized: boolean; active: boolean };
+type RoomRecord = { _id: Id; code: string; building?: string | null; capacity: number; isComputerized: boolean; roomType: string; active: boolean };
 type LecturerRecord = { _id: Id; name: string; email: string; staffNumber?: string | null };
-type ModuleRecord = { _id: Id; code: string; name: string; lecturer: Id; requiresComputers: boolean; sessionsPerWeek: number; durationHours: number; students: Id[] };
+type ModuleRecord = { _id: Id; code: string; name: string; lecturer: Id; requiresComputers: boolean; sessionsPerWeek: number; durationHours: number; credits: number; batches: number; preferredRoomType: string; specificRequirements: string; students: Id[] };
 type StudentRecord = { _id: Id; studentId: string };
 
 export type ImportExisting = { rooms: RoomRecord[]; lecturers: LecturerRecord[]; modules: ModuleRecord[]; students: StudentRecord[] };
@@ -192,7 +197,7 @@ type Changes<T> = { insert: T[]; update: Array<{ _id: Id; changes: Partial<T> }>
 export type ImportPlan = {
   tallies: ImportTally[];
   issues: ImportIssue[];
-  rooms: Changes<Omit<RoomRecord, "building"> & { building: string }>;
+  rooms: Changes<Omit<RoomRecord, "building" | "roomType"> & { building: string; roomType: string }>;
   lecturers: Changes<Omit<LecturerRecord, "staffNumber"> & { staffNumber: string }>;
   modules: Changes<Omit<ModuleRecord, "students">>;
   enrolments: Map<string, Id[]>;
@@ -306,6 +311,7 @@ export const planImport = (sheets: ImportSheet[], existing: ImportExisting, term
       building: row.values.building ?? current?.building ?? "",
       capacity: row.values.capacity ?? current?.capacity,
       isComputerized: yesNo(row.values.isComputerized, "Computer lab", current?.isComputerized, false),
+      roomType: row.values.roomType ?? current?.roomType ?? "30-seater",
       active: yesNo(row.values.active, "In use", current?.active, true),
     }),
     changes: plan.rooms,
@@ -357,6 +363,10 @@ export const planImport = (sheets: ImportSheet[], existing: ImportExisting, term
         requiresComputers: yesNo(row.values.requiresComputers, "Computer lab", current?.requiresComputers, false),
         sessionsPerWeek: row.values.sessionsPerWeek ?? current?.sessionsPerWeek ?? NEW_MODULE_DEFAULTS.sessionsPerWeek,
         durationHours: row.values.durationHours ?? current?.durationHours ?? NEW_MODULE_DEFAULTS.durationHours,
+        credits: row.values.credits ?? current?.credits ?? 10,
+        batches: row.values.batches ?? current?.batches ?? 1,
+        preferredRoomType: row.values.preferredRoomType ?? current?.preferredRoomType ?? "any",
+        specificRequirements: row.values.specificRequirements ?? current?.specificRequirements ?? "",
       });
       const lecturer = row.values.lecturer ? lecturerFor(row.values.lecturer) : current?.lecturer;
       if (!lecturer) throw new AppError("Lecturer email is blank");
@@ -431,9 +441,9 @@ export const importTimetablingData = async (
 
   const studentNumbers = [...new Set(sheets.filter((sheet) => sheet.kind === "enrolments").flatMap((sheet) => sheet.rows.map((row) => row.values.studentId)).filter((value): value is string => Boolean(value)))];
   const [rooms, lecturers, modules, students] = await Promise.all([
-    Room.find({ institution }).select("code building capacity isComputerized active").lean(),
+    Room.find({ institution }).select("code building capacity isComputerized roomType active").lean(),
     Lecturer.find({ institution }).select("name email staffNumber").lean(),
-    CourseModule.find({ institution, ...term }).select("code name lecturer requiresComputers sessionsPerWeek durationHours students").lean(),
+    CourseModule.find({ institution, ...term }).select("code name lecturer requiresComputers sessionsPerWeek durationHours credits batches preferredRoomType specificRequirements students").lean(),
     studentNumbers.length ? Student.find({ institution, studentId: { $in: studentNumbers } }).select("studentId").lean() : [],
   ]);
   const plan = planImport(sheets, { rooms, lecturers, modules, students }, term);

@@ -6,6 +6,7 @@ export interface Room {
   building?: string;
   capacity: number;
   isComputerized: boolean;
+  roomType: string;
   active: boolean;
 }
 
@@ -30,6 +31,10 @@ export interface CourseModule extends Term {
   requiresComputers: boolean;
   sessionsPerWeek: number;
   durationHours: number;
+  credits: number;
+  batches: number;
+  preferredRoomType: string;
+  specificRequirements: string;
   studentCount: number;
 }
 
@@ -52,6 +57,7 @@ export interface UnplacedSession {
   module: string;
   moduleCode: string;
   session: number;
+  batch: number;
   reason: string;
 }
 
@@ -75,9 +81,10 @@ export interface ClassSession {
   day: number;
   startHour: number;
   endHour: number;
+  batch: number;
   module: { _id: string; code: string; name: string; requiresComputers: boolean; studentCount: number } | null;
   lecturer: { _id: string; name: string } | null;
-  room: { _id: string; code: string; building?: string; capacity: number; isComputerized: boolean } | null;
+  room: { _id: string; code: string; building?: string; capacity: number; isComputerized: boolean; roomType: string } | null;
 }
 
 export interface WaitingSession extends UnplacedSession {
@@ -98,8 +105,8 @@ export interface TimetableDetail {
 export type RoomInput = Omit<Room, '_id'>;
 export type RoomSeriesInput = Omit<RoomInput, 'code'> & { prefix: string; startNumber: string; count: number };
 export type LecturerInput = Omit<Lecturer, '_id' | 'moduleCount'>;
-export type ModuleInput = Term & Pick<CourseModule, 'code' | 'name' | 'requiresComputers' | 'sessionsPerWeek' | 'durationHours'> & { lecturer: string };
-export type Placement = { day: number; startHour: number; roomId: string };
+export type ModuleInput = Term & Pick<CourseModule, 'code' | 'name' | 'requiresComputers' | 'sessionsPerWeek' | 'durationHours' | 'credits' | 'batches' | 'preferredRoomType' | 'specificRequirements'> & { lecturer: string };
+export type Placement = { day: number; startHour: number; roomId: string; session?: number; batch?: number };
 
 const data = <T>(promise: Promise<{ data: { data: T } }>) => promise.then((response) => response.data.data);
 
@@ -141,8 +148,8 @@ export const timetablingService = {
   generateRun: (term: Term) => data<TimetableDetail>(apiClient.post('/timetabling/runs', term)),
   getRun: (id: string) => data<TimetableDetail>(apiClient.get(`/timetabling/runs/${id}`)),
   publishRun: (id: string) => data<TimetableDetail>(apiClient.post(`/timetabling/runs/${id}/publish`)),
-  placeUnplaced: (runId: string, moduleId: string, placement: Placement) =>
-    data<TimetableDetail>(apiClient.post(`/timetabling/runs/${runId}/sessions`, { moduleId, ...placement })),
+  placeUnplaced: (runId: string, moduleId: string, placement: Placement, session?: number, batch?: number) =>
+    data<TimetableDetail>(apiClient.post(`/timetabling/runs/${runId}/sessions`, { moduleId, session, batch, ...placement })),
   moveSession: (id: string, placement: Placement) => data<TimetableDetail>(apiClient.put(`/timetabling/sessions/${id}`, placement)),
 
   // Without `apply` the file is only checked, and the result says what importing it would change

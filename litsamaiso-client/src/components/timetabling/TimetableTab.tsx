@@ -40,7 +40,7 @@ const PlacementModal: React.FC<{ detail: TimetableDetail; target: Target; onClos
       const placement = { day, startHour, roomId };
       const updated = target.kind === 'move'
         ? await timetablingService.moveSession(target.session._id, placement)
-        : await timetablingService.placeUnplaced(detail.run._id, target.waiting.module, placement);
+        : await timetablingService.placeUnplaced(detail.run._id, target.waiting.module, placement, target.waiting.session, target.waiting.batch);
       toast.success(`${info.code} ${target.kind === 'move' ? 'moved' : 'placed'}`);
       onSaved(updated);
     } catch (error) {
@@ -90,7 +90,7 @@ const SessionCard: React.FC<{ session: ClassSession; view: View; flagged: boolea
     title={editable ? 'Move this class' : undefined}
     className={`block h-full w-full rounded-md border px-2 py-1.5 text-left text-xs ${flagged ? 'border-rose-300 bg-rose-50' : 'border-blue-200 bg-blue-50'} ${editable ? 'hover:border-blue-400' : 'cursor-default'}`}
   >
-    <span className="flex items-center gap-1 font-semibold text-slate-900">{session.module?.code || 'Deleted module'}{session.module?.requiresComputers && <Monitor className="h-3 w-3 text-blue-700" />}</span>
+    <span className="flex items-center gap-1 font-semibold text-slate-900">{session.module?.code || 'Deleted module'}{session.batch > 1 && <span className="rounded bg-amber-100 px-1 text-xs text-amber-800">B{session.batch}</span>}{session.module?.requiresComputers && <Monitor className="h-3 w-3 text-blue-700" />}</span>
     <span className="block text-slate-600">{formatTime(session.startHour, session.endHour)}</span>
     {view !== 'room' && <span className="block text-slate-600">{session.room?.code}</span>}
     {view !== 'lecturer' && <span className="block truncate text-slate-500">{session.lecturer?.name}</span>}
@@ -288,8 +288,8 @@ const TimetableTab: React.FC<{ term: Term }> = ({ term }) => {
           <p className="text-sm text-slate-600">No time or room satisfied every rule for these classes. Add rooms or adjust the module, then generate again, or place one by hand.</p>
           <ul className="mt-3 divide-y divide-slate-100">
             {detail.unplaced.map((waiting) => (
-              <li key={`${waiting.module}-${waiting.session}`} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
-                <span><span className="font-semibold text-slate-900">{waiting.moduleCode}</span> <span className="text-slate-500">class {waiting.session} · {waiting.lecturerName}</span><span className="block text-amber-800">{waiting.reason}</span></span>
+              <li key={`${waiting.module}-${waiting.session}-${waiting.batch}`} className="flex flex-wrap items-center justify-between gap-3 py-2 text-sm">
+                <span><span className="font-semibold text-slate-900">{waiting.moduleCode}</span> <span className="text-slate-500">session {waiting.session}{waiting.batch > 1 ? `, batch ${waiting.batch}` : ''} · {waiting.lecturerName}</span><span className="block text-amber-800">{waiting.reason}</span></span>
                 {editable && <button type="button" onClick={() => setTarget({ kind: 'place', waiting })} className={secondaryButton}><MoveRight className="h-4 w-4" /> Place</button>}
               </li>
             ))}

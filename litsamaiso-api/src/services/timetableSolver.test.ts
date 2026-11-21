@@ -24,6 +24,10 @@ const module = (overrides: Partial<SolverModule> & Pick<SolverModule, "id">): So
   requiresComputers: false,
   sessionsPerWeek: 1,
   durationHours: 2,
+  credits: 10,
+  batches: 1,
+  preferredRoomType: "any",
+  specificRequirements: "",
   ...overrides,
 });
 
@@ -31,6 +35,8 @@ const room = (overrides: Partial<SolverRoom> & Pick<SolverRoom, "id">): SolverRo
   code: overrides.id.toUpperCase(),
   capacity: 50,
   isComputerized: false,
+  roomType: "30-seater",
+  active: true,
   ...overrides,
 });
 
@@ -87,7 +93,7 @@ test("a lecturer's classes on different days need no break", () => {
   const lecturer = { lecturerId: "l1", lecturerName: "Dr Mokoena" };
   const modules = [module({ id: "a", ...lecturer }), module({ id: "b", ...lecturer })];
   const ctx = buildContext(modules, [room({ id: "r1" })]);
-  const monday: Placement = { ...slotFor(modules[0]!, 0, 7), moduleId: "a", roomId: "r1" };
+  const monday: Placement = { ...slotFor(modules[0]!, 0, 7), moduleId: "a", roomId: "r1", batch: 1 };
   assert.equal(timeClash(ctx, "b", slotFor(modules[1]!, 1, 9), [monday]), null);
 });
 
@@ -95,7 +101,7 @@ test("moving a class too close to the lecturer's other class is refused", () => 
   const lecturer = { lecturerId: "l1", lecturerName: "Dr Mokoena" };
   const modules = [module({ id: "a", ...lecturer }), module({ id: "b", ...lecturer })];
   const ctx = buildContext(modules, [room({ id: "r1" }), room({ id: "r2" })]);
-  const existing: Placement = { ...slotFor(modules[0]!, 0, 7), moduleId: "a", roomId: "r1" };
+  const existing: Placement = { ...slotFor(modules[0]!, 0, 7), moduleId: "a", roomId: "r1", batch: 1 };
 
   // Ends 09:00, so 10:00 is only one hour later
   const tooSoon = timeClash(ctx, "b", slotFor(modules[1]!, 0, 10), [existing]);
@@ -108,7 +114,7 @@ test("moving a class too close to the lecturer's other class is refused", () => 
 test("moving a class into a booked room is refused", () => {
   const modules = [module({ id: "a" }), module({ id: "b" })];
   const ctx = buildContext(modules, [room({ id: "r1" })]);
-  const existing: Placement = { ...slotFor(modules[0]!, 2, 9), moduleId: "a", roomId: "r1" };
+  const existing: Placement = { ...slotFor(modules[0]!, 2, 9), moduleId: "a", roomId: "r1", batch: 1 };
   const clash = roomClash(ctx, "b", "r1", slotFor(modules[1]!, 2, 10), [existing]);
   assert.equal(clash?.kind, "room");
   assert.match(clash!.message, /R1 is already booked for A/);

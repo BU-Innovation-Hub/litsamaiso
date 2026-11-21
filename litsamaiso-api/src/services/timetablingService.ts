@@ -69,6 +69,15 @@ const unique = <T>(values: T[]) => [...new Set(values)];
 export const listRooms = async (actor: Actor) =>
   Room.find({ institution: institutionOf(actor) }).sort({ building: 1, code: 1 }).lean();
 
+const normalizeRoomTypeValue = (value: string | undefined): string => {
+  if (!value) return "30-seater";
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  if (normalized.includes("lecture")) return "lecture theatre";
+  if (normalized.includes("30") || normalized.includes("thirty")) return "30-seater";
+  if (normalized.includes("computer") || normalized.includes("lab")) return "computer lab";
+  return "30-seater";
+};
+
 export const roomInput = (input: Record<string, any>) => {
   const building = optionalString(input.building);
   return {
@@ -76,6 +85,7 @@ export const roomInput = (input: Record<string, any>) => {
     building: building ?? "",
     capacity: wholeNumber(input.capacity, "Capacity", 1, 2000),
     isComputerized: flag(input.isComputerized),
+    roomType: normalizeRoomTypeValue(input.roomType),
     active: input.active === undefined ? true : flag(input.active),
   };
 };
@@ -83,7 +93,7 @@ export const roomInput = (input: Record<string, any>) => {
 export const createRoom = async (actor: Actor, input: Record<string, any>) => {
   const room = roomInput(input);
   try {
-    const created = await Room.create({ ...room, institution: institutionOf(actor) });
+    const created = await Room.create({ ...room, institution: institutionOf(actor) } as any);
     await audit(actor, "timetabling.room.created", "Room", created._id, { room });
     return created.toObject();
   } catch (error) {
@@ -228,6 +238,10 @@ export const listModules = async (actor: Actor, query: Record<string, any>) => {
         requiresComputers: 1,
         sessionsPerWeek: 1,
         durationHours: 1,
+        credits: 1,
+        batches: 1,
+        preferredRoomType: 1,
+        specificRequirements: 1,
         studentCount: { $size: "$students" },
       },
     },
@@ -237,6 +251,15 @@ export const listModules = async (actor: Actor, query: Record<string, any>) => {
   ]);
 };
 
+const normalizeRoomType = (value: string | undefined): string => {
+  if (!value) return "any";
+  const normalized = value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  if (normalized.includes("lecture")) return "lecture theatre";
+  if (normalized.includes("30") || normalized.includes("thirty")) return "30-seater";
+  if (normalized.includes("computer") || normalized.includes("lab")) return "computer lab";
+  return "any";
+};
+
 // A module's own fields, without its lecturer or term
 export const moduleFields = (input: Record<string, any>) => ({
   code: requireString(input.code, "Module code", { max: 30 }).toUpperCase(),
@@ -244,6 +267,10 @@ export const moduleFields = (input: Record<string, any>) => ({
   requiresComputers: flag(input.requiresComputers),
   sessionsPerWeek: wholeNumber(input.sessionsPerWeek, "Classes per week", 1, MAX_SESSIONS_PER_WEEK),
   durationHours: wholeNumber(input.durationHours, "Hours per class", 1, MAX_SESSION_HOURS),
+  credits: wholeNumber(input.credits, "Credits", 1, 100) ?? 10,
+  batches: wholeNumber(input.batches, "Batches", 1, 20) ?? 1,
+  preferredRoomType: normalizeRoomType(input.preferredRoomType),
+  specificRequirements: String(input.specificRequirements ?? ""),
 });
 
 const moduleInput = async (actor: Actor, input: Record<string, any>) => {
@@ -258,7 +285,7 @@ const duplicateModuleMessage = (module: { code: string; academicYear: string; se
 export const createModule = async (actor: Actor, input: Record<string, any>) => {
   const module = await moduleInput(actor, input);
   try {
-    const created = await CourseModule.create({ ...module, institution: institutionOf(actor) });
+    const created = await CourseModule.create({ ...module, institution: institutionOf(actor) } as any);
     await audit(actor, "timetabling.module.created", "CourseModule", created._id, { module });
     return created.toObject();
   } catch (error) {
@@ -357,6 +384,10 @@ const toSolverModules = (modules: any[]): SolverModule[] =>
     requiresComputers: Boolean(module.requiresComputers),
     sessionsPerWeek: module.sessionsPerWeek,
     durationHours: module.durationHours,
+    credits: module.credits ?? 10,
+    batches: module.batches ?? 1,
+    preferredRoomType: module.preferredRoomType ?? "any",
+    specificRequirements: module.specificRequirements ?? "",
   }));
 
 const toSolverRooms = (rooms: any[]): SolverRoom[] =>
@@ -365,6 +396,7 @@ const toSolverRooms = (rooms: any[]): SolverRoom[] =>
     code: room.code,
     capacity: room.capacity,
     isComputerized: Boolean(room.isComputerized),
+    roomType: room.roomType ?? "30-seater",
     active: room.active !== false,
   }));
 
@@ -374,6 +406,7 @@ const toPlacement = (session: any): Placement => ({
   day: session.day,
   startHour: session.startHour,
   endHour: session.endHour,
+  batch: session.batch ?? 1,
 });
 
 const rulesOf = (run: any): TimetableRules => ({
@@ -492,6 +525,7 @@ export const generateRun = async (actor: Actor, input: Record<string, any>) => {
         startHour: placement.startHour,
         endHour: placement.endHour,
         hours: hoursBetween(placement.startHour, placement.endHour),
+        batch: placement.batch,
       })),
     );
   } catch (error) {
@@ -558,14 +592,14 @@ const assertPlaceable = async (
   actor: Actor,
   run: any,
   moduleId: string,
-  target: { day: number; startHour: number; roomId: Types.ObjectId },
+  target: { day: number; startHour: number; roomId: Types.ObjectId; batch: number },
   excludeSessionId?: Types.ObjectId,
 ) => {
   const others = await ClassSession.find({
     run: run._id,
     day: target.day,
     ...(excludeSessionId ? { _id: { $ne: excludeSessionId } } : {}),
-  }).lean();
+  }).select("module room day startHour endHour batch").lean();
   const moduleIds = unique([moduleId, ...others.map((other) => String(other.module))]);
   const [modules, rooms] = await Promise.all([
     CourseModule.find({ _id: { $in: moduleIds }, institution: institutionOf(actor) }).populate("lecturer", "name").lean(),
@@ -576,7 +610,8 @@ const assertPlaceable = async (
   if (!module) throw new AppError("Module not found", 404);
 
   const slot = slotFor(module, target.day, target.startHour);
-  const clash = checkPlacement(ctx, { ...slot, moduleId, roomId: String(target.roomId) }, others.map(toPlacement));
+  const batch = excludeSessionId ? (others.find((s) => String(s._id) === String(excludeSessionId))?.batch ?? 1) : target.batch;
+  const clash = checkPlacement(ctx, { ...slot, moduleId, roomId: String(target.roomId), batch }, others.map(toPlacement));
   if (clash) throw new AppError(clash.message, 409, `clash_${clash.kind}`);
   return slot;
 };
@@ -587,6 +622,7 @@ const targetOf = (run: any, input: Record<string, any>) => {
     day: wholeNumber(input.day, "Day", 0, rules.days - 1),
     startHour: wholeNumber(input.startHour, "Start time", rules.dayStartHour, rules.dayEndHour - 1),
     roomId: objectId(input.roomId, "Room"),
+    batch: wholeNumber(input.batch, "Batch", 1, 20) ?? 1,
   };
 };
 
@@ -617,16 +653,18 @@ export const placeUnplaced = async (actor: Actor, runId: string, input: Record<s
   const run = await findRun(actor, runId);
   editableRun(run);
   const moduleId = objectId(input.moduleId, "Module");
-  const entry = run.unplaced.find((item) => String(item.module) === String(moduleId));
-  if (!entry) throw new AppError("This module has no classes waiting to be placed", 404);
+  const session = wholeNumber(input.session, "Session", 1, 10) ?? 1;
+  const batch = wholeNumber(input.batch, "Batch", 1, 20) ?? 1;
+  const entry = run.unplaced.find((item) => String(item.module) === String(moduleId) && item.session === session && item.batch === batch);
+  if (!entry) throw new AppError("This class (session " + session + ", batch " + batch + ") has no classes waiting to be placed", 404);
 
   const target = targetOf(run, input);
   const slot = await assertPlaceable(actor, run, String(moduleId), target);
 
   // Claim the waiting entry first so two people can't place the same class twice
   const claimed = await TimetableRun.updateOne(
-    { _id: run._id, unplaced: { $elemMatch: { module: moduleId, session: entry.session } } },
-    { $pull: { unplaced: { module: moduleId, session: entry.session } } },
+    { _id: run._id, unplaced: { $elemMatch: { module: moduleId, session, batch } } },
+    { $pull: { unplaced: { module: moduleId, session, batch } } },
   );
   if (!claimed.modifiedCount) throw new AppError("This class was just placed by someone else. Reload to see it.", 409);
 
@@ -638,6 +676,7 @@ export const placeUnplaced = async (actor: Actor, runId: string, input: Record<s
       room: target.roomId,
       ...slot,
       hours: hoursBetween(slot.startHour, slot.endHour),
+      batch,
     });
     await audit(actor, "timetabling.session.placed", "ClassSession", created._id, { run: String(run._id), placement: toPlacement(created) });
   } catch (error) {

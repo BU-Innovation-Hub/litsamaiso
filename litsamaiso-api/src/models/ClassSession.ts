@@ -11,6 +11,7 @@ export interface ClassSessionDocument {
   endHour: number;
   // Every hour the class occupies, e.g. [9, 10] for 09:00-11:00
   hours: number[];
+  batch: number;
 }
 
 const classSessionSchema = new Schema<ClassSessionDocument>(
@@ -23,6 +24,7 @@ const classSessionSchema = new Schema<ClassSessionDocument>(
     startHour: { type: Number, required: true },
     endHour: { type: Number, required: true },
     hours: { type: [Number], required: true },
+    batch: { type: Number, default: 1, min: 1 },
   },
   { timestamps: true },
 );
