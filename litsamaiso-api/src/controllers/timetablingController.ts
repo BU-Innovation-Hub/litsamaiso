@@ -55,3 +55,20 @@ export const importTemplate = (_req: Request, res: Response) => {
     .setHeader("Content-Disposition", 'attachment; filename="room-allocation-template.xlsx"')
     .send(timetablingImport.buildImportTemplate());
 };
+
+export const latestImport = (req: Request, res: Response) => handle(res, () => timetablingImport.latestImport(scopedActor(req), req.query));
+
+export const importColumns =(_req: Request, res: Response) => handle(res, async () => timetablingImport.importColumns());
+
+// A headers-only CSV for one tab. The kind is checked against a fixed list, so it is safe in the filename.
+export const importSample = (req: Request, res: Response) => {
+  const kind = param(req, "kind");
+  if (!timetablingImport.isSampleKind(kind)) {
+    res.status(400).json({ message: `There is no sample for "${kind}". Choose rooms, lecturers or modules.` });
+    return;
+  }
+  res
+    .setHeader("Content-Type", "text/csv; charset=utf-8")
+    .setHeader("Content-Disposition", `attachment; filename="${kind}-sample.csv"`)
+    .send(timetablingImport.buildSampleCsv(kind));
+};

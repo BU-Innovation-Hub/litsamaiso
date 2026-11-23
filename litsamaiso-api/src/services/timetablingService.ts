@@ -20,6 +20,7 @@ import {
   type SolverModule,
   type SolverRoom,
   type TimetableRules,
+  type UnplacedSession,
 } from "./timetableSolver.js";
 
 export type Actor = { _id: unknown; email?: string; role?: any; institution: unknown };
@@ -44,6 +45,10 @@ const wholeNumber = (value: unknown, field: string, min: number, max: number) =>
   }
   return number;
 };
+
+// A whole number that may be left out, e.g. a field the form doesn't send. Anything given is still checked.
+const optionalWholeNumber = (value: unknown, field: string, min: number, max: number, fallback: number) =>
+  value === "" || value === null || value === undefined ? fallback : wholeNumber(value, field, min, max);
 
 export const flag = (value: unknown) => value === true || ["true", "1", "yes", "on"].includes(String(value).toLowerCase());
 
@@ -267,8 +272,8 @@ export const moduleFields = (input: Record<string, any>) => ({
   requiresComputers: flag(input.requiresComputers),
   sessionsPerWeek: wholeNumber(input.sessionsPerWeek, "Classes per week", 1, MAX_SESSIONS_PER_WEEK),
   durationHours: wholeNumber(input.durationHours, "Hours per class", 1, MAX_SESSION_HOURS),
-  credits: wholeNumber(input.credits, "Credits", 1, 100) ?? 10,
-  batches: wholeNumber(input.batches, "Batches", 1, 20) ?? 1,
+  credits: optionalWholeNumber(input.credits, "Credits", 1, 100, 10),
+  batches: optionalWholeNumber(input.batches, "Batches", 1, 20, 1),
   preferredRoomType: normalizeRoomType(input.preferredRoomType),
   specificRequirements: String(input.specificRequirements ?? ""),
 });
@@ -443,6 +448,31 @@ const findIssues = (run: any, sessions: any[], modules: any[], rooms: any[]) => 
   return issues;
 };
 
+// A timetabled class as the timetable shows it, with its module, lecturer and room
+export const sessionView = (session: any, module: any, room: any) => ({
+  _id: session._id,
+  day: session.day,
+  startHour: session.startHour,
+  endHour: session.endHour,
+  batch: session.batch ?? 1,
+  module: module
+    ? { _id: module._id, code: module.code, name: module.name, requiresComputers: module.requiresComputers, studentCount: module.students?.length ?? 0 }
+    : null,
+  lecturer: module?.lecturer ? { _id: module.lecturer._id, name: module.lecturer.name } : null,
+  room: room
+    ? { _id: room._id, code: room.code, building: room.building, capacity: room.capacity, isComputerized: room.isComputerized, roomType: room.roomType }
+    : null,
+});
+
+// A class the generator couldn't place. Each batch is its own waiting class, so the batch is kept.
+export const waitingEntry = (entry: UnplacedSession, codeOf: Map<string, string>) => ({
+  module: entry.moduleId,
+  moduleCode: codeOf.get(entry.moduleId) ?? "",
+  session: entry.session,
+  batch: entry.batch,
+  reason: entry.reason,
+});
+
 export const getRun = async (actor: Actor, runId: string) => {
   const run = await findRun(actor, runId);
   const sessions = await ClassSession.find({ run: run._id }).sort({ day: 1, startHour: 1 }).lean();
@@ -456,21 +486,7 @@ export const getRun = async (actor: Actor, runId: string) => {
 
   return {
     run,
-    sessions: sessions.map((session) => {
-      const module: any = moduleById.get(String(session.module));
-      const room = roomById.get(String(session.room));
-      return {
-        _id: session._id,
-        day: session.day,
-        startHour: session.startHour,
-        endHour: session.endHour,
-        module: module
-          ? { _id: module._id, code: module.code, name: module.name, requiresComputers: module.requiresComputers, studentCount: module.students.length }
-          : null,
-        lecturer: module?.lecturer ? { _id: module.lecturer._id, name: module.lecturer.name } : null,
-        room: room ? { _id: room._id, code: room.code, building: room.building, capacity: room.capacity, isComputerized: room.isComputerized } : null,
-      };
-    }),
+    sessions: sessions.map((session) => sessionView(session, moduleById.get(String(session.module)), roomById.get(String(session.room)))),
     // What Registry needs to place a waiting class by hand
     unplaced: run.unplaced.map((entry) => {
       const module: any = moduleById.get(String(entry.module));
@@ -506,12 +522,7 @@ export const generateRun = async (actor: Actor, input: Record<string, any>) => {
     ...term,
     status: "draft",
     rules: DEFAULT_RULES,
-    unplaced: result.unplaced.map((entry) => ({
-      module: entry.moduleId,
-      moduleCode: codeOf.get(entry.moduleId) ?? "",
-      session: entry.session,
-      reason: entry.reason,
-    })),
+    unplaced: result.unplaced.map((entry) => waitingEntry(entry, codeOf)),
     generatedBy: actorIdOf(actor),
   });
   try {
@@ -622,7 +633,7 @@ const targetOf = (run: any, input: Record<string, any>) => {
     day: wholeNumber(input.day, "Day", 0, rules.days - 1),
     startHour: wholeNumber(input.startHour, "Start time", rules.dayStartHour, rules.dayEndHour - 1),
     roomId: objectId(input.roomId, "Room"),
-    batch: wholeNumber(input.batch, "Batch", 1, 20) ?? 1,
+    batch: optionalWholeNumber(input.batch, "Batch", 1, 20, 1),
   };
 };
 
@@ -653,8 +664,8 @@ export const placeUnplaced = async (actor: Actor, runId: string, input: Record<s
   const run = await findRun(actor, runId);
   editableRun(run);
   const moduleId = objectId(input.moduleId, "Module");
-  const session = wholeNumber(input.session, "Session", 1, 10) ?? 1;
-  const batch = wholeNumber(input.batch, "Batch", 1, 20) ?? 1;
+  const session = optionalWholeNumber(input.session, "Session", 1, 10, 1);
+  const batch = optionalWholeNumber(input.batch, "Batch", 1, 20, 1);
   const entry = run.unplaced.find((item) => String(item.module) === String(moduleId) && item.session === session && item.batch === batch);
   if (!entry) throw new AppError("This class (session " + session + ", batch " + batch + ") has no classes waiting to be placed", 404);
 

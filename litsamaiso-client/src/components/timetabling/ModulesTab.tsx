@@ -3,6 +3,8 @@ import { Edit, Monitor, Plus, Trash2, UserMinus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { getApiErrorMessage } from '../../utils/apiError';
 import { timetablingService, type CourseModule, type Lecturer, type ModuleInput, type ModuleStudent, type Term } from '../../services/timetablingService';
+import ModuleFields from './ModuleFields';
+import { moduleForm } from './moduleForm';
 import { cell, dangerIconButton, iconButton, inputClass, labelClass, Modal, secondaryButton, Table } from './shared';
 import { useResource } from './useResource';
 
@@ -66,7 +68,7 @@ const ModulesTab: React.FC<{ term: Term }> = ({ term }) => {
   const [editing, setEditing] = useState<{ id?: string; form: ModuleInput } | null>(null);
   const [enrolling, setEnrolling] = useState<CourseModule | null>(null);
 
-  const blank = (): ModuleInput => ({ ...term, code: '', name: '', lecturer: lecturers[0]?._id || '', requiresComputers: false, sessionsPerWeek: 2, durationHours: 2 });
+  const blank = (): ModuleInput => ({ ...term, code: '', name: '', lecturer: lecturers[0]?._id || '', requiresComputers: false, sessionsPerWeek: 2, durationHours: 2, credits: 10, batches: 1, preferredRoomType: 'any', specificRequirements: '' });
 
   const save = async () => {
     if (!editing) return;
@@ -109,7 +111,7 @@ const ModulesTab: React.FC<{ term: Term }> = ({ term }) => {
               <td className={cell}>{module.requiresComputers ? <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700"><Monitor className="h-3.5 w-3.5" /> Computer lab</span> : 'Any room'}</td>
               <td className="whitespace-nowrap px-4 py-3 text-right text-sm">
                 <button type="button" title="Students" aria-label={`${module.code} students`} onClick={() => setEnrolling(module)} className={`${iconButton} mr-2`}><Users className="h-4 w-4" /></button>
-                <button type="button" title="Edit module" aria-label={`Edit ${module.code}`} onClick={() => setEditing({ id: module._id, form: { academicYear: module.academicYear, semester: module.semester, code: module.code, name: module.name, lecturer: module.lecturer?._id || '', requiresComputers: module.requiresComputers, sessionsPerWeek: module.sessionsPerWeek, durationHours: module.durationHours } })} className={`${iconButton} mr-2`}><Edit className="h-4 w-4" /></button>
+                <button type="button" title="Edit module" aria-label={`Edit ${module.code}`} onClick={() => setEditing({ id: module._id, form: moduleForm(module) })} className={`${iconButton} mr-2`}><Edit className="h-4 w-4" /></button>
                 <button type="button" title="Delete module" aria-label={`Delete ${module.code}`} onClick={() => void remove(module)} className={dangerIconButton}><Trash2 className="h-4 w-4" /></button>
               </td>
             </tr>
@@ -119,28 +121,7 @@ const ModulesTab: React.FC<{ term: Term }> = ({ term }) => {
 
       {editing && (
         <Modal title={editing.id ? `Edit ${editing.form.code}` : 'Add module'} subtitle={`${term.academicYear} semester ${term.semester}`} busy={busy} onClose={() => setEditing(null)} onSubmit={save}>
-          <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
-            <label className={labelClass}>Code<input required value={editing.form.code} onChange={(event) => set('code', event.target.value)} placeholder="CS101" className={inputClass} /></label>
-            <label className={labelClass}>Name<input required value={editing.form.name} onChange={(event) => set('name', event.target.value)} placeholder="Introduction to Programming" className={inputClass} /></label>
-          </div>
-          <label className={labelClass}>Lecturer
-            <select required value={editing.form.lecturer} onChange={(event) => set('lecturer', event.target.value)} className={inputClass}>
-              {lecturers.map((lecturer) => <option key={lecturer._id} value={lecturer._id}>{lecturer.name}</option>)}
-            </select>
-          </label>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className={labelClass}>Classes per week
-              <select value={editing.form.sessionsPerWeek} onChange={(event) => set('sessionsPerWeek', Number(event.target.value))} className={inputClass}>
-                {[1, 2, 3, 4, 5].map((count) => <option key={count} value={count}>{count}</option>)}
-              </select>
-            </label>
-            <label className={labelClass}>Hours per class
-              <select value={editing.form.durationHours} onChange={(event) => set('durationHours', Number(event.target.value))} className={inputClass}>
-                {[1, 2, 3, 4].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}
-              </select>
-            </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={editing.form.requiresComputers} onChange={(event) => set('requiresComputers', event.target.checked)} /> Needs a computer lab</label>
+          <ModuleFields form={editing.form} lecturers={lecturers} set={set} />
         </Modal>
       )}
 

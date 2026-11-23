@@ -123,6 +123,15 @@ export interface ImportResult {
   ignoredSheets: string[];
 }
 
+// The tabs that have a sample CSV. Students are allocated on another platform, so enrolments have none.
+export type SampleKind = 'rooms' | 'lecturers' | 'modules';
+export type ColumnStatus = 'required' | 'requiredForNew' | 'optional';
+export interface ImportColumn { label: string; status: ColumnStatus; help: string; example: string }
+export type ImportColumns = Record<SampleKind, ImportColumn[]>;
+
+// The most recent import into a term
+export interface LatestImport { importedAt: string; importedByEmail: string | null; fileName: string; changes: number }
+
 export const timetablingService = {
   listRooms: () => data<Room[]>(apiClient.get('/timetabling/rooms')),
   createRoom: (input: RoomInput) => data<Room>(apiClient.post('/timetabling/rooms', input)),
@@ -162,4 +171,7 @@ export const timetablingService = {
     return data<ImportResult>(apiClient.post('/timetabling/import', form, { headers: { 'Content-Type': 'multipart/form-data' } }));
   },
   downloadImportTemplate: async () => (await apiClient.get<Blob>('/timetabling/import/template', { responseType: 'blob' })).data,
+  latestImport: (term: Term) => data<LatestImport | null>(apiClient.get('/timetabling/import/latest', { params: term })),
+  getImportColumns: () => data<ImportColumns>(apiClient.get('/timetabling/import/columns')),
+  downloadSample: async (kind: SampleKind) => (await apiClient.get<Blob>(`/timetabling/import/template/${kind}`, { responseType: 'blob' })).data,
 };

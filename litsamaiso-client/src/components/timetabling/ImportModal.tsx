@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import { CheckCircle2, Download, FileSpreadsheet, Loader2, TriangleAlert, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
-import { academicYearInputProps } from '../elections/electionHelpers';
 import { getApiErrorMessage } from '../../utils/apiError';
-import { timetablingService, type ImportKind, type ImportResult, type Term } from '../../services/timetablingService';
-import { Modal, secondaryButton } from './shared';
+import { timetablingService, type ImportKind, type ImportResult, type LatestImport, type Term } from '../../services/timetablingService';
+import { SAMPLE_KINDS, SAMPLE_LABELS, useSampleDownload } from './importSamples';
+import { saveBlob } from '../../utils/saveBlob';
+import { ConfirmDialog, Modal, secondaryButton } from './shared';
+import { AcademicYearPicker, SemesterPicker } from './TermControls';
 
 const KIND_LABELS: Record<ImportKind, string> = { rooms: 'Rooms', lecturers: 'Lecturers', modules: 'Modules', enrolments: 'Enrolments' };
-const isAcademicYear = (value: string) => {
-  const match = /^(\d{4})\/(\d{4})$/.exec(value);
-  return Boolean(match) && Number(match?.[2]) === Number(match?.[1]) + 1;
-};
-const termClass = 'block rounded-md border px-3 py-2 text-sm outline-none focus:border-active-clr disabled:opacity-60';
 const plural = (count: number, noun: string) => `${count.toLocaleString()} ${noun}${count === 1 ? '' : 's'}`;
 
 const Summary: React.FC<{ result: ImportResult }> = ({ result }) => (
@@ -58,13 +55,15 @@ const Summary: React.FC<{ result: ImportResult }> = ({ result }) => (
 );
 
 const ImportModal: React.FC<{ term: Term; onClose: () => void; onImported: () => void }> = ({ term, onClose, onImported }) => {
-  const [yearInput, setYearInput] = useState(term.academicYear);
   const [target, setTarget] = useState<Term>(term);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ImportResult | null>(null);
   const [done, setDone] = useState<ImportResult | null>(null);
-  const [working, setWorking] = useState<'checking' | 'importing' | 'template' | null>(null);
+  const [working, setWorking] = useState<'checking' | 'confirming' | 'importing' | 'template' | null>(null);
+  // Set when the term already had an import, or when that couldn't be checked, to ask before importing again
+  const [repeat, setRepeat] = useState<{ previous: LatestImport | null } | null>(null);
   const [dragging, setDragging] = useState(false);
+  const sample = useSampleDownload();
 
   const check = async (chosen: File, into: Term) => {
     if (!/\.(xlsx|xls|csv)$/i.test(chosen.name)) {
@@ -105,17 +104,32 @@ const ImportModal: React.FC<{ term: Term; onClose: () => void; onImported: () =>
     }
   };
 
+  // Importing into a term that already had an import is allowed, but only once Registry has seen it
+  const requestImport = async () => {
+    if (!file || !preview?.changes) return;
+    setWorking('confirming');
+    let previous: LatestImport | null;
+    try {
+      previous = await timetablingService.latestImport(target);
+    } catch {
+      setWorking(null);
+      setRepeat({ previous: null });
+      return;
+    }
+    setWorking(null);
+    if (previous) setRepeat({ previous });
+    else await importFile();
+  };
+
+  const confirmRepeat = () => {
+    setRepeat(null);
+    void importFile();
+  };
+
   const downloadTemplate = async () => {
     setWorking('template');
     try {
-      const blob = await timetablingService.downloadImportTemplate();
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'room-allocation-template.xlsx';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(link.href);
+      saveBlob(await timetablingService.downloadImportTemplate(), 'room-allocation-template.xlsx');
     } catch (error) {
       toast.error(getApiErrorMessage(error, 'Unable to download the template'));
     } finally {
@@ -129,11 +143,11 @@ const ImportModal: React.FC<{ term: Term; onClose: () => void; onImported: () =>
       wide
       title="Import from Excel"
       subtitle="Rooms, lecturers, modules and the students in each module"
-      busy={working === 'importing'}
-      busyLabel="Importing..."
+      busy={working === 'importing' || working === 'confirming'}
+      busyLabel={working === 'confirming' ? 'Checking...' : 'Importing...'}
       submitLabel={`Import ${plural(preview?.changes ?? 0, 'change')}`}
       onClose={() => { if (working !== 'importing') onClose(); }}
-      {...(canImport ? { onSubmit: importFile } : {})}
+      {...(canImport ? { onSubmit: requestImport } : {})}
     >
       {done ? (
         <>
@@ -151,14 +165,19 @@ const ImportModal: React.FC<{ term: Term; onClose: () => void; onImported: () =>
             <button type="button" onClick={() => void downloadTemplate()} disabled={working !== null} className={secondaryButton}>
               {working === 'template' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download template
             </button>
+            <div className="flex w-full flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+              <span className="text-xs font-medium text-slate-500">Or one CSV per tab:</span>
+              {SAMPLE_KINDS.map((kind) => (
+                <button key={kind} type="button" onClick={() => void sample.download(kind)} disabled={working !== null || sample.downloading !== null} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                  {sample.downloading === kind ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} {SAMPLE_LABELS[kind]} sample
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <input {...academicYearInputProps} aria-label="Academic year" value={yearInput} disabled={working !== null} onChange={(event) => { setYearInput(event.target.value); if (isAcademicYear(event.target.value)) changeTerm({ ...target, academicYear: event.target.value }); }} className={`${termClass} w-32 ${isAcademicYear(yearInput) ? 'border-slate-300' : 'border-rose-400'}`} />
-            <select aria-label="Semester" value={target.semester} disabled={working !== null} onChange={(event) => changeTerm({ ...target, semester: Number(event.target.value) })} className={`${termClass} border-slate-300`}>
-              <option value={1}>Semester 1</option>
-              <option value={2}>Semester 2</option>
-            </select>
+            <AcademicYearPicker value={target.academicYear} disabled={working !== null} onChange={(academicYear) => changeTerm({ ...target, academicYear })} />
+            <SemesterPicker value={target.semester} disabled={working !== null} onChange={(semester) => changeTerm({ ...target, semester })} />
             <p className="text-sm text-slate-500">Modules and enrolments go into this semester.</p>
           </div>
 
@@ -200,6 +219,23 @@ const ImportModal: React.FC<{ term: Term; onClose: () => void; onImported: () =>
           )}
         </>
       )}
+      <ConfirmDialog
+        open={repeat !== null}
+        title={repeat?.previous ? `${target.academicYear} semester ${target.semester} already has an import` : `Couldn't check ${target.academicYear} semester ${target.semester}`}
+        confirmLabel="Import anyway"
+        onConfirm={confirmRepeat}
+        onCancel={() => setRepeat(null)}
+      >
+        {repeat?.previous ? (
+          <p>
+            <span className="font-semibold text-slate-800">{repeat.previous.fileName}</span> was imported
+            {repeat.previous.importedByEmail ? <> by <span className="font-semibold text-slate-800">{repeat.previous.importedByEmail}</span></> : null} on {new Date(repeat.previous.importedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}, with {plural(repeat.previous.changes, 'change')}.
+          </p>
+        ) : (
+          <p>We couldn't find out whether this semester already has an import.</p>
+        )}
+        <p>Importing {file?.name} updates the rooms, lecturers and modules that match and adds the new ones. Nothing is deleted.</p>
+      </ConfirmDialog>
     </Modal>
   );
 };

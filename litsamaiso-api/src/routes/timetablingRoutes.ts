@@ -32,6 +32,9 @@ const readSpreadsheet = (req: Request, res: Response, next: NextFunction) => {
 };
 
 router.get("/import/template", timetabling.importTemplate);
+router.get("/import/template/:kind", timetabling.importSample);
+router.get("/import/columns", timetabling.importColumns);
+router.get("/import/latest", timetabling.latestImport);
 router.post("/import", readSpreadsheet, timetabling.importData);
 
 router.get("/rooms", timetabling.listRooms);

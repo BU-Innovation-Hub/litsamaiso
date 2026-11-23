@@ -5,6 +5,7 @@ import { CourseModule } from "../models/CourseModule.js";
 import { Lecturer } from "../models/Lecturer.js";
 import { Room } from "../models/Room.js";
 import { Student } from "../models/Student.js";
+import { TimetablingImport } from "../models/TimetablingImport.js";
 import AppError from "../utils/errors.js";
 import { withOptionalTransaction } from "../utils/transaction.js";
 import {
@@ -26,7 +27,9 @@ import {
 
 export type ImportKind = "rooms" | "lecturers" | "modules" | "enrolments";
 
-type Column = { label: string; aliases: string[]; required?: boolean; help: string };
+// `required` columns must be on the sheet. A `requiredForNew` column can be left off, but a row that adds a
+// new record must fill it in. `example` is what the column guide shows; it is never written to a file.
+type Column = { label: string; aliases: string[]; required?: boolean; requiredForNew?: boolean; help: string; example: string };
 
 const NEW_MODULE_DEFAULTS = { sessionsPerWeek: 2, durationHours: 2 };
 
@@ -34,33 +37,33 @@ const NEW_MODULE_DEFAULTS = { sessionsPerWeek: 2, durationHours: 2 };
 // loosely, so a sheet Registry already keeps (e.g. "Room", "Seats") can be uploaded as it is.
 const COLUMNS: Record<ImportKind, Record<string, Column>> = {
   rooms: {
-    code: { label: "Room code", aliases: ["room code", "room", "code", "room number", "room no", "venue"], required: true, help: "Required. For example A101 or LAB1." },
-    building: { label: "Building", aliases: ["building", "block", "location"], help: "Optional." },
-    capacity: { label: "Capacity", aliases: ["capacity", "seats", "number of seats", "size"], required: true, help: "Number of seats. Required for a new room." },
-    isComputerized: { label: "Computer lab", aliases: ["computer lab", "computerised", "computerized", "computers", "lab"], help: "Yes or No. Blank means No for a new room." },
-    roomType: { label: "Room type", aliases: ["room type", "type"], help: "lecture theatre, 30-seater, computer lab, or lab. Defaults to 30-seater." },
-    active: { label: "In use", aliases: ["in use", "active", "available"], help: "Yes or No. Blank means Yes for a new room. A room not in use is left off timetables." },
+    code: { label: "Room code", aliases: ["room code", "room", "code", "room number", "room no", "venue"], required: true, help: "Required. For example A101 or LAB1.", example: "A101" },
+    building: { label: "Building", aliases: ["building", "block", "location"], help: "Optional.", example: "Block A" },
+    capacity: { label: "Capacity", aliases: ["capacity", "seats", "number of seats", "size"], required: true, help: "Number of seats. Required for a new room.", example: "60" },
+    isComputerized: { label: "Computer lab", aliases: ["computer lab", "computerised", "computerized", "computers", "lab"], help: "Yes or No. Blank means No for a new room.", example: "No" },
+    roomType: { label: "Room type", aliases: ["room type", "type"], help: "lecture theatre, 30-seater or computer lab. Defaults to 30-seater.", example: "30-seater" },
+    active: { label: "In use", aliases: ["in use", "active", "available"], help: "Yes or No. Blank means Yes for a new room. A room not in use is left off timetables.", example: "Yes" },
   },
   lecturers: {
-    name: { label: "Name", aliases: ["name", "full name", "lecturer name", "lecturer"], required: true, help: "Required for a new lecturer." },
-    email: { label: "Email", aliases: ["email", "email address", "e mail"], required: true, help: "Required. This is how a lecturer is recognised." },
-    staffNumber: { label: "Staff number", aliases: ["staff number", "staff no", "staff id", "employee number"], help: "Optional." },
+    name: { label: "Name", aliases: ["name", "full name", "lecturer name", "lecturer"], required: true, help: "Required for a new lecturer.", example: "Lineo Mohapi" },
+    email: { label: "Email", aliases: ["email", "email address", "e mail"], required: true, help: "Required. This is how a lecturer is recognised.", example: "lineo.mohapi@botho.example" },
+    staffNumber: { label: "Staff number", aliases: ["staff number", "staff no", "staff id", "employee number"], help: "Optional.", example: "BU0042" },
   },
   modules: {
-    code: { label: "Module code", aliases: ["module code", "code", "course code", "module"], required: true, help: "Required. For example CSC101." },
-    name: { label: "Module name", aliases: ["module name", "name", "title", "module title", "course name"], help: "Optional. Required for a new module." },
-    lecturer: { label: "Lecturer email", aliases: ["lecturer email", "lecturer", "lecturer name", "email"], help: "Optional. The lecturer must be on the Lecturers sheet or already added. Their name works too if no other lecturer has it." },
-    sessionsPerWeek: { label: "Classes per week", aliases: ["classes per week", "sessions per week", "classes", "sessions"], help: `1 to ${MAX_SESSIONS_PER_WEEK}. Blank means ${NEW_MODULE_DEFAULTS.sessionsPerWeek} for a new module.` },
-    durationHours: { label: "Hours per class", aliases: ["hours per class", "hours per session", "hours", "duration", "class length"], help: `1 to ${MAX_SESSION_HOURS}. Blank means ${NEW_MODULE_DEFAULTS.durationHours} for a new module.` },
-    requiresComputers: { label: "Computer lab", aliases: ["computer lab", "needs computer lab", "needs computers", "computers", "lab"], help: "Yes or No. Blank means No for a new module." },
-    credits: { label: "Credits", aliases: ["credits", "no credits", "credit"], help: "Module credits. Default is 10." },
-    batches: { label: "Batches", aliases: ["batches", "no. of projected batches", "number of batches"], help: "Number of parallel class groups. Default is 1." },
-    preferredRoomType: { label: "Room type preference", aliases: ["room type", "preferred room type", "room type (lecture theatre/30 seater)"], help: "lecture theatre, 30-seater, computer lab, or any." },
-    specificRequirements: { label: "Specific requirements", aliases: ["specific requirements", "requirements", "notes"], help: "Any special room requirements." },
+    code: { label: "Module code", aliases: ["module code", "code", "course code", "module"], required: true, help: "Required. For example CSC101.", example: "CSC101" },
+    name: { label: "Module name", aliases: ["module name", "name", "title", "module title", "course name"], requiredForNew: true, help: "Optional. Required for a new module.", example: "Introduction to Programming" },
+    lecturer: { label: "Lecturer email", aliases: ["lecturer email", "lecturer", "lecturer name", "email"], requiredForNew: true, help: "The lecturer must be on the Lecturers sheet or already added. Their name works too if no other lecturer has it. Required for a new module.", example: "lineo.mohapi@botho.example" },
+    sessionsPerWeek: { label: "Classes per week", aliases: ["classes per week", "sessions per week", "classes", "sessions"], help: `1 to ${MAX_SESSIONS_PER_WEEK}. Blank means ${NEW_MODULE_DEFAULTS.sessionsPerWeek} for a new module.`, example: "2" },
+    durationHours: { label: "Hours per class", aliases: ["hours per class", "hours per session", "hours", "duration", "class length"], help: `1 to ${MAX_SESSION_HOURS}. Blank means ${NEW_MODULE_DEFAULTS.durationHours} for a new module.`, example: "2" },
+    requiresComputers: { label: "Computer lab", aliases: ["computer lab", "needs computer lab", "needs computers", "computers", "lab"], help: "Yes or No. Blank means No for a new module.", example: "Yes" },
+    credits: { label: "Credits", aliases: ["credits", "no credits", "credit"], help: "Module credits, 1 to 100. Default is 10.", example: "12" },
+    batches: { label: "Batches", aliases: ["batches", "no. of projected batches", "number of batches"], help: "Number of parallel class groups, 1 to 20. Default is 1.", example: "1" },
+    preferredRoomType: { label: "Room type preference", aliases: ["room type", "preferred room type", "room type (lecture theatre/30 seater)"], help: "lecture theatre, 30-seater, computer lab, or any.", example: "computer lab" },
+    specificRequirements: { label: "Specific requirements", aliases: ["specific requirements", "requirements", "notes"], help: "Any special room requirements.", example: "Projector" },
   },
   enrolments: {
-    module: { label: "Module code", aliases: ["module code", "module", "code", "course code"], required: true, help: "Required. A module on the Modules sheet or already in the semester." },
-    studentId: { label: "Student number", aliases: ["student number", "student id", "student no", "studentid", "registration number", "reg no"], required: true, help: "Required. One row per student per module. The student must be in the Student Registry." },
+    module: { label: "Module code", aliases: ["module code", "module", "code", "course code"], required: true, help: "Required. A module on the Modules sheet or already in the semester.", example: "CSC101" },
+    studentId: { label: "Student number", aliases: ["student number", "student id", "student no", "studentid", "registration number", "reg no"], required: true, help: "Required. One row per student per module. The student must be in the Student Registry.", example: "0012" },
   },
 };
 
@@ -424,6 +427,28 @@ export const planImport = (sheets: ImportSheet[], existing: ImportExisting, term
 // Preview and import
 // ---------------------------------------------------------------------------
 
+export const importRecord = (actor: Actor, institution: Id, term: Term, fileName: string | undefined, changes: number, sheets: ImportTally[]) => ({
+  institution,
+  ...term,
+  fileName: (fileName || "spreadsheet").slice(0, 255),
+  ...(Types.ObjectId.isValid(String(actor._id)) ? { importedBy: new Types.ObjectId(String(actor._id)) } : {}),
+  ...(actor.email ? { importedByEmail: actor.email } : {}),
+  changes,
+  sheets,
+});
+
+export type LatestImport = { importedAt: Date; importedByEmail: string | null; fileName: string; changes: number };
+
+// The most recent import into a term, so Registry can be warned before importing into it again
+export const latestImport = async (actor: Actor, input: Record<string, any>): Promise<LatestImport | null> => {
+  const term = termOf(input);
+  const found = await TimetablingImport.findOne({ institution: institutionOf(actor), ...term })
+    .sort({ createdAt: -1 })
+    .select("createdAt importedByEmail fileName changes")
+    .lean();
+  return found ? { importedAt: found.createdAt!, importedByEmail: found.importedByEmail ?? null, fileName: found.fileName, changes: found.changes } : null;
+};
+
 export const importTimetablingData = async (
   actor: Actor,
   file: { buffer: Buffer; originalname?: string } | undefined,
@@ -466,6 +491,8 @@ export const importTimetablingData = async (
             updateOne: { filter: { _id: new Types.ObjectId(moduleId), institution }, update: { $addToSet: { students: { $each: studentIds } } } },
           })), options);
         }
+        // Recorded with the changes, so the history never lists an import that didn't happen
+        await TimetablingImport.create([importRecord(actor, institution, term, file.originalname, changes, plan.tallies)], options);
       });
     } catch (error) {
       if (isDuplicateKey(error)) {
@@ -521,4 +548,36 @@ export const buildImportTemplate = (): Buffer => {
     XLSX.utils.book_append_sheet(workbook, sheet, SHEET_TITLES[kind]);
   }
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+};
+
+// ---------------------------------------------------------------------------
+// One sample CSV per tab, and the column guide shown beside it
+// ---------------------------------------------------------------------------
+
+// Enrolments come from another platform, so only these three have a sample
+export const SAMPLE_KINDS = ["rooms", "lecturers", "modules"] as const;
+export type SampleKind = (typeof SAMPLE_KINDS)[number];
+
+export const isSampleKind = (value: unknown): value is SampleKind => SAMPLE_KINDS.includes(value as SampleKind);
+
+export type ColumnStatus = "required" | "requiredForNew" | "optional";
+export type ColumnGuide = { label: string; status: ColumnStatus; help: string; example: string };
+
+// The columns of each sample, in the order they appear in the file
+export const importColumns = (): Record<SampleKind, ColumnGuide[]> =>
+  Object.fromEntries(SAMPLE_KINDS.map((kind) => [
+    kind,
+    Object.values(COLUMNS[kind]).map(({ label, required, requiredForNew, help, example }) => ({
+      label,
+      status: required ? "required" : requiredForNew ? "requiredForNew" : "optional",
+      help,
+      example,
+    })),
+  ])) as Record<SampleKind, ColumnGuide[]>;
+
+// The header row only, so nothing made up can be imported by mistake. The byte order mark makes
+// Excel open the file as UTF-8.
+export const buildSampleCsv = (kind: SampleKind): Buffer => {
+  const labels = Object.values(COLUMNS[kind]).map((column) => column.label);
+  return Buffer.from(`﻿${XLSX.utils.sheet_to_csv(XLSX.utils.aoa_to_sheet([labels]))}\r\n`, "utf8");
 };

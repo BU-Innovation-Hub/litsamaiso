@@ -24,17 +24,16 @@ import { ClassSession } from "../models/ClassSession.js";
 import { CourseModule } from "../models/CourseModule.js";
 import { Institution } from "../models/Institution.js";
 import { Lecturer } from "../models/Lecturer.js";
-import { Role } from "../models/Role.js";
 import { Room } from "../models/Room.js";
 import { Student } from "../models/Student.js";
 import { TimetableRun } from "../models/TimetableRun.js";
 import { User } from "../models/User.js";
 import { ACADEMIC_YEAR_MESSAGE, isAcademicYear } from "../utils/validation.js";
+import { assertHostAllowed, fail, findInstitution, readFlag } from "./scriptSupport.js";
 
 const SAMPLE_DOMAIN = "timetable-sample.invalid";
 const SAMPLE_EMAIL = /@timetable-sample\.invalid$/;
 const SAMPLE_BUILDING = /^Sample /;
-const CASE_INSENSITIVE = { locale: "en", strength: 2 } as const;
 
 const ROOMS = [
   { code: "HALL1", building: "Sample Main Hall", capacity: 200 },
@@ -168,47 +167,6 @@ const buildStudents = () => {
 
 const lecturerEmail = (name: string) =>
   `${name.split(" ").slice(1).join(".").toLowerCase()}@${SAMPLE_DOMAIN}`;
-
-const readFlag = (name: string): string | undefined => {
-  const prefix = `--${name}=`;
-  const inline = process.argv.find((arg) => arg.startsWith(prefix));
-  if (inline) return inline.slice(prefix.length);
-  const index = process.argv.indexOf(`--${name}`);
-  const next = index >= 0 ? process.argv[index + 1] : undefined;
-  return next && !next.startsWith("--") ? next : undefined;
-};
-
-function fail(message: string): never {
-  throw new Error(message);
-}
-
-const hostOf = (uri: string): string => {
-  const match = /^mongodb(?:\+srv)?:\/\/(?:[^@/]*@)?([^/?]+)/.exec(uri);
-  return match?.[1] ?? fail("MONGO_URI isn't a MongoDB connection string");
-};
-
-const isLocalHost = (host: string): boolean => /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(host);
-
-const findInstitution = async (wanted: string | undefined) => {
-  const all = await Institution.find().select("name").sort({ name: 1 }).lean();
-  const names = all.map((institution) => `"${institution.name}"`).join(", ") || "none";
-  if (wanted) {
-    const match = /^[a-f0-9]{24}$/i.test(wanted)
-      ? await Institution.findById(wanted).select("name").lean()
-      : await Institution.findOne({ name: wanted }).collation(CASE_INSENSITIVE).select("name").lean();
-    return match ?? fail(`No institution called "${wanted}". Institutions: ${names}`);
-  }
-  if (all.length === 1) return all[0]!;
-
-  // With several, the one with a Registry user is the one someone can sign in to and test
-  const registry = await Role.findOne({ name: "registry" }).collation(CASE_INSENSITIVE).select("_id").lean();
-  const withRegistry = registry
-    ? (await User.distinct("institution", { $or: [{ role: registry._id }, { additionalRoles: registry._id }] })).map(String)
-    : [];
-  const candidates = all.filter((institution) => withRegistry.includes(String(institution._id)));
-  if (candidates.length === 1) return candidates[0]!;
-  return fail(`Say which institution with --institution "<name>". Institutions: ${names}`);
-};
 
 const seed = async (institution: Types.ObjectId, academicYear: string, semester: number) => {
   const students = buildStudents();
@@ -347,10 +305,7 @@ ${count(sessions.deletedCount, "timetabled class", "timetabled classes")} and ${
 };
 
 const run = async () => {
-  const host = hostOf(getMongoUri());
-  if (!isLocalHost(host) && readFlag("confirm-host") !== host) {
-    fail(`MONGO_URI points at ${host}, which isn't this machine. Add --confirm-host=${host} if you want sample data there.`);
-  }
+  const host = assertHostAllowed(getMongoUri(), readFlag("confirm-host"), "add sample data");
 
   const now = new Date();
   const academicYear = readFlag("year") ?? `${now.getFullYear()}/${now.getFullYear() + 1}`;

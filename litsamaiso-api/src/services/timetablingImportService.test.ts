@@ -2,7 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Types } from "mongoose";
 import XLSX from "xlsx";
-import { buildImportTemplate, parseWorkbook, planImport, type ImportExisting } from "./timetablingImportService.js";
+import { readFileSync } from "node:fs";
+import {
+  buildImportTemplate,
+  buildSampleCsv,
+  importColumns,
+  importRecord,
+  isSampleKind,
+  parseWorkbook,
+  planImport,
+  SAMPLE_KINDS,
+  type ImportExisting,
+} from "./timetablingImportService.js";
+import { moduleFields } from "./timetablingService.js";
 
 const term = { academicYear: "2026/2027", semester: 1 };
 
@@ -178,4 +190,122 @@ test("enrolments add students once, to modules in the file or already in the ter
     "Module CSC999 isn't in 2026/2027 semester 1. Add it on the Modules sheet first",
     "Student 9999 isn't in the Student Registry",
   ]);
+});
+
+// ---------------------------------------------------------------------------
+// Per-tab sample CSVs and the column guide
+// ---------------------------------------------------------------------------
+
+test("each tab's sample CSV is just its header row, and is read back as that tab", () => {
+  for (const kind of SAMPLE_KINDS) {
+    const csv = buildSampleCsv(kind);
+    assert.ok(csv.toString("utf8").startsWith("﻿"), `${kind} sample starts with a byte order mark for Excel`);
+    const { sheets, ignored } = parseWorkbook(csv);
+    assert.deepEqual(ignored, []);
+    assert.equal(sheets.length, 1);
+    assert.equal(sheets[0]!.kind, kind);
+    assert.deepEqual(sheets[0]!.missing, []);
+    assert.deepEqual(sheets[0]!.rows, [], "no example data that could be imported by mistake");
+  }
+});
+
+test("the column guide lists the sample's columns in the file's order", () => {
+  const guide = importColumns();
+  assert.deepEqual(Object.keys(guide), [...SAMPLE_KINDS]);
+  for (const kind of SAMPLE_KINDS) {
+    const header = buildSampleCsv(kind).toString("utf8").replace(/^﻿/, "").trim().split(",");
+    assert.deepEqual(guide[kind].map((column) => column.label), header);
+    assert.ok(guide[kind].every((column) => column.help && column.example), `${kind} columns all have help and an example`);
+  }
+  assert.deepEqual(guide.rooms.filter((column) => column.status === "required").map((column) => column.label), ["Room code", "Capacity"]);
+  assert.deepEqual(guide.lecturers.filter((column) => column.status === "required").map((column) => column.label), ["Name", "Email"]);
+  assert.deepEqual(guide.modules.filter((column) => column.status !== "optional").map((column) => [column.label, column.status]), [
+    ["Module code", "required"],
+    ["Module name", "requiredForNew"],
+    ["Lecturer email", "requiredForNew"],
+  ]);
+});
+
+test("only rooms, lecturers and modules have a sample", () => {
+  assert.ok(isSampleKind("rooms") && isSampleKind("lecturers") && isSampleKind("modules"));
+  for (const kind of ["enrolments", "ROOMS", "../rooms", "", undefined]) assert.equal(isSampleKind(kind), false);
+});
+
+// ---------------------------------------------------------------------------
+// The test data in docs/sample-data/room-allocation, so it keeps importing as described
+// ---------------------------------------------------------------------------
+
+const sampleData = new URL("../../../docs/sample-data/room-allocation/", import.meta.url);
+const planSampleData = (set: "valid" | "with-errors") =>
+  planImport(SAMPLE_KINDS.flatMap((kind) => parseWorkbook(readFileSync(new URL(`${set}/${kind}.csv`, sampleData))).sheets), nothing(), term);
+
+test("the valid test data imports in full", () => {
+  const result = planSampleData("valid");
+  assert.deepEqual(result.issues, []);
+  assert.deepEqual(result.tallies.map(({ kind, added, skipped }) => [kind, added, skipped]), [["rooms", 14, 0], ["lecturers", 10, 0], ["modules", 18, 0]]);
+  assert.ok(result.lecturers.insert.some((lecturer) => lecturer.staffNumber === "BU0042"));
+  assert.equal(result.modules.insert.find((module) => module.code === "CSC305")?.specificRequirements, "Projector, whiteboard");
+  const named = result.modules.insert.find((module) => module.code === "NET220");
+  const palesa = result.lecturers.insert.find((lecturer) => lecturer.email === "palesa.nthako@botho.example");
+  assert.equal(String(named?.lecturer), String(palesa?._id), "a lecturer can be given by name");
+  assert.equal(result.rooms.insert.find((room) => room.code === "A104")?.active, false);
+});
+
+test("the test data with errors is skipped row by row, with the reason", () => {
+  const result = planSampleData("with-errors");
+  assert.deepEqual(result.tallies.map(({ kind, added, skipped }) => [kind, added, skipped]), [["rooms", 1, 7], ["lecturers", 1, 4], ["modules", 1, 10]]);
+  assert.deepEqual(result.issues.map(({ row, message }) => [row, message]), [
+    [3, "Room D102: Capacity must be a whole number from 1 to 2000"],
+    [4, "Room D103: Capacity must be a whole number from 1 to 2000"],
+    [5, "Room D104: Capacity must be a whole number from 1 to 2000"],
+    [6, 'Room D105: Computer lab must be Yes or No, not "maybe"'],
+    [7, "Room D101 is already on Sheet1 row 2"],
+    [8, "Room code is blank"],
+    [9, 'Room D106: In use must be Yes or No, not "sometimes"'],
+    [3, "Lecturer sello.thamae.botho.example: Enter a valid email address"],
+    [4, "Email is blank"],
+    [5, "Lecturer puleng.makara@botho.example is already on Sheet1 row 2"],
+    [6, "Lecturer neo.tau@botho.example: Name is required"],
+    [3, "Module DEV120: no lecturer has the email neo.tau@botho.example. Add them on the Lecturers sheet first"],
+    [4, "Module DEV130: no lecturer has the email nobody@botho.example. Add them on the Lecturers sheet first"],
+    [5, "Module DEV140: no lecturer is called Thato Unknown. Add them on the Lecturers sheet first"],
+    [6, "Module DEV150: Classes per week must be a whole number from 1 to 5"],
+    [7, "Module DEV160: Hours per class must be a whole number from 1 to 4"],
+    [8, "Module DEV170: Credits must be a whole number from 1 to 100"],
+    [9, "Module DEV180: Lecturer email is blank"],
+    [10, "Module DEV110 is already on Sheet1 row 2"],
+    [11, "Module DEV190: Module name is required"],
+    [12, 'Module DEV195: Computer lab must be Yes or No, not "perhaps"'],
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// The Add module form doesn't send credits or batches
+// ---------------------------------------------------------------------------
+
+test("a module without credits or batches gets the defaults, but a wrong value is still refused", () => {
+  const form = { code: "csc101", name: "Introduction to Programming", sessionsPerWeek: 2, durationHours: 2, requiresComputers: true };
+  const fields = moduleFields(form);
+  assert.equal(fields.credits, 10);
+  assert.equal(fields.batches, 1);
+  assert.equal(fields.preferredRoomType, "any");
+  assert.equal(moduleFields({ ...form, credits: "", batches: null }).credits, 10);
+  assert.equal(moduleFields({ ...form, credits: 15, batches: 2 }).batches, 2);
+  assert.throws(() => moduleFields({ ...form, credits: 0 }), /Credits must be a whole number from 1 to 100/);
+  assert.throws(() => moduleFields({ ...form, batches: "two" }), /Batches must be a whole number from 1 to 20/);
+});
+
+// ---------------------------------------------------------------------------
+// Import history
+// ---------------------------------------------------------------------------
+
+test("an import is recorded against its term, by whoever made it", () => {
+  const institution = new Types.ObjectId();
+  const actorId = new Types.ObjectId();
+  const sheets = [{ sheet: "Sheet1", kind: "rooms" as const, rows: 2, added: 2, updated: 0, unchanged: 0, skipped: 0 }];
+  const record = importRecord({ _id: actorId, email: "registry@botho.example", institution }, institution, term, "rooms.csv", 2, sheets);
+  assert.deepEqual(record, { institution, ...term, fileName: "rooms.csv", importedBy: actorId, importedByEmail: "registry@botho.example", changes: 2, sheets });
+  const unnamed = importRecord({ _id: "script", institution }, institution, term, undefined, 1, []);
+  assert.equal(unnamed.fileName, "spreadsheet");
+  assert.ok(!("importedBy" in unnamed) && !("importedByEmail" in unnamed));
 });

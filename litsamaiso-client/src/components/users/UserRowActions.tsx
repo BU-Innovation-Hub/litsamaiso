@@ -15,7 +15,7 @@ type UserRowActionsProps = {
 };
 
 const itemClass =
-  'flex cursor-pointer select-none items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-700 outline-none data-[highlighted]:bg-gray-100 data-[disabled]:cursor-not-allowed data-[disabled]:text-gray-400 data-[disabled]:data-[highlighted]:bg-transparent';
+  'flex cursor-pointer select-none items-center gap-2 rounded-md px-3 py-2 text-sm text-gray-700 outline-none data-highlighted:bg-gray-100 data-disabled:cursor-not-allowed data-disabled:text-gray-400 data-disabled:data-highlighted:bg-transparent';
 
 // AppAdmin's row actions, behind one button so the Actions column stays narrow.
 // The menu renders in a portal, so the table's scroll box can't clip it on the last rows.
@@ -70,7 +70,7 @@ const UserRowActions: React.FC<UserRowActionsProps> = ({
         <DropdownMenu.Separator className="my-1 h-px bg-gray-200" />
 
         <DropdownMenu.Item
-          className={cn(itemClass, 'text-red-600 data-[highlighted]:bg-red-50 data-[highlighted]:text-red-700')}
+          className={cn(itemClass, 'text-red-600 data-highlighted:bg-red-50 data-highlighted:text-red-700')}
           onSelect={onDelete}
         >
           <Trash2 className="h-4 w-4" />
