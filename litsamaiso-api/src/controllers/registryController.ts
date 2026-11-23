@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { addExceptionToRegistry, addRegistryStudent, applyRegistryImport, deleteRegistryException, deleteRegistryStudent, editRegistryException, editRegistryStudent, findStudentByNationalId, getRegistryDashboard, listRegistryExceptions, listRegistryStudents, reconcileException, reconcileRegistryImport, resolveRegistryRow, stageRegistryUpload, type RegistryUploadProgress } from "../services/registryService.js";
 
 const actor = (req: Request): any => (req as any).user;
-const scopedActor = (req: Request): any => {
+export const scopedActor = (req: Request): any => {
   const current = actor(req);
   if (!current?._id) {
     throw new Error("Authenticated user id is missing");

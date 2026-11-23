@@ -1,0 +1,15 @@
+Room code,Building,Capacity,Computer lab,Room type,In use
+LT1,Main Block,150,No,lecture theatre,Yes
+LT2,Main Block,120,No,lecture theatre,Yes
+A101,Block A,30,No,30-seater,Yes
+A102,Block A,30,No,30-seater,Yes
+A103,Block A,30,No,30-seater,Yes
+A104,Block A,30,No,30-seater,No
+B201,Block B,35,No,30-seater,Yes
+B202,Block B,35,No,30-seater,Yes
+B203,Block B,30,No,30-seater,Yes
+C101,Block C,45,No,30-seater,Yes
+C102,Block C,45,No,30-seater,Yes
+CL1,ICT Centre,40,Yes,computer lab,Yes
+CL2,ICT Centre,40,Yes,computer lab,Yes
+CL3,ICT Centre,30,Yes,computer lab,Yes

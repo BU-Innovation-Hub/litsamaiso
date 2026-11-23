@@ -4,6 +4,7 @@ import {
   Building2,
   CalendarDays,
   ClipboardCheck,
+  DoorOpen,
   GitBranch,
   History,
   LayoutDashboard,
@@ -52,6 +53,13 @@ export const navigationItems: NavigationItem[] = [
     href: '/student-registry',
     roles: roleAccess.registry,
     icon: ClipboardList,
+  },
+  {
+    id: 'room-allocation',
+    label: 'Room Allocation',
+    href: '/room-allocation',
+    roles: roleAccess.registry,
+    icon: DoorOpen,
   },
   {
     id: 'student-issues',

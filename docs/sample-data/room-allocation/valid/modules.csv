@@ -1,0 +1,19 @@
+Module code,Module name,Lecturer email,Classes per week,Hours per class,Computer lab,Credits,Batches,Room type preference,Specific requirements
+CSC101,Introduction to Programming,lineo.mohapi@botho.example,2,2,Yes,12,2,computer lab,
+CSC201,Data Structures and Algorithms,lineo.mohapi@botho.example,2,2,Yes,12,1,computer lab,
+CSC305,Web Application Development,teboho.letsie@botho.example,2,2,Yes,15,1,computer lab,"Projector, whiteboard"
+ISY210,Database Systems,teboho.letsie@botho.example,2,2,Yes,12,1,computer lab,
+NET220,Computer Networks,Palesa Nthako,2,2,Yes,12,1,computer lab,Network rack access
+MAT101,Discrete Mathematics,palesa.nthako@botho.example,3,1,No,10,1,30-seater,
+ENG100,Academic English,mamello.ntho@botho.example,2,1,No,8,2,30-seater,
+BIS110,Business Communication,mamello.ntho@botho.example,2,2,No,10,1,30-seater,
+ACC101,Financial Accounting I,thabo.mokhele@botho.example,3,2,No,15,1,lecture theatre,
+ACC202,Management Accounting,thabo.mokhele@botho.example,2,2,No,15,1,30-seater,
+ECO101,Principles of Microeconomics,refiloe.sekhonyana@botho.example,2,2,No,12,1,lecture theatre,
+STA110,Business Statistics,refiloe.sekhonyana@botho.example,2,2,No,12,1,any,Scientific calculators
+MGT201,Principles of Management,lerato.ramakatane@botho.example,2,2,No,10,1,30-seater,
+MKT210,Marketing Fundamentals,lerato.ramakatane@botho.example,2,2,No,10,1,30-seater,
+HRM301,Human Resource Management,khotso.molapo@botho.example,1,3,No,15,1,30-seater,
+LAW210,Business Law,khotso.molapo@botho.example,2,2,No,10,1,lecture theatre,
+ENT201,Entrepreneurship,nthabiseng.lebona@botho.example,2,2,No,10,1,any,
+PRJ400,Final Year Project,tumelo.phafane@botho.example,1,2,Yes,20,1,computer lab,Supervised lab time

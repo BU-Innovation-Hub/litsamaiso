@@ -1,0 +1,12 @@
+Module code,Module name,Lecturer email,Classes per week,Hours per class,Computer lab,Credits,Batches,Room type preference,Specific requirements
+DEV110,Software Testing,puleng.makara@botho.example,2,2,Yes,10,1,computer lab,
+DEV120,Mobile Development,neo.tau@botho.example,2,2,Yes,10,1,computer lab,
+DEV130,Cloud Computing,nobody@botho.example,2,2,Yes,10,1,computer lab,
+DEV140,Software Architecture,Thato Unknown,2,2,No,10,1,30-seater,
+DEV150,Agile Methods,puleng.makara@botho.example,7,2,No,10,1,30-seater,
+DEV160,Systems Analysis,puleng.makara@botho.example,2,0,No,10,1,30-seater,
+DEV170,IT Project Management,puleng.makara@botho.example,2,2,No,150,1,30-seater,
+DEV180,DevOps Practices,,2,2,Yes,10,1,computer lab,
+DEV110,Software Testing II,puleng.makara@botho.example,2,2,Yes,10,1,computer lab,
+DEV190,,puleng.makara@botho.example,2,2,No,10,1,30-seater,
+DEV195,Cyber Security,puleng.makara@botho.example,2,2,perhaps,10,1,computer lab,

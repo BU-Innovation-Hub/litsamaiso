@@ -1,0 +1,9 @@
+Room code,Building,Capacity,Computer lab,Room type,In use
+D101,Block D,30,No,30-seater,Yes
+D102,Block D,,No,30-seater,Yes
+D103,Block D,abc,No,30-seater,Yes
+D104,Block D,5000,No,30-seater,Yes
+D105,Block D,30,maybe,30-seater,Yes
+D101,Block D,40,No,30-seater,Yes
+,Block D,30,No,30-seater,Yes
+D106,Block D,45,No,lecture theatre,sometimes

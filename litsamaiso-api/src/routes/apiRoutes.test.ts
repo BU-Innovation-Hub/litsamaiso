@@ -29,7 +29,7 @@ const get = (path: string) => fetch(`${baseUrl}${path}`);
 test("every v1 route is served under the version prefix and at its legacy path", async () => {
   // Requests without a token are rejected by requireAuth before any database access,
   // so an auth error (rather than a 404) proves the router is mounted.
-  for (const path of ["/accounts", "/elections", "/audit-logs", "/registry/imports"]) {
+  for (const path of ["/accounts", "/elections", "/audit-logs", "/registry/imports", "/timetabling/rooms"]) {
     const versioned = await get(`${API_V1_PREFIX}${path}`);
     const legacy = await get(path);
     assert.equal(versioned.status, 401, `${API_V1_PREFIX}${path}`);
